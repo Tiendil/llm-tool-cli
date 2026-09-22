@@ -1,0 +1,219 @@
+version = 1
+
+#############################
+# Relation: tested_by / tests
+#############################
+
+[[relations]]
+id = "tested_by"
+description = "Tests that verify the artifact."
+
+[[relations]]
+id = "tests"
+description = "Artifacts verified by the test."
+
+# Empty packages need no placeholder tests; these rules discover tests as they are added.
+[[rules]]
+relation = "tested_by"
+input = { type = "all", items = [
+  { type = "glob", pattern = "@/llm_tool_cli/{**package_path}/__init__.py" },
+  { type = "not", item = { type = "glob", pattern = "@/llm_tool_cli/**/tests/**/*.py" } },
+] }
+output = { type = "files", pattern = "@/llm_tool_cli/{package_path}/tests/test_init.py" }
+
+[[rules]]
+relation = "tested_by"
+input = { type = "all", items = [
+  { type = "glob", pattern = "@/llm_tool_cli/{**package_path}/{*module}.py" },
+  { type = "not", item = { type = "glob", pattern = "@/llm_tool_cli/**/__init__.py" } },
+  { type = "not", item = { type = "glob", pattern = "@/llm_tool_cli/**/tests/**/*.py" } },
+] }
+output = { type = "files", pattern = "@/llm_tool_cli/{package_path}/tests/test_{module}.py" }
+
+[[rules]]
+relation = "tests"
+input = { type = "glob", pattern = "@/llm_tool_cli/{**package_path}/tests/test_init.py" }
+output = { type = "list", artifacts = ["@/llm_tool_cli/{package_path}/__init__.py"] }
+
+[[rules]]
+relation = "tests"
+input = { type = "all", items = [
+  { type = "glob", pattern = "@/llm_tool_cli/{**package_path}/tests/test_{*module}.py" },
+  { type = "not", item = { type = "glob", pattern = "@/llm_tool_cli/**/tests/test_init.py" } },
+] }
+output = { type = "list", artifacts = ["@/llm_tool_cli/{package_path}/{module}.py"] }
+
+#################################
+# Relation: imports / imported_by
+#################################
+
+[[relations]]
+id = "imports"
+description = "Python files imported by the artifact."
+
+[[relations]]
+id = "imported_by"
+description = "Python files that import the artifact."
+
+# The helper runs Tach in the same development environment as Depmesh.
+[[rules]]
+relation = "imports"
+input = { type = "glob", pattern = "@/llm_tool_cli/{**module_path}.py" }
+output = {
+  type = "command",
+  command = "python ./bin/depmesh/tach_map_query.py --direction dependencies --artifact ./llm_tool_cli/{module_path}.py",
+}
+
+[[rules]]
+relation = "imported_by"
+input = { type = "glob", pattern = "@/llm_tool_cli/{**module_path}.py" }
+output = {
+  type = "command",
+  command = "python ./bin/depmesh/tach_map_query.py --direction dependents --artifact ./llm_tool_cli/{module_path}.py",
+}
+
+################################
+# Relation: governed_by / governs
+################################
+
+[[relations]]
+id = "governed_by"
+description = "Specifications that apply to the artifact."
+
+[[relations]]
+id = "governs"
+description = "Artifacts governed by the specification."
+
+# General specification requirements govern all specs, including themselves.
+[[rules]]
+relation = "governed_by"
+input = { type = "glob", pattern = "@/specs/**/*.md" }
+output = { type = "list", artifacts = ["@/specs/meta/general.md"] }
+
+[[rules]]
+relation = "governs"
+input = { type = "one_of", artifacts = ["@/specs/meta/general.md"] }
+output = { type = "files", pattern = "@/specs/**/*.md" }
+
+[[rules]]
+relation = "governed_by"
+input = { type = "glob", pattern = "@/llm_tool_cli/**/*.py" }
+output = { type = "files", pattern = "@/specs/architecture/*.md" }
+
+[[rules]]
+relation = "governs"
+input = { type = "glob", pattern = "@/specs/architecture/*.md" }
+output = { type = "files", pattern = "@/llm_tool_cli/**/*.py" }
+
+# Dependency discovery and boundary checks reflect the module ownership rules.
+[[rules]]
+relation = "governed_by"
+input = { type = "one_of", artifacts = [
+  "@/AGENTS.md",
+  "@/tach.toml",
+  "@/depmesh.toml",
+  "@/bin/depmesh/tach_map_query.py",
+] }
+output = { type = "list", artifacts = ["@/specs/architecture/modules_layout.md"] }
+
+[[rules]]
+relation = "governs"
+input = { type = "one_of", artifacts = ["@/specs/architecture/modules_layout.md"] }
+output = { type = "list", artifacts = [
+  "@/AGENTS.md",
+  "@/tach.toml",
+  "@/depmesh.toml",
+  "@/bin/depmesh/tach_map_query.py",
+] }
+
+[[rules]]
+relation = "governed_by"
+input = { type = "one_of", artifacts = ["@/README.md"] }
+output = { type = "list", artifacts = ["@/specs/documentation/readme.md"] }
+
+[[rules]]
+relation = "governs"
+input = { type = "one_of", artifacts = ["@/specs/documentation/readme.md"] }
+output = { type = "list", artifacts = ["@/README.md"] }
+
+[[rules]]
+relation = "governed_by"
+input = { type = "any", items = [
+  { type = "one_of", artifacts = ["@/CHANGELOG.md"] },
+  { type = "glob", pattern = "@/changes/*.md" },
+] }
+output = { type = "list", artifacts = ["@/specs/documentation/changelog.md"] }
+
+[[rules]]
+relation = "governs"
+input = { type = "one_of", artifacts = ["@/specs/documentation/changelog.md"] }
+output = { type = "union", items = [
+  { type = "list", artifacts = ["@/CHANGELOG.md"] },
+  { type = "files", pattern = "@/changes/*.md" },
+] }
+
+###############################################
+# Relation: terms_defined_by / defines_terms_for
+###############################################
+
+[[relations]]
+id = "terms_defined_by"
+description = "Dictionaries that define terms used by the artifact."
+
+[[relations]]
+id = "defines_terms_for"
+description = "Artifacts that use terms from the dictionary."
+
+[[rules]]
+relation = "terms_defined_by"
+input = { type = "any", items = [
+  { type = "glob", pattern = "@/specs/**/*.md" },
+  { type = "glob", pattern = "@/llm_tool_cli/**/*.py" },
+  { type = "one_of", artifacts = [
+    "@/AGENTS.md",
+    "@/CHANGELOG.md",
+    "@/README.md",
+    "@/depmesh.toml",
+    "@/tach.toml",
+    "@/bin/depmesh/tach_map_query.py",
+  ] },
+] }
+output = { type = "list", artifacts = ["@/specs/dictionary.md"] }
+
+[[rules]]
+relation = "defines_terms_for"
+input = { type = "one_of", artifacts = ["@/specs/dictionary.md"] }
+output = { type = "union", items = [
+  { type = "files", pattern = "@/specs/**/*.md" },
+  { type = "files", pattern = "@/llm_tool_cli/**/*.py" },
+  { type = "list", artifacts = [
+    "@/AGENTS.md",
+    "@/CHANGELOG.md",
+    "@/README.md",
+    "@/depmesh.toml",
+    "@/tach.toml",
+    "@/bin/depmesh/tach_map_query.py",
+  ] },
+] }
+
+###############################
+# Relation: indexed_by / indexes
+###############################
+
+[[relations]]
+id = "indexed_by"
+description = "Indexes that list the specification."
+
+[[relations]]
+id = "indexes"
+description = "Specifications listed by the index."
+
+[[rules]]
+relation = "indexed_by"
+input = { type = "glob", pattern = "@/specs/**/*.md" }
+output = { type = "list", artifacts = ["@/specs/intro.md"] }
+
+[[rules]]
+relation = "indexes"
+input = { type = "one_of", artifacts = ["@/specs/intro.md"] }
+output = { type = "files", pattern = "@/specs/**/*.md" }

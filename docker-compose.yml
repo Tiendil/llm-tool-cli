@@ -1,0 +1,7 @@
+services:
+  llm-tool-cli:
+    build:
+      context: ./
+      dockerfile: ./docker/Dockerfile
+    volumes:
+      - ${PWD}:/repository
