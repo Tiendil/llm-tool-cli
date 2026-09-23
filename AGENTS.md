@@ -11,6 +11,8 @@ Its import package is `llm_tool_cli`.
 The package is currently empty and has no CLI entry point or implemented public API.
 Do not add placeholder runtime modules or implement proposed capabilities without a corresponding development request.
 
+Code in `llm_tool_cli`, including comments and docstrings, MUST NOT mention tools that depend on the library unless explicitly requested by the developer.
+
 ## Simplicity-first design
 
 - Start with the smallest design that satisfies the current explicit requirements and preserves existing behavior. Do not design for hypothetical future requirements.
