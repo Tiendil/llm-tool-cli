@@ -3,7 +3,7 @@
 Concrete ``code`` values are stable compatibility identifiers. Callers may catch
 the corresponding classes without parsing messages. ``path`` identifies the
 failed operation's filesystem input; ``reason`` contains the original reason.
-The producing operation preserves the low-level exception through chaining.
+The producing operation preserves any underlying low-level exception through chaining.
 """
 
 from pathlib import Path
@@ -35,6 +35,12 @@ class DiscoveryFailed(Error):
     code = "config_discovery_failed"
 
 
+class NotFound(Error):
+    """No configuration file was found in the search directory or its parents."""
+
+    code = "config_not_found"
+
+
 class Unreadable(Error):
     """A configuration file could not be opened or read."""
 
@@ -51,6 +57,12 @@ class InvalidToml(Error):
     """A configuration file does not contain valid TOML."""
 
     code = "config_invalid_toml"
+
+
+class ValidationFailed(Error):
+    """Parsed configuration does not satisfy the supplied model."""
+
+    code = "config_validation_failed"
 
 
 class AlreadyExists(Error):

@@ -2,5 +2,7 @@
 
 - Prepared the empty Python package, development containers, quality checks, CI, release helpers, Donna and Depmesh integrations, and base specifications.
 - Add Tomli as the shared TOML 1.1 parsing dependency.
+- Add Pydantic as a runtime dependency and `config.load_config(path, config_class)` to read TOML into caller-owned models with shared validation failures.
 - Add configuration discovery, explicit path resolution, TOML reading, and exclusive starter creation, with shared exceptions in `core.errors` and configuration-specific failures in `config.errors`.
+- Add `config.locate_config` for explicit-path selection or nearest-file discovery, with a shared `config_not_found` failure; explicit path resolution now expands home markers.
 - Share error messages, codes, shallow-copied context, and diagnostic records through `core.errors.Error`; configuration errors expose their original diagnostic text as `reason`.

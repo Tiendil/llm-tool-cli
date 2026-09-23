@@ -1,10 +1,19 @@
 import contextlib
 from pathlib import Path
 
+import pydantic
 import pytest
 from pytest_mock import MockerFixture
 
-from llm_tool_cli.config import create_config, errors, find_config, read_toml, resolve_config_path
+from llm_tool_cli.config import (
+    create_config,
+    errors,
+    find_config,
+    load_config,
+    locate_config,
+    read_toml,
+    resolve_config_path,
+)
 
 
 class TestFindConfig:
@@ -95,9 +104,26 @@ class TestResolveConfigPath:
 
         assert resolve_config_path(link, tmp_path) == target
 
-    @pytest.mark.parametrize("path", ["~/config.toml", "@/config.toml"])
-    def test_preserves_application_syntax(self, tmp_path: Path, path: str) -> None:
-        assert resolve_config_path(Path(path), tmp_path) == tmp_path / path
+    def test_expands_home(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        home = tmp_path / "home"
+        mocker.patch.dict("os.environ", {"HOME": str(home)})
+
+        assert resolve_config_path(Path("~/config.toml"), tmp_path / "cwd") == home / "config.toml"
+
+    def test_preserves_application_syntax(self, tmp_path: Path) -> None:
+        assert resolve_config_path(Path("@/config.toml"), tmp_path) == tmp_path / "@/config.toml"
+
+    def test_home_expansion_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        path = Path("~/config.toml")
+        mocker.patch.object(Path, "expanduser", side_effect=RuntimeError("home directory unavailable"))
+
+        with pytest.raises(errors.PathResolutionFailed) as caught:
+            resolve_config_path(path, tmp_path)
+
+        assert caught.value.code == "config_path_resolution_failed"
+        assert caught.value.path == path
+        assert isinstance(caught.value.__cause__, RuntimeError)
+        assert caught.value.reason == str(caught.value.__cause__)
 
     def test_reported_symlink_loop(self, tmp_path: Path, mocker: MockerFixture) -> None:
         link = tmp_path / "loop"
@@ -117,6 +143,82 @@ class TestResolveConfigPath:
             resolve_config_path(Path("custom.toml"), tmp_path)
 
         assert caught.value.code == "config_path_resolution_failed"
+        assert caught.value.path == tmp_path / "custom.toml"
+        assert isinstance(caught.value.__cause__, PermissionError)
+
+
+class TestLocateConfig:
+    def test_discovers_nearest_without_reading(self, tmp_path: Path) -> None:
+        nested = tmp_path / "nested"
+        nested.mkdir()
+        (tmp_path / "config.toml").touch()
+        nearest = nested / "config.toml"
+        nearest.write_text("invalid TOML [", encoding="utf-8")
+
+        assert locate_config("config.toml", cwd=nested) == nearest
+
+    def test_discovers_in_parent(self, tmp_path: Path) -> None:
+        nested = tmp_path / "nested"
+        nested.mkdir()
+        config_path = tmp_path / "config.toml"
+        config_path.touch()
+
+        assert locate_config("config.toml", path=None, cwd=nested) == config_path
+
+    def test_explicit_missing_path_does_not_fall_back(self, tmp_path: Path) -> None:
+        (tmp_path / "config.toml").touch()
+
+        assert locate_config("config.toml", path=Path("custom.toml"), cwd=tmp_path) == tmp_path / "custom.toml"
+
+    def test_explicit_home_path(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        home = tmp_path / "home"
+        mocker.patch.dict("os.environ", {"HOME": str(home)})
+
+        assert locate_config("config.toml", path=Path("~/custom.toml"), cwd=tmp_path) == home / "custom.toml"
+
+    def test_discovered_symlink_keeps_its_directory(self, tmp_path: Path) -> None:
+        target = tmp_path / "target.toml"
+        target.touch()
+        nested = tmp_path / "nested"
+        nested.mkdir()
+        link = nested / "config.toml"
+        link.symlink_to(target)
+
+        assert locate_config("config.toml", cwd=nested) == link
+
+    def test_missing(self, tmp_path: Path) -> None:
+        filename = f"{tmp_path.name}-missing.toml"
+
+        with pytest.raises(errors.NotFound) as caught:
+            locate_config(filename, cwd=tmp_path)
+
+        assert caught.value.code == "config_not_found"
+        assert caught.value.path == tmp_path
+        assert filename in caught.value.reason
+        assert caught.value.__cause__ is None
+        assert caught.value.as_record() == {
+            "type": "error",
+            "code": "config_not_found",
+            "message": caught.value.message,
+            "path": str(tmp_path),
+            "reason": caught.value.reason,
+        }
+
+    def test_discovery_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        mocker.patch.object(Path, "is_file", side_effect=PermissionError("access denied"))
+
+        with pytest.raises(errors.DiscoveryFailed) as caught:
+            locate_config("config.toml", cwd=tmp_path)
+
+        assert caught.value.path == tmp_path / "config.toml"
+        assert isinstance(caught.value.__cause__, PermissionError)
+
+    def test_explicit_resolution_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        mocker.patch.object(Path, "resolve", side_effect=PermissionError("access denied"))
+
+        with pytest.raises(errors.PathResolutionFailed) as caught:
+            locate_config("config.toml", path=Path("custom.toml"), cwd=tmp_path)
+
         assert caught.value.path == tmp_path / "custom.toml"
         assert isinstance(caught.value.__cause__, PermissionError)
 
@@ -201,6 +303,75 @@ class TestReadToml:
 
         with pytest.raises(AssertionError):
             read_toml(path)
+
+
+class TestLoadConfig:
+    def test_supplied_model(self, tmp_path: Path) -> None:
+        class Config(pydantic.BaseModel):
+            count: int
+            label: str = "default"
+
+        path = tmp_path / "custom.toml"
+        path.write_text('count = "3"\n', encoding="utf-8")
+
+        loaded: Config = load_config(path, Config)
+
+        assert loaded == Config(count=3)
+
+    def test_empty_file_uses_model_defaults(self, tmp_path: Path) -> None:
+        class Config(pydantic.BaseModel):
+            enabled: bool = True
+
+        path = tmp_path / "custom.toml"
+        path.touch()
+
+        assert load_config(path, Config) == Config()
+
+    @pytest.mark.parametrize("text", ["", 'count = "invalid"\n', "count = -1\n"])
+    def test_validation_failure(self, tmp_path: Path, text: str) -> None:
+        class Config(pydantic.BaseModel):
+            count: int = pydantic.Field(gt=0)
+
+        path = Path("custom.toml")
+        (tmp_path / path).write_text(text, encoding="utf-8")
+
+        with contextlib.chdir(tmp_path), pytest.raises(errors.ValidationFailed) as caught:
+            load_config(path, Config)
+
+        assert caught.value.code == "config_validation_failed"
+        assert caught.value.path == path
+        assert isinstance(caught.value.__cause__, pydantic.ValidationError)
+        assert caught.value.reason == str(caught.value.__cause__)
+        assert caught.value.as_record() == {
+            "type": "error",
+            "code": "config_validation_failed",
+            "message": caught.value.message,
+            "path": str(path),
+            "reason": str(caught.value.__cause__),
+        }
+
+    @pytest.mark.parametrize(
+        ("data", "expected_error"),
+        [(None, errors.Unreadable), (b"item = [", errors.InvalidToml), (b'label = "\xff"', errors.InvalidEncoding)],
+    )
+    def test_read_failure(self, tmp_path: Path, data: bytes | None, expected_error: type[errors.Error]) -> None:
+        path = tmp_path / "custom.toml"
+        if data is not None:
+            path.write_bytes(data)
+
+        with pytest.raises(expected_error) as caught:
+            load_config(path, pydantic.BaseModel)
+
+        assert caught.value.path == path
+        assert caught.value.__cause__ is not None
+
+    def test_unexpected_model_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        path = tmp_path / "custom.toml"
+        path.touch()
+        mocker.patch.object(pydantic.BaseModel, "model_validate", side_effect=TypeError("model defect"))
+
+        with pytest.raises(TypeError):
+            load_config(path, pydantic.BaseModel)
 
 
 class TestCreateConfig:
