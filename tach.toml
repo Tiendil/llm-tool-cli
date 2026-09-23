@@ -13,3 +13,11 @@ exclude = [
 path = "llm_tool_cli"
 depends_on = []
 visibility = []
+
+[[modules]]
+path = "llm_tool_cli.core"
+depends_on = []
+
+[[modules]]
+path = "llm_tool_cli.config"
+depends_on = ["llm_tool_cli.core"]

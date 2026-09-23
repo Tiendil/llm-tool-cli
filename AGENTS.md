@@ -8,7 +8,7 @@ Every agent MUST follow the rules and guidelines outlined in this document when 
 
 `llm-tool-cli` is a Python library for reusable support in LLM-oriented command-line tools.
 Its import package is `llm_tool_cli`.
-The package is currently empty and has no CLI entry point or implemented public API.
+The package provides configuration file mechanics and shared exceptions, with no CLI entry point.
 Do not add placeholder runtime modules or implement proposed capabilities without a corresponding development request.
 
 Code in `llm_tool_cli`, including comments and docstrings, MUST NOT mention tools that depend on the library unless explicitly requested by the developer.
