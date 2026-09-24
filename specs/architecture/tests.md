@@ -170,8 +170,9 @@ Error tests SHOULD NOT repeat unchanged error inheritance or shared base-error b
 A module-level `tests/test_errors.py` file is optional and SHOULD be omitted when producing-function or entity tests already cover all meaningful error behavior.
 Exact production error message text MUST NOT be asserted in ordinary unit tests unless a behavior specification declares that text as a stable external contract.
 
-Tests for exception boundaries SHOULD verify that expected low-level failures are raised as library-specific exceptions, including `pydantic.ValidationError` from external input, so consumers receive the documented failure contract.
-Tests for produced errors SHOULD assert the expected exception type, stable error code, and relevant structured fields through the producing boundary so they verify usable failures rather than static declarations.
+Tests for exception boundaries SHOULD verify that expected low-level failures are returned as environment-error results, including `pydantic.ValidationError` from external input, so consumers receive the documented failure contract.
+Tests for produced errors SHOULD assert the expected environment-error type, stable error code, and relevant structured fields through the producing boundary so they verify usable failures rather than static declarations.
+Result composition tests SHOULD verify propagation of complete error lists, successful values, and short-circuit behavior while ensuring unrelated exceptions remain raised.
 Tests for unexpected failures MUST verify that the operation remains failed rather than recovering with a successful, empty, or fallback result.
 Tests for stored-state integrity failures MUST NOT classify those failures as expected caller-correctable input errors.
 
@@ -209,7 +210,7 @@ Coverage SHOULD include the following implemented responsibilities:
 - warnings.
 - errors and exit behavior.
 
-When the library owns a delegated CLI error boundary, tests SHOULD verify fatal-error exit categories and the default non-zero exit code for unmapped library exceptions so the mapping preserves failure classification.
+When the library owns a delegated CLI error boundary, tests SHOULD verify fatal-error exit categories and the default non-zero exit code for unmapped environment errors so the mapping preserves failure classification.
 Tests SHOULD verify that fatal errors use the boundary's documented error representation so consumers can recognize them.
 Tests SHOULD verify that warnings alone do not cause a non-zero exit code when the operation otherwise succeeds, so non-fatal problems remain distinct from failure.
 Warning tests MUST follow the specified warning architecture and MUST NOT introduce warning storage or delivery channels solely for testing.

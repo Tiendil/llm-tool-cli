@@ -74,7 +74,9 @@ Ordinary validation failures remain appropriate when unsupported values can arri
 ## Validation and resolution
 
 Validation functions and methods MUST only verify invariants.
-They MUST return `None` on success and raise an appropriate exception on failure.
+They MUST use `None` as the successful value.
+Validation of expected external input failures MUST use `Result[None, EnvironmentErrors]` according to the error architecture.
+Internal invariant checks MAY return `None` directly and raise an appropriate internal exception on failure.
 This return contract keeps validation distinct from data retrieval and transformation.
 
 Validation functions and methods MUST NOT return information incidentally obtained through any of these operations during validation:
@@ -90,7 +92,7 @@ Callers that need the resulting information MUST obtain it separately unless the
 A validating constructor MAY return the object it constructs when construction is part of its explicit contract.
 This exception MUST NOT be used to return dependencies resolved or information incidentally extracted during validation.
 Framework validator hooks MUST follow the return protocol required by their framework.
-Hooks that must return the validated value or instance are exempt from the `None` return requirement.
+Hooks that must return the validated value or instance, or raise validation exceptions, are exempt from the ordinary validation return contract.
 
 Predicates named `is_*`, `has_*`, or `can_*` SHOULD return `bool` and MUST NOT raise an exception for an ordinary negative result.
 

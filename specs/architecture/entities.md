@@ -57,10 +57,11 @@ Default factories and discriminators SHOULD use Pydantic's field mechanisms so m
 Validators SHOULD enforce one cohesive invariant or closely related family of constraints so unrelated validation failures remain understandable and independently testable.
 A validator MAY inspect multiple fields when they jointly define an invariant.
 
-Shared entity infrastructure SHOULD be introduced only when implemented models need a common behavior or invariant.
-When a shared base entity exists, project models SHOULD inherit from it to apply shared validation and serialization conventions consistently.
+The library MUST provide a shared Pydantic base entity for common validation, copying, and JSON serialization behavior.
+Project models SHOULD inherit from it to apply shared validation and serialization conventions consistently.
 Models MAY use Pydantic directly when they intentionally mirror external input shapes or must satisfy a third-party model contract.
-A shared base entity MUST provide a copy-with-changes operation so callers can derive updated values without mutating immutable entities.
+The shared base entity MUST provide a copy-with-changes operation that deeply copies existing data and applies trusted changes without validation so callers can derive updated values without mutating immutable entities.
+It MUST provide JSON serialization with two-space indentation and validated JSON reconstruction using the concrete entity type.
 
 ## Semantic types
 

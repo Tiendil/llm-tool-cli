@@ -1,9 +1,9 @@
 """Public configuration failures.
 
-Concrete ``code`` values are stable compatibility identifiers. Callers may catch
-the corresponding classes without parsing messages. ``path`` identifies the
+Concrete ``code`` values are stable compatibility identifiers. Callers may inspect
+the returned values without parsing messages. ``path`` identifies the
 failed operation's filesystem input; ``reason`` contains the original reason.
-The producing operation preserves any underlying low-level exception through chaining.
+The producing operation preserves any underlying low-level exception as ``cause``.
 """
 
 from pathlib import Path
@@ -11,67 +11,63 @@ from pathlib import Path
 from llm_tool_cli.core import errors as core_errors
 
 
-class Error(core_errors.Error):
+class EnvironmentError(core_errors.EnvironmentError):
     """Classification and filesystem context for configuration failures."""
 
-    def __init__(self, path: Path, reason: str) -> None:
-        self.path = path
-        self.reason = reason
-        super().__init__(f"{path}: {reason}")
-
-    def as_record(self) -> dict[str, object]:
-        return {**super().as_record(), "path": str(self.path), "reason": self.reason}
+    path: Path
+    reason: str
+    message: str = "{error.path}: {error.reason}"
 
 
-class PathResolutionFailed(Error):
+class PathResolutionFailed(EnvironmentError):
     """An explicit path could not be resolved."""
 
-    code = "config_path_resolution_failed"
+    code: str = "config_path_resolution_failed"
 
 
-class DiscoveryFailed(Error):
+class DiscoveryFailed(EnvironmentError):
     """The search directory or a candidate could not be inspected."""
 
-    code = "config_discovery_failed"
+    code: str = "config_discovery_failed"
 
 
-class NotFound(Error):
+class NotFound(EnvironmentError):
     """No configuration file was found in the search directory or its parents."""
 
-    code = "config_not_found"
+    code: str = "config_not_found"
 
 
-class Unreadable(Error):
+class Unreadable(EnvironmentError):
     """A configuration file could not be opened or read."""
 
-    code = "config_unreadable"
+    code: str = "config_unreadable"
 
 
-class InvalidEncoding(Error):
+class InvalidEncoding(EnvironmentError):
     """A configuration file does not contain valid UTF-8."""
 
-    code = "config_invalid_encoding"
+    code: str = "config_invalid_encoding"
 
 
-class InvalidToml(Error):
+class InvalidToml(EnvironmentError):
     """A configuration file does not contain valid TOML."""
 
-    code = "config_invalid_toml"
+    code: str = "config_invalid_toml"
 
 
-class ValidationFailed(Error):
+class ValidationFailed(EnvironmentError):
     """Parsed configuration does not satisfy the supplied model."""
 
-    code = "config_validation_failed"
+    code: str = "config_validation_failed"
 
 
-class AlreadyExists(Error):
+class AlreadyExists(EnvironmentError):
     """The starter target already exists and was left untouched."""
 
-    code = "config_already_exists"
+    code: str = "config_already_exists"
 
 
-class Unwritable(Error):
+class Unwritable(EnvironmentError):
     """Starter text could not be encoded or written to the target."""
 
-    code = "config_unwritable"
+    code: str = "config_unwritable"

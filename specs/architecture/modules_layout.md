@@ -42,7 +42,7 @@ Shared infrastructure MUST remain independent of the more specialized capabiliti
 Submodules MAY use these conventional names when their responsibilities exist:
 
 - `entities` for module-owned typed values and data structures.
-- `errors` for module-owned exception types.
+- `errors` for module-owned environment errors and internal exception types.
 - `utils` for small technical helpers without a more specific owner.
 - `tests` for colocated tests of module behavior.
 - `tests.make` for reusable test-object constructors.
@@ -51,6 +51,11 @@ Submodules MAY use these conventional names when their responsibilities exist:
 These submodules are optional unless the applicable architecture requires them for an implemented responsibility.
 A module that defines expected fatal errors MUST provide an `errors` submodule as required by the error architecture.
 An implementation MUST NOT introduce them solely for layout symmetry.
+
+Generic result propagation, shared entity infrastructure, and shared error bases MUST belong to the core module.
+The shared callback exception bridge MUST be publicly available as `llm_tool_cli.core.errors.EnvironmentErrorsProxy`.
+The shared base entity MUST be publicly available as `llm_tool_cli.core.entities.BaseEntity`.
+Capability errors MUST remain with their owning capabilities, and consumer presentation metadata MUST remain with the consumer.
 
 ## Import boundaries
 
