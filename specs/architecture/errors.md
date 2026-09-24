@@ -88,6 +88,9 @@ Technical propagation exceptions MUST NOT escape a public result-returning opera
 
 Internal exceptions MUST carry an exception message and MAY carry structured debugging context or technical propagation payloads through `details`.
 The shared internal-exception base MUST shallow-copy the supplied details mapping while preserving its values.
+Internal exception subclasses MAY declare a message template whose placeholders refer to keys in `details`.
+When no explicit message is supplied, the shared base MUST format that template from `details`, or use the concrete exception class name when no template is declared.
+An explicit message MUST take precedence and remain literal, including an empty message or text containing braces.
 Internal-exception details MAY contain arbitrary Python objects and MUST NOT be treated as environment-error diagnostic records.
 The shared internal-exception base MUST NOT define environment-error codes, corrective guidance, or diagnostic-record serialization.
 

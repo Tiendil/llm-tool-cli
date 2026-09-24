@@ -1,9 +1,14 @@
 from pathlib import Path
 from types import MappingProxyType
+from typing import ClassVar
 
 import pytest
 
 from llm_tool_cli.core.errors import EnvironmentError, EnvironmentErrors, EnvironmentErrorsProxy, InternalError
+
+
+class BrokenState(InternalError):
+    message_template: ClassVar[str] = "Broken {thing}"
 
 
 class TestInternalError:
@@ -15,6 +20,37 @@ class TestInternalError:
         assert error.message == expected
         assert str(error) == expected
         assert error.args == (expected,)
+
+    def test_init__formats_template_from_details(self) -> None:
+        details: dict[str, object] = {"thing": "state {literal}"}
+        error = BrokenState(details=MappingProxyType(details))
+
+        assert error.details == details
+        assert error.message == "Broken state {literal}"
+        assert str(error) == error.message
+        assert error.args == (error.message,)
+
+    @pytest.mark.parametrize("message", ["", "literal {thing}", "{"])
+    def test_init__explicit_message_overrides_template(self, message: str) -> None:
+        error = BrokenState(message)
+
+        assert error.message == message
+        assert str(error) == message
+        assert error.args == (message,)
+
+    @pytest.mark.parametrize("template", ["Invalid state", ""])
+    def test_init__constant_template_without_details(self, template: str) -> None:
+        class InvalidState(InternalError):
+            message_template: ClassVar[str] = template
+
+        error = InvalidState()
+
+        assert error.message == template
+        assert error.details == {}
+
+    def test_init__missing_template_context_raises(self) -> None:
+        with pytest.raises(KeyError, match="thing"):
+            BrokenState()
 
     @pytest.mark.parametrize("details", [None, {}])
     def test_init__empty_details_are_independent(self, details: dict[str, object] | None) -> None:

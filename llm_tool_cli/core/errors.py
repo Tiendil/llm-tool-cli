@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Self
+from typing import ClassVar, Self
 
 import pydantic
 
@@ -13,15 +13,18 @@ class InternalError(Exception):
     technical propagation payloads. They are not environment-error diagnostics.
     """
 
+    message_template: ClassVar[str | None] = None
+
     def __init__(
         self,
         message: str | None = None,
         *,
         details: Mapping[str, object] | None = None,
     ) -> None:
-        super().__init__(type(self).__name__ if message is None else message)
-
         self.details: dict[str, object] = dict(details) if details is not None else {}
+        if message is None and self.message_template is not None:
+            message = self.message_template.format(**self.details)
+        super().__init__(type(self).__name__ if message is None else message)
 
     @property
     def message(self) -> str:
