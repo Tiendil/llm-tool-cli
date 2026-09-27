@@ -210,12 +210,18 @@ class TestNormalizePath:
 
         assert normalize_path("outside/file", tmp_path).unwrap_err() == [InvalidProjectPath(path=str(link / "file"))]
 
-    @pytest.mark.parametrize("value", ["", ".", "nested/..", "../outside"])
+    @pytest.mark.parametrize("value", [".", "nested/..", "../outside"])
     def test_rejects_root_and_outside_filesystem_inputs(self, tmp_path: Path, value: str) -> None:
         assert normalize_path(value, tmp_path).unwrap_err() == [InvalidProjectPath(path=str(tmp_path / value))]
 
-    def test_empty_input_identifies_explicit_non_root_base(self, tmp_path: Path) -> None:
-        assert normalize_path("", tmp_path, cwd=tmp_path / "nested").unwrap() == "@/nested"
+    @pytest.mark.parametrize("base", [None, ".", "nested"])
+    def test_rejects_empty_input_regardless_of_base(self, tmp_path: Path, base: str | None) -> None:
+        cwd = None if base is None else tmp_path / base
+
+        assert normalize_path("", tmp_path, cwd=cwd).unwrap_err() == [InvalidProjectPath(path="")]
+
+    def test_dot_identifies_explicit_non_root_base(self, tmp_path: Path) -> None:
+        assert normalize_path(".", tmp_path, cwd=tmp_path / "nested").unwrap() == "@/nested"
 
     def test_relative_root_uses_absolute_candidate_in_diagnostic(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -243,12 +249,11 @@ class TestNormalizePath:
 
         assert normalize_path("@/~/file", tmp_path).unwrap() == "@/~/file"
 
-    def test_preserves_segment_text(self, tmp_path: Path) -> None:
-        value = " notes /Заметки проекта.md "
-
+    @pytest.mark.parametrize("value", [" notes /Заметки проекта.md ", " "])
+    def test_preserves_segment_text(self, tmp_path: Path, value: str) -> None:
         assert normalize_path(value, tmp_path).unwrap() == "@/" + value
 
-    @pytest.mark.parametrize("value", ["@/file", "@/../file", "file", "~/file"])
+    @pytest.mark.parametrize("value", ["", "@/file", "@/../file", "file", "~/file"])
     def test_root_resolution_failure_precedes_input_processing(self, tmp_path: Path, value: str) -> None:
         root = tmp_path / "loop"
         root.symlink_to(root)

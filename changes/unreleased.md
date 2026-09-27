@@ -1,5 +1,6 @@
 ### Migration
 
+- Pass `.` instead of an empty string to `paths.normalize_path` when referring to an explicit directory base below the project root; empty inputs now return `invalid_project_path`.
 - Replace `Result[T, EnvironmentErrors]` annotations with `Result[T]`. Failures always carry `EnvironmentErrors`; `Err`, `UnwrapError`, and `map_err` no longer accept arbitrary error payloads.
 - Configuration operations now return `Result[T]`; handle or propagate environment-error values instead of catching configuration exceptions. Configuration error models accept keyword fields, expose formatted text through `format_message()`, and retain original exceptions through `cause`.
 - Replace imports of `core.errors.Error` with `InternalError`, `config.errors.Error` with `EnvironmentError`, and `ErrorsList` with `EnvironmentErrors`. Internal exceptions carry messages and details; diagnostic codes and records belong to environment errors.
@@ -7,6 +8,7 @@
 
 ### Changes
 
+- Reject empty inputs in shared mixed path normalization with an empty diagnostic `path`, preserving root-resolution failure precedence.
 - Add `paths.UntrustedPath` as a shared semantic type for filesystem inputs without established resolution or containment guarantees, preserving ordinary `Path` runtime behavior.
 - Add `paths.resolve_project_path` for resolving identifier or filesystem inputs below a project root, with home expansion, optional rejection of absolute inputs, and shared failure diagnostics.
 - Add `paths.normalize_path` for mixed identifier and filesystem inputs, with explicit directory bases, home expansion, shared containment, and structured resolution failures.

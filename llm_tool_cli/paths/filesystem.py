@@ -42,12 +42,15 @@ def resolve_project_path(value: str, root: Path, *, allow_absolute: bool = True)
 def normalize_path(value: str, root: Path, *, cwd: Path | None = None) -> Result[ProjectPathId]:
     """Normalize an identifier or filesystem input to a project identifier.
 
-    Resolve the root first. Normalize inputs starting with ``@`` lexically;
-    otherwise expand home markers and enforce filesystem containment. Relative
-    filesystem inputs use the supplied directory base, or the resolved root.
+    Resolve the root first and reject empty inputs. Normalize inputs starting
+    with ``@`` lexically; otherwise expand home markers and enforce filesystem
+    containment. Relative inputs use the supplied directory base, or the resolved root.
     Neither form requires an existing target.
     """
     project_root = resolve_project_root(root).unwrap()
+
+    if not value:
+        return Err([InvalidProjectPath(path=value)])
 
     if value.startswith("@"):
         return normalize_project_path_id(value)

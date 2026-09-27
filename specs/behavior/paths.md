@@ -65,6 +65,12 @@ A canonical identifier alone MUST NOT be treated as proof of filesystem containm
 Normalization of an identifier or filesystem input MUST resolve the supplied project root before processing the input.
 Root resolution failures MUST take precedence over input normalization and target resolution failures.
 
+Empty textual inputs MUST be rejected with an invalid-path failure whose `path` field is empty, regardless of the supplied directory base.
+An empty input MUST NOT identify that base.
+An explicit `.` MUST retain ordinary relative filesystem path semantics, and whitespace MUST NOT be removed from non-empty inputs.
+
+**Example:** With root `/project` and directory base `/project/nested`, `""` is invalid while `.` produces `@/nested`.
+
 Inputs starting with `@` MUST use lexical identifier normalization, including rejection of a missing `@/` prefix.
 This branch MUST NOT resolve the identifier's target or establish filesystem containment.
 An explicit filesystem base MUST NOT affect this branch.
