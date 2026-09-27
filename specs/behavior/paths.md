@@ -1,13 +1,13 @@
-# Project-path identifiers
+# Project paths
 
 ## Goal of the document
 
-This document describes lexical project-path normalization and invalid-input behavior.
+This document describes lexical project-path normalization, filesystem project-root resolution, and their failure behavior.
 
 ## Scope
 
-This specification applies to project-root-anchored identifiers owned by the library.
-Filesystem resolution and application-specific artifact or pattern semantics are out of scope.
+This specification applies to project-path concepts owned by the library.
+Filesystem containment and application-specific artifact or pattern semantics are out of scope.
 
 ## Identifiers
 
@@ -40,8 +40,24 @@ Normalization MUST NOT access the filesystem or depend on the current working di
 It MUST NOT expand home markers, require an existing target, or resolve symlinks.
 A canonical identifier alone MUST NOT be treated as proof of filesystem containment.
 
+## Project-root resolution
+
+Resolving a supplied filesystem root MUST produce an absolute path with symlinks and parent-directory segments resolved.
+Relative roots MUST use the process current working directory as their base.
+Resolution MUST NOT expand home markers or require the target to exist or be a directory.
+Consumers MUST enforce any required existence or directory-kind constraints separately.
+
+**Example:** With the working directory `/workspace`, a missing `project` root resolves to `/workspace/project`, while `~/project` resolves to `/workspace/~/project` without home expansion.
+
+Root resolution MUST remain separate from lexical identifier normalization and MUST NOT establish containment of any project path.
+
 ## Errors
 
 Rejected input MUST produce one failure diagnostic with the stable code `invalid_project_path`.
 Its `path` field MUST contain the rejected input with surrounding whitespace removed.
 Consumers MUST be able to identify this failure by its code without parsing the message.
+
+Filesystem failures that prevent root resolution, including permission failures and symlink loops, MUST produce one failure diagnostic with the stable code `path_resolution_failed`.
+Its `path` field MUST contain the supplied filesystem path and its `reason` field MUST describe the resolution failure, with surrounding whitespace removed from both fields.
+The original exception MUST be retained as a private cause and MUST NOT appear in serialized diagnostics.
+Unexpected failures outside filesystem resolution MUST remain exceptions.

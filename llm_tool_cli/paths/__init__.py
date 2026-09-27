@@ -1,9 +1,11 @@
-"""Lexical project-path identifiers, independent of the filesystem.
+"""Lexical project-path identifiers and filesystem project-root resolution.
 
-``ProjectPathId``, ``normalize_project_path_id``, and ``paths.errors`` are public.
-Filesystem resolution, containment, and application-specific syntax belong to callers.
+Lexical normalization is independent of the filesystem. Project-path
+containment and application-specific syntax belong to callers.
+``paths.errors`` exposes public failures for both operations.
 """
 
+from llm_tool_cli.paths.filesystem import ProjectRootPath, resolve_project_root
 from llm_tool_cli.paths.normalization import ProjectPathId, normalize_project_path_id
 
-__all__ = ["ProjectPathId", "normalize_project_path_id"]
+__all__ = ["ProjectPathId", "ProjectRootPath", "normalize_project_path_id", "resolve_project_root"]

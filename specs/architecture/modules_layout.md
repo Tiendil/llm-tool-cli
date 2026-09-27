@@ -57,9 +57,14 @@ The shared callback exception bridge MUST be publicly available as `llm_tool_cli
 The shared base entity MUST be publicly available as `llm_tool_cli.core.entities.BaseEntity`.
 Capability errors MUST remain with their owning capabilities, and consumer presentation metadata MUST remain with the consumer.
 
-The paths module MUST own lexical project-path normalization, its canonical identifier type, and its invalid-path environment error.
-It MUST remain independent of filesystem resolution and consumer-specific artifact or pattern semantics.
-Its public interfaces MUST be `llm_tool_cli.paths.normalize_project_path_id`, `llm_tool_cli.paths.ProjectPathId`, and `llm_tool_cli.paths.errors.InvalidProjectPath`.
+The paths module MUST own lexical project-path normalization and filesystem project-root resolution, together with their semantic types and environment errors.
+Lexical normalization MUST remain independent of filesystem resolution.
+Project-path containment and consumer-specific artifact or pattern semantics MUST remain consumer-owned.
+Its public interfaces MUST include:
+
+- `llm_tool_cli.paths.normalize_project_path_id` and `llm_tool_cli.paths.ProjectPathId`.
+- `llm_tool_cli.paths.resolve_project_root` and `llm_tool_cli.paths.ProjectRootPath`.
+- `llm_tool_cli.paths.errors.InvalidProjectPath` and `llm_tool_cli.paths.errors.PathResolutionFailed`.
 
 ## Import boundaries
 
