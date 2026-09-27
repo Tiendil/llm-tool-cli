@@ -7,6 +7,7 @@
 
 ### Changes
 
+- Add `paths.resolve_inside_project` and `ResolvedProjectPath` for symlink-aware project containment with shared invalid-path and filesystem-resolution diagnostics.
 - Add `paths.resolve_project_root` and `ProjectRootPath` for filesystem root resolution, returning shared `path_resolution_failed` diagnostics with original causes on resolution failure.
 - Add `Result.is_err(error_type)` for selective recovery when every diagnostic matches an environment-error type, while preserving failure checks without an argument.
 - Add shared lexical `@/` path normalization through `paths.normalize_project_path_id`, with `ProjectPathId` values and structured `invalid_project_path` failures.

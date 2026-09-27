@@ -2,12 +2,12 @@
 
 ## Goal of the document
 
-This document describes lexical project-path normalization, filesystem project-root resolution, and their failure behavior.
+This document describes lexical project-path normalization, filesystem resolution, project-root containment, and their failure behavior.
 
 ## Scope
 
 This specification applies to project-path concepts owned by the library.
-Filesystem containment and application-specific artifact or pattern semantics are out of scope.
+Application-specific artifact or pattern semantics are out of scope.
 
 ## Identifiers
 
@@ -51,13 +51,27 @@ Consumers MUST enforce any required existence or directory-kind constraints sepa
 
 Root resolution MUST remain separate from lexical identifier normalization and MUST NOT establish containment of any project path.
 
+## Filesystem containment
+
+Resolving a supplied filesystem path inside an already resolved project root MUST produce an absolute path strictly below that root or report a failure.
+Resolution MUST resolve symlinks and parent-directory segments before checking containment.
+It MUST reject the root itself and targets outside the root, including targets reached through symlinks.
+It MUST NOT require the target to exist or have a particular filesystem kind.
+
+Relative filesystem paths MUST use the process current working directory as their base.
+Callers that require another base MUST combine that base with the input before requesting containment resolution.
+Containment resolution MUST NOT interpret `@/` identifiers or expand home markers.
+
+**Example:** If `/workspace/project/link` points outside `/workspace/project`, resolving a path through `link` fails containment even though its supplied filesystem path starts with the project root.
+
 ## Errors
 
 Rejected input MUST produce one failure diagnostic with the stable code `invalid_project_path`.
-Its `path` field MUST contain the rejected input with surrounding whitespace removed.
+Its `path` field MUST contain the rejected input with surrounding whitespace removed; containment failures MUST use the supplied filesystem path.
 Consumers MUST be able to identify this failure by its code without parsing the message.
 
-Filesystem failures that prevent root resolution, including permission failures and symlink loops, MUST produce one failure diagnostic with the stable code `path_resolution_failed`.
-Its `path` field MUST contain the supplied filesystem path and its `reason` field MUST describe the resolution failure, with surrounding whitespace removed from both fields.
+Filesystem failures that prevent root or containment resolution, including permission failures and symlink loops, MUST produce one failure diagnostic with the stable code `path_resolution_failed`.
+Its `path` field MUST contain the supplied filesystem root for root resolution or the supplied filesystem path for containment resolution.
+Its `reason` field MUST describe the resolution failure, with surrounding whitespace removed from both fields.
 The original exception MUST be retained as a private cause and MUST NOT appear in serialized diagnostics.
 Unexpected failures outside filesystem resolution MUST remain exceptions.
