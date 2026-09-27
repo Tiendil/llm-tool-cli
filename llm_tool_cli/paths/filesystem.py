@@ -9,6 +9,7 @@ from llm_tool_cli.paths.normalization import ProjectPathId, normalize_project_pa
 
 ProjectRootPath = NewType("ProjectRootPath", Path)
 ResolvedProjectPath = NewType("ResolvedProjectPath", Path)
+UntrustedPath = NewType("UntrustedPath", Path)
 
 
 @unwrap_to_error

@@ -23,7 +23,7 @@ Detailed requirements for individual specifications are out of scope except for 
 - `specs/dictionary.md` defines project terminology shared by multiple specifications and dependency metadata rules.
 - `specs/meta/general.md` defines general rules for project specification documents.
 - `specs/meta/behavior.md` defines the content and abstraction level of behavior specifications, separating observable contracts from implementation interfaces.
-- `specs/architecture/modules_layout.md` describes package organization, package initializer responsibilities, public import boundaries including canonical identifier checking, component extraction, and mixed path normalization and resolution, consumer ownership, and shared result infrastructure.
+- `specs/architecture/modules_layout.md` describes package organization, package initializer responsibilities, public import boundaries including canonical identifier checking, component extraction, mixed path normalization and resolution, and the shared untrusted filesystem path type, consumer ownership, and shared result infrastructure.
 - `specs/architecture/python.md` describes Python typing, result-based validation, and class conventions.
 - `specs/architecture/entities.md` describes entity modeling, typed data conventions including static typing suppressions, and validation and serialization boundaries.
 - `specs/architecture/errors.md` describes independent internal-exception and environment-error hierarchies, result propagation, warnings, and consumer presentation boundaries.

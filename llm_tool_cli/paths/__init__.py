@@ -7,6 +7,7 @@ syntax belongs to callers. ``paths.errors`` exposes public path failures.
 from llm_tool_cli.paths.filesystem import (
     ProjectRootPath,
     ResolvedProjectPath,
+    UntrustedPath,
     normalize_path,
     project_path_id_from_filesystem,
     project_path_id_from_resolved,
@@ -26,6 +27,7 @@ __all__ = [
     "ProjectPathId",
     "ProjectRootPath",
     "ResolvedProjectPath",
+    "UntrustedPath",
     "is_project_path_id",
     "normalize_path",
     "normalize_project_path_id",

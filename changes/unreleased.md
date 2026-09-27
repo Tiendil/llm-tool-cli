@@ -7,6 +7,7 @@
 
 ### Changes
 
+- Add `paths.UntrustedPath` as a shared semantic type for filesystem inputs without established resolution or containment guarantees, preserving ordinary `Path` runtime behavior.
 - Add `paths.resolve_project_path` for resolving identifier or filesystem inputs below a project root, with home expansion, optional rejection of absolute inputs, and shared failure diagnostics.
 - Add `paths.normalize_path` for mixed identifier and filesystem inputs, with explicit directory bases, home expansion, shared containment, and structured resolution failures.
 - Add `paths.project_path_id_from_filesystem` to resolve a supplied filesystem root and path, enforce containment, and return a canonical identifier with shared failure diagnostics.
