@@ -12,6 +12,32 @@ ResolvedProjectPath = NewType("ResolvedProjectPath", Path)
 
 
 @unwrap_to_error
+def resolve_project_path(value: str, root: Path, *, allow_absolute: bool = True) -> Result[ResolvedProjectPath]:
+    """Resolve an identifier or filesystem input strictly below a project root.
+
+    Resolve the root first. Normalize identifiers before resolving symlinks;
+    expand home markers only in filesystem inputs. Relative filesystem inputs
+    use the resolved root. When absolute inputs are disabled, reject paths
+    that are absolute after home expansion. Do not require an existing target.
+    """
+    project_root = resolve_project_root(root).unwrap()
+
+    if value.startswith("@"):
+        return resolve_root_anchored_path(value, project_root)
+
+    try:
+        path = Path(value).expanduser()
+    except (OSError, RuntimeError) as error:
+        return Err([PathResolutionFailed(path=value, reason=str(error)).with_cause(error)])
+
+    if path.is_absolute() and not allow_absolute:
+        return Err([InvalidProjectPath(path=value)])
+
+    candidate = path if path.is_absolute() else project_root / path
+    return resolve_inside_project(candidate, project_root)
+
+
+@unwrap_to_error
 def normalize_path(value: str, root: Path, *, cwd: Path | None = None) -> Result[ProjectPathId]:
     """Normalize an identifier or filesystem input to a project identifier.
 

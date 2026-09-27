@@ -63,6 +63,28 @@ Containment failures MUST identify the filesystem candidate formed after home ex
 The identifier `@/~/file` retains its literal `~` segment.
 With an explicit base `/home/user/project/nested`, `file` produces `@/nested/file`; without that base it produces `@/file`.
 
+## Mixed path resolution
+
+Resolution of an identifier or filesystem input MUST resolve the supplied project root before processing the input.
+Root resolution failures MUST take precedence over input rejection, home expansion, and target resolution failures.
+Successful resolution MUST produce an absolute filesystem path strictly below the resolved root.
+Rejected input MUST produce a failure rather than a successful absence.
+
+Inputs starting with `@` MUST use root-anchored resolution, including lexical normalization before filesystem resolution and rejection of a missing `@/` prefix.
+Other inputs MUST be interpreted as filesystem paths with home markers expanded before resolution.
+Relative filesystem inputs MUST use the resolved project root as their base.
+The root MUST NOT undergo home expansion.
+
+Absolute filesystem inputs MUST be accepted by default.
+Callers MUST be able to disable absolute filesystem inputs; this restriction MUST apply after home expansion and MUST NOT reject root-anchored identifiers.
+An input rejected by this restriction MUST use the original textual input in its invalid-path diagnostic.
+Accepted inputs MUST enforce filesystem containment without requiring an existing target or a particular filesystem kind.
+Lexical, home-expansion, and filesystem failures MUST preserve their respective diagnostics.
+
+**Example:** With root and home directory `/project`, both `@/file` and `~/file` resolve to `/project/file` by default.
+Disabling absolute filesystem inputs rejects `~/file`, while `@/file` and `file` remain accepted.
+The identifier `@/~/file` resolves to `/project/~/file` without home expansion.
+
 ## Project-root resolution
 
 Resolving a supplied filesystem root MUST produce an absolute path with symlinks and parent-directory segments resolved.
@@ -128,7 +150,7 @@ Its `path` field MUST contain the rejected input with surrounding whitespace rem
 Consumers MUST be able to identify this failure by its code without parsing the message.
 
 Filesystem failures that prevent root or containment resolution, including permission failures and symlink loops, MUST produce one failure diagnostic with the stable code `path_resolution_failed`.
-An inability to expand a home marker during mixed path normalization MUST use the same failure diagnostic.
+An inability to expand a home marker during mixed path normalization or resolution MUST use the same failure diagnostic.
 Its `path` field MUST contain the supplied filesystem root for root resolution, the supplied filesystem path for containment resolution, or the original textual input for home expansion.
 Its `reason` field MUST describe the resolution failure, with surrounding whitespace removed from both fields.
 The original exception MUST be retained as a private cause and MUST NOT appear in serialized diagnostics.

@@ -11,6 +11,7 @@ from llm_tool_cli.paths.filesystem import (
     project_path_id_from_filesystem,
     project_path_id_from_resolved,
     resolve_inside_project,
+    resolve_project_path,
     resolve_project_root,
     resolve_root_anchored_path,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "project_path_id_from_filesystem",
     "project_path_id_from_resolved",
     "resolve_inside_project",
+    "resolve_project_path",
     "resolve_project_root",
     "resolve_root_anchored_path",
 ]
