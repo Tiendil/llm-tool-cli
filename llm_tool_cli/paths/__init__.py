@@ -5,7 +5,10 @@ syntax belongs to callers. ``paths.errors`` exposes public path failures.
 """
 
 from llm_tool_cli.paths.filesystem import (
+    PathInput,
+    ProjectConfigPath,
     ProjectRootPath,
+    RelativeProjectPath,
     ResolvedProjectPath,
     UntrustedPath,
     normalize_path,
@@ -24,8 +27,11 @@ from llm_tool_cli.paths.normalization import (
 )
 
 __all__ = [
+    "PathInput",
+    "ProjectConfigPath",
     "ProjectPathId",
     "ProjectRootPath",
+    "RelativeProjectPath",
     "ResolvedProjectPath",
     "UntrustedPath",
     "is_project_path_id",

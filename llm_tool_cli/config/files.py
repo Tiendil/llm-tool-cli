@@ -5,9 +5,10 @@ import tomli
 
 from llm_tool_cli.config import errors
 from llm_tool_cli.core.result import Err, Ok, Result, unwrap_to_error
+from llm_tool_cli.paths import ProjectConfigPath
 
 
-def find_config(filename: str, start_dir: Path) -> Result[Path | None]:
+def find_config(filename: str, start_dir: Path) -> Result[ProjectConfigPath | None]:
     """Find the nearest file from the resolved start directory through its root.
 
     Matching directories are skipped. No match returns ``Ok(None)``; filesystem
@@ -20,13 +21,13 @@ def find_config(filename: str, start_dir: Path) -> Result[Path | None]:
         for directory in (current, *current.parents):
             candidate = directory / filename
             if candidate.is_file():
-                return Ok(candidate)
+                return Ok(ProjectConfigPath(candidate))
     except (OSError, RuntimeError) as exc:
         return Err([errors.DiscoveryFailed(path=candidate, reason=str(exc)).with_cause(exc)])
     return Ok(None)
 
 
-def resolve_config_path(path: Path, cwd: Path) -> Result[Path]:
+def resolve_config_path(path: Path, cwd: Path) -> Result[ProjectConfigPath]:
     """Expand an explicit path's home marker, then resolve it against cwd.
 
     Follow symlinks without requiring the target to exist. Do not search for a
@@ -37,13 +38,13 @@ def resolve_config_path(path: Path, cwd: Path) -> Result[Path]:
     try:
         expanded = path.expanduser()
         candidate = expanded if expanded.is_absolute() else cwd / expanded
-        return Ok(candidate.resolve())
+        return Ok(ProjectConfigPath(candidate.resolve()))
     except (OSError, RuntimeError) as exc:
         return Err([errors.PathResolutionFailed(path=candidate, reason=str(exc)).with_cause(exc)])
 
 
 @unwrap_to_error
-def locate_config(filename: str, *, path: Path | None = None, cwd: Path) -> Result[Path]:
+def locate_config(filename: str, *, path: Path | None = None, cwd: Path) -> Result[ProjectConfigPath]:
     """Select an explicit configuration path or discover the nearest file.
 
     Explicit paths use ``resolve_config_path`` without falling back to discovery

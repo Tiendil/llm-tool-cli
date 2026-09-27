@@ -7,7 +7,10 @@ from llm_tool_cli.core.result import Err, Ok, Result, unwrap_to_error
 from llm_tool_cli.paths.errors import InvalidProjectPath, PathResolutionFailed
 from llm_tool_cli.paths.normalization import ProjectPathId, normalize_project_path_id, project_path_parts
 
+PathInput = NewType("PathInput", Path)
+ProjectConfigPath = NewType("ProjectConfigPath", Path)
 ProjectRootPath = NewType("ProjectRootPath", Path)
+RelativeProjectPath = NewType("RelativeProjectPath", Path)
 ResolvedProjectPath = NewType("ResolvedProjectPath", Path)
 UntrustedPath = NewType("UntrustedPath", Path)
 

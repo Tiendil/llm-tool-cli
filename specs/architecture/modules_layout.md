@@ -71,10 +71,17 @@ Its public interfaces MUST include:
 - `llm_tool_cli.paths.resolve_project_root` and `llm_tool_cli.paths.ProjectRootPath`.
 - `llm_tool_cli.paths.resolve_inside_project` and `llm_tool_cli.paths.ResolvedProjectPath`.
 - `llm_tool_cli.paths.UntrustedPath`, a semantic filesystem input type that establishes no resolution, existence, or project-containment guarantees and adds no runtime validation or conversion to the supplied `Path`.
+- `llm_tool_cli.paths.PathInput`, a `NewType` over `pathlib.Path` marking a supplied filesystem path without resolution, existence, or containment guarantees.
+- `llm_tool_cli.paths.ProjectConfigPath`, a `NewType` over `pathlib.Path` marking a configuration file path without requiring resolution or existence.
+- `llm_tool_cli.paths.RelativeProjectPath`, a `NewType` over `pathlib.Path` marking a filesystem path interpreted relative to a project root, with validation policies owned by the consumer.
 - `llm_tool_cli.paths.resolve_root_anchored_path`, accepting a textual identifier and an already resolved project root and returning a result containing the resolved project path.
 - `llm_tool_cli.paths.project_path_id_from_resolved`, accepting a `ResolvedProjectPath` and the `ProjectRootPath` used for its containment check and returning a `ProjectPathId` directly.
 - `llm_tool_cli.paths.project_path_id_from_filesystem`, accepting a filesystem path and filesystem root and returning a result containing a `ProjectPathId` after root resolution and containment enforcement.
 - `llm_tool_cli.paths.errors.InvalidProjectPath` and `llm_tool_cli.paths.errors.PathResolutionFailed`.
+
+These semantic path constructors MUST preserve the supplied `Path` without runtime validation or conversion.
+The configuration module MUST use the shared `ProjectConfigPath` for successful path values returned by `find_config`, `resolve_config_path`, and `locate_config`.
+It MUST preserve each operation's existing discovery, resolution, and symlink behavior.
 
 ## Import boundaries
 
