@@ -118,6 +118,16 @@ output = { type = "files", pattern = "@/llm_tool_cli/**/*.py" }
 # Dependency discovery and boundary checks reflect the module ownership rules.
 [[rules]]
 relation = "governed_by"
+input = { type = "glob", pattern = "@/llm_tool_cli/protocol/**/*.py" }
+output = { type = "list", artifacts = ["@/specs/behavior/protocol.md"] }
+
+[[rules]]
+relation = "governs"
+input = { type = "one_of", artifacts = ["@/specs/behavior/protocol.md"] }
+output = { type = "files", pattern = "@/llm_tool_cli/protocol/**/*.py" }
+
+[[rules]]
+relation = "governed_by"
 input = { type = "glob", pattern = "@/llm_tool_cli/paths/**/*.py" }
 output = { type = "list", artifacts = ["@/specs/behavior/paths.md"] }
 
