@@ -7,6 +7,7 @@
 
 ### Changes
 
+- Add `paths.project_path_id_from_resolved` to convert a path already resolved and contained under its project root into a canonical identifier without filesystem access or repeated validation.
 - Add `paths.resolve_root_anchored_path` to resolve `@/` identifiers under an explicit resolved project root, preserving lexical normalization, symlink containment, and shared failure diagnostics.
 - Add `paths.resolve_inside_project` and `ResolvedProjectPath` for symlink-aware project containment with shared invalid-path and filesystem-resolution diagnostics.
 - Add `paths.resolve_project_root` and `ProjectRootPath` for filesystem root resolution, returning shared `path_resolution_failed` diagnostics with original causes on resolution failure.

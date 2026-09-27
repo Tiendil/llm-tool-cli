@@ -2,7 +2,7 @@
 
 ## Goal of the document
 
-This document describes lexical project-path normalization, filesystem resolution, project-root containment, and their failure behavior.
+This document describes project-path identifiers, their conversion to and from filesystem paths, and their failure behavior.
 
 ## Scope
 
@@ -73,6 +73,19 @@ Callers that require another base MUST combine that base with the input before r
 Containment resolution MUST NOT interpret `@/` identifiers or expand home markers.
 
 **Example:** If `/workspace/project/link` points outside `/workspace/project`, resolving a path through `link` fails containment even though its supplied filesystem path starts with the project root.
+
+## Resolved path identifiers
+
+Conversion to a canonical identifier MUST accept a filesystem path already resolved and checked strictly below the supplied resolved project root.
+The caller MUST supply the same root used for that containment check.
+Conversion MUST return the path relative to that root with an `@/` prefix and `/` separators, preserving all segment text.
+It MUST return the identifier directly, with no expected failure outcome for inputs satisfying these preconditions.
+
+Conversion MUST NOT access the filesystem, depend on the current working directory, or repeat resolution or validation already established by those preconditions.
+It MUST support files, directories, and missing targets without imposing existence or filename-extension requirements.
+
+**Example:** A resolved path `/project/notes/Project Plan.md` under `/project` converts to `@/notes/Project Plan.md`.
+When the supplied resolved path is a symlink's target, the identifier represents that target rather than the original symlink spelling.
 
 ## Errors
 

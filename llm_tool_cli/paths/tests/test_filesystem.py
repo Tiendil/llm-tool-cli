@@ -5,11 +5,68 @@ from pytest_mock import MockerFixture
 
 from llm_tool_cli.paths import (
     ProjectRootPath,
+    project_path_id_from_resolved,
     resolve_inside_project,
     resolve_project_root,
     resolve_root_anchored_path,
 )
 from llm_tool_cli.paths.errors import InvalidProjectPath, PathResolutionFailed
+
+
+class TestProjectPathIdFromResolved:
+    @pytest.mark.parametrize("kind", ["file", "directory", "missing"])
+    def test_converts_resolved_path(self, tmp_path: Path, kind: str) -> None:
+        path = tmp_path / "target"
+        if kind == "file":
+            path.touch()
+        elif kind == "directory":
+            path.mkdir()
+        root = resolve_project_root(tmp_path).unwrap()
+        resolved = resolve_inside_project(path, root).unwrap()
+
+        assert project_path_id_from_resolved(resolved, root) == "@/target"
+
+    @pytest.mark.parametrize(
+        "relative",
+        [
+            "nested/file.txt",
+            "README",
+            "Case/FILE",
+            " notes /Заметки проекта.md ",
+            r"a\b/file",
+            "name:section",
+            "~/file",
+        ],
+    )
+    def test_preserves_segment_text(self, tmp_path: Path, relative: str) -> None:
+        root = resolve_project_root(tmp_path).unwrap()
+        resolved = resolve_inside_project(tmp_path / relative, root).unwrap()
+
+        assert project_path_id_from_resolved(resolved, root) == "@/" + relative
+
+    def test_uses_resolved_symlink_target(self, tmp_path: Path) -> None:
+        target = tmp_path / "target"
+        target.mkdir()
+        (tmp_path / "link").symlink_to(target, target_is_directory=True)
+        root = resolve_project_root(tmp_path).unwrap()
+        resolved = resolve_root_anchored_path("@/link/file.txt", root).unwrap()
+
+        assert project_path_id_from_resolved(resolved, root) == "@/target/file.txt"
+
+    def test_uses_root_independently_of_cwd(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        root = resolve_project_root(tmp_path / "project").unwrap()
+        resolved = resolve_inside_project(root / "file.txt", root).unwrap()
+        monkeypatch.chdir(tmp_path)
+
+        assert project_path_id_from_resolved(resolved, root) == "@/file.txt"
+
+    def test_does_not_access_filesystem(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        root = resolve_project_root(tmp_path).unwrap()
+        resolved = resolve_inside_project(root / "file.txt", root).unwrap()
+        mocker.patch.object(Path, "resolve", side_effect=AssertionError("unexpected path resolution"))
+        mocker.patch.object(Path, "stat", side_effect=AssertionError("unexpected filesystem access"))
+
+        assert project_path_id_from_resolved(resolved, root) == "@/file.txt"
 
 
 class TestResolveProjectRoot:

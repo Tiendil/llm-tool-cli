@@ -5,10 +5,19 @@ from typing import NewType
 
 from llm_tool_cli.core.result import Err, Ok, Result, unwrap_to_error
 from llm_tool_cli.paths.errors import InvalidProjectPath, PathResolutionFailed
-from llm_tool_cli.paths.normalization import normalize_project_path_id
+from llm_tool_cli.paths.normalization import ProjectPathId, normalize_project_path_id
 
 ProjectRootPath = NewType("ProjectRootPath", Path)
 ResolvedProjectPath = NewType("ResolvedProjectPath", Path)
+
+
+def project_path_id_from_resolved(path: ResolvedProjectPath, root: ProjectRootPath) -> ProjectPathId:
+    """Convert a resolved path strictly below its resolved root to an identifier.
+
+    The path must already have passed containment resolution for this root.
+    Preserve segment text without filesystem access or repeated validation.
+    """
+    return ProjectPathId("@/" + path.relative_to(root).as_posix())
 
 
 def resolve_project_root(root: Path) -> Result[ProjectRootPath]:
