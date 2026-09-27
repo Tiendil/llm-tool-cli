@@ -4,11 +4,10 @@ import pydantic
 import tomli
 
 from llm_tool_cli.config import errors
-from llm_tool_cli.core.errors import EnvironmentErrors
 from llm_tool_cli.core.result import Err, Ok, Result, unwrap_to_error
 
 
-def find_config(filename: str, start_dir: Path) -> Result[Path | None, EnvironmentErrors]:
+def find_config(filename: str, start_dir: Path) -> Result[Path | None]:
     """Find the nearest file from the resolved start directory through its root.
 
     Matching directories are skipped. No match returns ``Ok(None)``; filesystem
@@ -27,7 +26,7 @@ def find_config(filename: str, start_dir: Path) -> Result[Path | None, Environme
     return Ok(None)
 
 
-def resolve_config_path(path: Path, cwd: Path) -> Result[Path, EnvironmentErrors]:
+def resolve_config_path(path: Path, cwd: Path) -> Result[Path]:
     """Expand an explicit path's home marker, then resolve it against cwd.
 
     Follow symlinks without requiring the target to exist. Do not search for a
@@ -44,7 +43,7 @@ def resolve_config_path(path: Path, cwd: Path) -> Result[Path, EnvironmentErrors
 
 
 @unwrap_to_error
-def locate_config(filename: str, *, path: Path | None = None, cwd: Path) -> Result[Path, EnvironmentErrors]:
+def locate_config(filename: str, *, path: Path | None = None, cwd: Path) -> Result[Path]:
     """Select an explicit configuration path or discover the nearest file.
 
     Explicit paths use ``resolve_config_path`` without falling back to discovery
@@ -62,7 +61,7 @@ def locate_config(filename: str, *, path: Path | None = None, cwd: Path) -> Resu
     return Ok(config_path)
 
 
-def read_toml(path: Path) -> Result[dict[str, object], EnvironmentErrors]:
+def read_toml(path: Path) -> Result[dict[str, object]]:
     """Read UTF-8 TOML 1.1 data without applying an application schema.
 
     Filesystem, UTF-8, and TOML failures return ``Unreadable``, ``InvalidEncoding``,
@@ -81,7 +80,7 @@ def read_toml(path: Path) -> Result[dict[str, object], EnvironmentErrors]:
 
 
 @unwrap_to_error
-def load_config[T: pydantic.BaseModel](path: Path, config_class: type[T]) -> Result[T, EnvironmentErrors]:
+def load_config[T: pydantic.BaseModel](path: Path, config_class: type[T]) -> Result[T]:
     """Read a TOML file and validate it using the caller's Pydantic model.
 
     Use the supplied path unchanged, without discovery or normalization.
@@ -97,7 +96,7 @@ def load_config[T: pydantic.BaseModel](path: Path, config_class: type[T]) -> Res
         return Err([errors.ValidationFailed(path=path, reason=str(exc)).with_cause(exc)])
 
 
-def create_config(path: Path, text: str) -> Result[None, EnvironmentErrors]:
+def create_config(path: Path, text: str) -> Result[None]:
     """Create a starter from verbatim UTF-8 text, without overwriting any target.
 
     The parent must already exist. No discovery, path normalization, directory

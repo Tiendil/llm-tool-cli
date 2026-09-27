@@ -75,7 +75,7 @@ Ordinary validation failures remain appropriate when unsupported values can arri
 
 Validation functions and methods MUST only verify invariants.
 They MUST use `None` as the successful value.
-Validation of expected external input failures MUST use `Result[None, EnvironmentErrors]` according to the error architecture.
+Validation of expected external input failures MUST use `Result[None]` according to the error architecture.
 Internal invariant checks MAY return `None` directly and raise an appropriate internal exception on failure.
 This return contract keeps validation distinct from data retrieval and transformation.
 

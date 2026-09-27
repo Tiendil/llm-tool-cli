@@ -60,9 +60,9 @@ They SHOULD omit redundant error-category suffixes when the shorter name remains
 ## Results
 
 Shared result infrastructure MUST belong to the core module and remain independent of capability-specific errors and presentation.
-`Result[T, E]` MUST distinguish `Ok(value)` from `Err(error)` while preserving the supplied payload.
-The generic error parameter MUST remain unrestricted so the result abstraction does not impose a particular error model.
-Operations with expected environment failures MUST use `Result[T, EnvironmentErrors]`, where `EnvironmentErrors` is a list of `EnvironmentError` values.
+`Result[T]` MUST distinguish `Ok(value)` from `Err(errors)` while preserving the supplied payload.
+Failures MUST contain `EnvironmentErrors`, a list of `EnvironmentError` values.
+Operations with expected environment failures MUST use `Result[T]`.
 Operations that do not have expected failure outcomes MAY return their ordinary value.
 An expected failure MUST NOT be exposed through both an error result and a separate raised-exception channel of the same operation.
 

@@ -1,7 +1,7 @@
 # llm-tool-cli
 
 A small Python support library for LLM-oriented CLI tools.
-Its scope and API are still being defined; `llm_tool_cli` currently contains only an empty `__init__.py`.
+Its scope and API are still being defined; `llm_tool_cli` provides configuration mechanics, lexical project-path normalization, and shared entity and result infrastructure.
 
 ## Development
 

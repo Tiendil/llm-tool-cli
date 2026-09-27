@@ -57,10 +57,16 @@ The shared callback exception bridge MUST be publicly available as `llm_tool_cli
 The shared base entity MUST be publicly available as `llm_tool_cli.core.entities.BaseEntity`.
 Capability errors MUST remain with their owning capabilities, and consumer presentation metadata MUST remain with the consumer.
 
+The paths module MUST own lexical project-path normalization, its canonical identifier type, and its invalid-path environment error.
+It MUST remain independent of filesystem resolution and consumer-specific artifact or pattern semantics.
+Its public interfaces MUST be `llm_tool_cli.paths.normalize_project_path_id`, `llm_tool_cli.paths.ProjectPathId`, and `llm_tool_cli.paths.errors.InvalidProjectPath`.
+
 ## Import boundaries
 
 Public import boundaries MUST be explicit enough to distinguish supported interfaces from implementation details.
 A public import boundary MAY be a package root or a declared public submodule.
+Capability implementations MUST live in dedicated submodules.
+Package initializers MUST be limited to package documentation, metadata, and import or re-export declarations.
 Package initializers SHOULD re-export names only when doing so improves the supported interface and keeps ownership clear.
 An initializer with no public names MAY remain empty.
 
