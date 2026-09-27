@@ -1,4 +1,4 @@
-"""Lexical normalization of project-path identifiers."""
+"""Lexical operations on project-path identifiers."""
 
 from typing import NewType
 
@@ -47,3 +47,12 @@ def is_project_path_id(value: object) -> bool:
     Do not access the filesystem or apply application-specific rules.
     """
     return isinstance(value, str) and normalize_project_path_id(value).ok() == value
+
+
+def project_path_parts(value: ProjectPathId) -> tuple[str, ...]:
+    """Return the components of an already canonical project-path identifier.
+
+    The caller must establish canonical form before calling. Preserve segment
+    text without filesystem access or repeated normalization and validation.
+    """
+    return tuple(value.removeprefix(_PROJECT_ROOT_PREFIX).split("/"))

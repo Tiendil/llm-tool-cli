@@ -5,7 +5,7 @@ from typing import NewType
 
 from llm_tool_cli.core.result import Err, Ok, Result, unwrap_to_error
 from llm_tool_cli.paths.errors import InvalidProjectPath, PathResolutionFailed
-from llm_tool_cli.paths.normalization import ProjectPathId, normalize_project_path_id
+from llm_tool_cli.paths.normalization import ProjectPathId, normalize_project_path_id, project_path_parts
 
 ProjectRootPath = NewType("ProjectRootPath", Path)
 ResolvedProjectPath = NewType("ResolvedProjectPath", Path)
@@ -124,5 +124,5 @@ def resolve_root_anchored_path(value: str, root: ProjectRootPath) -> Result[Reso
     target. Preserve lexical and filesystem resolution diagnostics.
     """
     normalized = normalize_project_path_id(value).unwrap()
-    path = root.joinpath(*normalized.removeprefix("@/").split("/"))
+    path = root.joinpath(*project_path_parts(normalized))
     return resolve_inside_project(path, root)

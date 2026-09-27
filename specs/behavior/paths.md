@@ -30,6 +30,17 @@ It MUST NOT impose application-specific existence or filename-extension requirem
 
 **Example:** `@/a/b` passes the check, while `@/a/../b` fails even though normalization can produce the valid identifier `@/b`.
 
+## Identifier components
+
+Component extraction MUST accept an already canonical identifier and return its segments in order, excluding the `@/` prefix.
+It MUST preserve every segment's text exactly and return the components directly, with no expected failure outcome for canonical inputs.
+Callers MUST establish canonical form before extraction.
+Extraction MUST NOT repeat normalization or validation.
+It MUST NOT access the filesystem or depend on the current working directory.
+
+**Example:** `@/notes/Project Plan.md` produces the two components `notes` and `Project Plan.md`.
+The backslash in `@/a\b/file` remains part of the first component.
+
 ## Normalization
 
 Normalization MUST accept a textual identifier and either produce its canonical form or report an invalid-path failure.

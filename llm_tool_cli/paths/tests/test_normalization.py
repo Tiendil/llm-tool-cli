@@ -2,8 +2,30 @@ from pathlib import Path
 
 import pytest
 
-from llm_tool_cli.paths import is_project_path_id, normalize_project_path_id
+from llm_tool_cli.paths import is_project_path_id, normalize_project_path_id, project_path_parts
 from llm_tool_cli.paths.errors import InvalidProjectPath
+
+
+class TestProjectPathParts:
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("@/LICENSE", ("LICENSE",)),
+            ("@/notes/Project Plan.md", ("notes", "Project Plan.md")),
+            ("@/Case/FILE", ("Case", "FILE")),
+            ("@/café/資料", ("café", "資料")),
+            ("@/ directory / file ", (" directory ", " file ")),
+            ("@/a/.../b", ("a", "...", "b")),
+            ("@/~/file", ("~", "file")),
+            ("@/a\\b/file", ("a\\b", "file")),
+            ("@/name:section", ("name:section",)),
+            ("@/src/{**package}/*.[pP][yY]", ("src", "{**package}", "*.[pP][yY]")),
+        ],
+    )
+    def test_extracts_components(self, value: str, expected: tuple[str, ...]) -> None:
+        identifier = normalize_project_path_id(value).unwrap()
+
+        assert project_path_parts(identifier) == expected
 
 
 class TestIsProjectPathId:
