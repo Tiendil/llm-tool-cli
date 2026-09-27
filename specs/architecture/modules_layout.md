@@ -57,12 +57,13 @@ The shared callback exception bridge MUST be publicly available as `llm_tool_cli
 The shared base entity MUST be publicly available as `llm_tool_cli.core.entities.BaseEntity`.
 Capability errors MUST remain with their owning capabilities, and consumer presentation metadata MUST remain with the consumer.
 
-The paths module MUST own lexical project-path normalization, filesystem resolution and containment, and conversion of resolved filesystem paths to canonical identifiers, together with their semantic types and environment errors.
+The paths module MUST own lexical project-path checking and normalization, filesystem resolution and containment, and conversion of resolved filesystem paths to canonical identifiers, together with their semantic types and environment errors.
 Lexical normalization MUST remain independent of filesystem resolution.
 Consumer-specific artifact or pattern semantics MUST remain consumer-owned.
 Its public interfaces MUST include:
 
 - `llm_tool_cli.paths.normalize_project_path_id` and `llm_tool_cli.paths.ProjectPathId`.
+- `llm_tool_cli.paths.is_project_path_id`, accepting an arbitrary object and returning a boolean indicating whether it is already a canonical project-path identifier.
 - `llm_tool_cli.paths.normalize_path`, accepting a textual identifier or filesystem input, a filesystem root, and an optional directory base named `cwd`, and returning a result containing a `ProjectPathId`.
 - `llm_tool_cli.paths.resolve_project_path`, accepting a textual identifier or filesystem input, a filesystem root, and an `allow_absolute` option defaulting to `True`, and returning a result containing a `ResolvedProjectPath` with home expansion and project-root containment.
 - `llm_tool_cli.paths.resolve_project_root` and `llm_tool_cli.paths.ProjectRootPath`.

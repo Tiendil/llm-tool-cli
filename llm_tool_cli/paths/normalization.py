@@ -38,3 +38,12 @@ def normalize_project_path_id(value: str) -> Result[ProjectPathId]:
         return Err([InvalidProjectPath(path=value)])
 
     return Ok(ProjectPathId(_PROJECT_ROOT_PREFIX + "/".join(parts)))
+
+
+def is_project_path_id(value: object) -> bool:
+    """Check whether an input is already a canonical project-path identifier.
+
+    Return false for non-strings and values requiring lexical normalization.
+    Do not access the filesystem or apply application-specific rules.
+    """
+    return isinstance(value, str) and normalize_project_path_id(value).ok() == value

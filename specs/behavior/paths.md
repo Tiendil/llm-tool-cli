@@ -21,6 +21,15 @@ Consumers own any additional target-kind, existence, or extension requirements.
 
 **Example:** `@/LICENSE`, `@/assets`, and `@/notes/Заметки проекта.md` are valid canonical identifiers, regardless of whether their targets exist.
 
+## Identifier checks
+
+A canonical-identifier check MUST return true exactly when the input is a string whose lexical normalization succeeds without changing its text.
+It MUST return false for non-string inputs and for malformed or noncanonical strings, without reporting a failure diagnostic.
+The check MUST NOT access the filesystem or depend on the current working directory.
+It MUST NOT impose application-specific existence or filename-extension requirements.
+
+**Example:** `@/a/b` passes the check, while `@/a/../b` fails even though normalization can produce the valid identifier `@/b`.
+
 ## Normalization
 
 Normalization MUST accept a textual identifier and either produce its canonical form or report an invalid-path failure.
@@ -145,7 +154,7 @@ Failures MUST retain the diagnostics of the failed resolution or containment ope
 
 ## Errors
 
-Rejected input MUST produce one failure diagnostic with the stable code `invalid_project_path`.
+Normalization and resolution MUST report rejected input with one failure diagnostic with the stable code `invalid_project_path`.
 Its `path` field MUST contain the rejected input with surrounding whitespace removed; containment failures MUST use the supplied filesystem path.
 Consumers MUST be able to identify this failure by its code without parsing the message.
 

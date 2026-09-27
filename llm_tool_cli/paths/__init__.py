@@ -15,12 +15,13 @@ from llm_tool_cli.paths.filesystem import (
     resolve_project_root,
     resolve_root_anchored_path,
 )
-from llm_tool_cli.paths.normalization import ProjectPathId, normalize_project_path_id
+from llm_tool_cli.paths.normalization import ProjectPathId, is_project_path_id, normalize_project_path_id
 
 __all__ = [
     "ProjectPathId",
     "ProjectRootPath",
     "ResolvedProjectPath",
+    "is_project_path_id",
     "normalize_path",
     "normalize_project_path_id",
     "project_path_id_from_filesystem",
