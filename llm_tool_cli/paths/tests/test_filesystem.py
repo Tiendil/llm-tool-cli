@@ -5,6 +5,7 @@ from pytest_mock import MockerFixture
 
 from llm_tool_cli.paths import (
     ProjectRootPath,
+    normalize_path,
     project_path_id_from_filesystem,
     project_path_id_from_resolved,
     resolve_inside_project,
@@ -12,6 +13,146 @@ from llm_tool_cli.paths import (
     resolve_root_anchored_path,
 )
 from llm_tool_cli.paths.errors import InvalidProjectPath, PathResolutionFailed
+
+
+class TestNormalizePath:
+    @pytest.mark.parametrize("value", ["@/nested/./child/../file", "@/nested/file"])
+    def test_normalizes_identifier(self, tmp_path: Path, value: str) -> None:
+        assert normalize_path(value, tmp_path).unwrap() == "@/nested/file"
+
+    @pytest.mark.parametrize("value", ["@file", "@/", "@/a/..", "@/../file", "@/a//b", "@/a/"])
+    def test_preserves_invalid_identifier_diagnostic(self, tmp_path: Path, value: str) -> None:
+        assert normalize_path(value, tmp_path).unwrap_err() == [InvalidProjectPath(path=value)]
+
+    @pytest.mark.parametrize("kind", ["file", "directory", "missing"])
+    def test_accepts_filesystem_target_without_kind_requirements(self, tmp_path: Path, kind: str) -> None:
+        target = tmp_path / "target"
+        if kind == "file":
+            target.touch()
+        elif kind == "directory":
+            target.mkdir()
+
+        assert normalize_path(str(target), tmp_path).unwrap() == "@/target"
+
+    def test_default_base_is_resolved_root(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        assert normalize_path("file", Path("project")).unwrap() == "@/file"
+
+    def test_explicit_base_is_independent_of_process_cwd(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path.parent)
+
+        assert normalize_path("file", tmp_path, cwd=tmp_path / "nested").unwrap() == "@/nested/file"
+
+    def test_relative_base_uses_process_cwd(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        assert normalize_path("file", tmp_path, cwd=Path("nested")).unwrap() == "@/nested/file"
+
+    def test_absolute_input_ignores_base(self, tmp_path: Path) -> None:
+        assert normalize_path(str(tmp_path / "file"), tmp_path, cwd=tmp_path.parent).unwrap() == "@/file"
+
+    def test_identifier_ignores_base_and_target_symlinks(self, tmp_path: Path) -> None:
+        (tmp_path / "outside").symlink_to(tmp_path.parent, target_is_directory=True)
+
+        assert normalize_path("@/outside/file", tmp_path, cwd=tmp_path.parent).unwrap() == "@/outside/file"
+
+    def test_filesystem_input_uses_resolved_symlink_target(self, tmp_path: Path) -> None:
+        target = tmp_path / "target"
+        target.mkdir()
+        (tmp_path / "link").symlink_to(target, target_is_directory=True)
+
+        assert normalize_path("link/file", tmp_path).unwrap() == "@/target/file"
+
+    def test_filesystem_input_rejects_symlink_escape(self, tmp_path: Path) -> None:
+        link = tmp_path / "outside"
+        link.symlink_to(tmp_path.parent, target_is_directory=True)
+
+        assert normalize_path("outside/file", tmp_path).unwrap_err() == [InvalidProjectPath(path=str(link / "file"))]
+
+    @pytest.mark.parametrize("value", ["", ".", "nested/..", "../outside"])
+    def test_rejects_root_and_outside_filesystem_inputs(self, tmp_path: Path, value: str) -> None:
+        assert normalize_path(value, tmp_path).unwrap_err() == [InvalidProjectPath(path=str(tmp_path / value))]
+
+    def test_empty_input_identifies_explicit_non_root_base(self, tmp_path: Path) -> None:
+        assert normalize_path("", tmp_path, cwd=tmp_path / "nested").unwrap() == "@/nested"
+
+    def test_relative_root_uses_absolute_candidate_in_diagnostic(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        assert normalize_path("../outside", Path("project")).unwrap_err() == [
+            InvalidProjectPath(path=str(tmp_path / "project" / ".." / "outside"))
+        ]
+
+    def test_expands_home_marker(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+
+        assert normalize_path("~/project/file", tmp_path / "project").unwrap() == "@/file"
+
+    def test_expanded_home_must_be_inside_project(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+
+        assert normalize_path("~/file", tmp_path / "project").unwrap_err() == [
+            InvalidProjectPath(path=str(tmp_path / "file"))
+        ]
+
+    def test_accepts_literal_home_marker_segment(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path.parent))
+
+        assert normalize_path("@/~/file", tmp_path).unwrap() == "@/~/file"
+
+    def test_preserves_segment_text(self, tmp_path: Path) -> None:
+        value = " notes /Заметки проекта.md "
+
+        assert normalize_path(value, tmp_path).unwrap() == "@/" + value
+
+    @pytest.mark.parametrize("value", ["@/file", "@/../file", "file", "~/file"])
+    def test_root_resolution_failure_precedes_input_processing(self, tmp_path: Path, value: str) -> None:
+        root = tmp_path / "loop"
+        root.symlink_to(root)
+
+        failure = normalize_path(value, root).unwrap_err()[0]
+
+        assert isinstance(failure, PathResolutionFailed)
+        assert failure.path == str(root)
+        assert isinstance(failure.cause, (OSError, RuntimeError))
+
+    def test_target_resolution_failure_preserves_diagnostic(self, tmp_path: Path) -> None:
+        link = tmp_path / "loop"
+        link.symlink_to(link)
+
+        failure = normalize_path("loop/file", tmp_path).unwrap_err()[0]
+
+        assert isinstance(failure, PathResolutionFailed)
+        assert failure.path == str(link / "file")
+        assert isinstance(failure.cause, (OSError, RuntimeError))
+
+    @pytest.mark.parametrize("cause", [RuntimeError("unknown home"), OSError("home lookup failed")])
+    def test_home_expansion_failure_preserves_diagnostic(
+        self, tmp_path: Path, mocker: MockerFixture, cause: Exception
+    ) -> None:
+        mocker.patch.object(Path, "expanduser", side_effect=cause)
+
+        failures = normalize_path("~/file", tmp_path).unwrap_err()
+
+        assert len(failures) == 1
+        failure = failures[0]
+        assert isinstance(failure, PathResolutionFailed)
+        assert failure.code == "path_resolution_failed"
+        assert failure.path == "~/file"
+        assert failure.reason == str(cause)
+        assert failure.cause == cause
+        assert "cause" not in failure.as_record()
+
+    def test_unexpected_exception_propagates(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        mocker.patch.object(Path, "expanduser", side_effect=ValueError("unexpected failure"))
+
+        with pytest.raises(ValueError, match="unexpected failure"):
+            normalize_path("file", tmp_path)
 
 
 class TestProjectPathIdFromFilesystem:

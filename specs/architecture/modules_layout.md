@@ -63,6 +63,7 @@ Consumer-specific artifact or pattern semantics MUST remain consumer-owned.
 Its public interfaces MUST include:
 
 - `llm_tool_cli.paths.normalize_project_path_id` and `llm_tool_cli.paths.ProjectPathId`.
+- `llm_tool_cli.paths.normalize_path`, accepting a textual identifier or filesystem input, a filesystem root, and an optional directory base named `cwd`, and returning a result containing a `ProjectPathId`.
 - `llm_tool_cli.paths.resolve_project_root` and `llm_tool_cli.paths.ProjectRootPath`.
 - `llm_tool_cli.paths.resolve_inside_project` and `llm_tool_cli.paths.ResolvedProjectPath`.
 - `llm_tool_cli.paths.resolve_root_anchored_path`, accepting a textual identifier and an already resolved project root and returning a result containing the resolved project path.

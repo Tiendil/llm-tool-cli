@@ -12,6 +12,30 @@ ResolvedProjectPath = NewType("ResolvedProjectPath", Path)
 
 
 @unwrap_to_error
+def normalize_path(value: str, root: Path, *, cwd: Path | None = None) -> Result[ProjectPathId]:
+    """Normalize an identifier or filesystem input to a project identifier.
+
+    Resolve the root first. Normalize inputs starting with ``@`` lexically;
+    otherwise expand home markers and enforce filesystem containment. Relative
+    filesystem inputs use the supplied directory base, or the resolved root.
+    Neither form requires an existing target.
+    """
+    project_root = resolve_project_root(root).unwrap()
+
+    if value.startswith("@"):
+        return normalize_project_path_id(value)
+
+    try:
+        path = Path(value).expanduser()
+    except (OSError, RuntimeError) as error:
+        return Err([PathResolutionFailed(path=value, reason=str(error)).with_cause(error)])
+
+    candidate = path if path.is_absolute() else (cwd if cwd is not None else project_root) / path
+    resolved = resolve_inside_project(candidate, project_root).unwrap()
+    return Ok(project_path_id_from_resolved(resolved, project_root))
+
+
+@unwrap_to_error
 def project_path_id_from_filesystem(path: Path, root: Path) -> Result[ProjectPathId]:
     """Resolve a filesystem path and convert it to a project identifier.
 
