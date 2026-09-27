@@ -3,7 +3,12 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
-from llm_tool_cli.paths import ProjectRootPath, resolve_inside_project, resolve_project_root
+from llm_tool_cli.paths import (
+    ProjectRootPath,
+    resolve_inside_project,
+    resolve_project_root,
+    resolve_root_anchored_path,
+)
 from llm_tool_cli.paths.errors import InvalidProjectPath, PathResolutionFailed
 
 
@@ -182,3 +187,108 @@ class TestResolveInsideProject:
 
         with pytest.raises(ValueError, match="unexpected failure"):
             resolve_inside_project(tmp_path / "file", ProjectRootPath(tmp_path))
+
+
+class TestResolveRootAnchoredPath:
+    def test_resolves_existing_file(self, tmp_path: Path) -> None:
+        target = tmp_path / "file"
+        target.touch()
+
+        assert resolve_root_anchored_path("@/file", ProjectRootPath(tmp_path)).unwrap() == target
+
+    def test_accepts_directory(self, tmp_path: Path) -> None:
+        target = tmp_path / "directory"
+        target.mkdir()
+
+        assert resolve_root_anchored_path("@/directory", ProjectRootPath(tmp_path)).unwrap() == target
+
+    @pytest.mark.parametrize("relative", ["missing/file", "LICENSE", "notes/Заметки проекта.md", "~/file"])
+    def test_accepts_missing_target_and_preserves_segment_text(self, tmp_path: Path, relative: str) -> None:
+        target = tmp_path / relative
+
+        assert resolve_root_anchored_path("@/" + relative, ProjectRootPath(tmp_path)).unwrap() == target
+        assert not target.exists()
+
+    def test_uses_root_independently_of_cwd(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        root = tmp_path / "project"
+        cwd = tmp_path / "elsewhere"
+        cwd.mkdir()
+        monkeypatch.chdir(cwd)
+
+        assert resolve_root_anchored_path("@/file", ProjectRootPath(root)).unwrap() == root / "file"
+
+    def test_normalizes_before_resolving_symlinks(self, tmp_path: Path) -> None:
+        (tmp_path / "outside").symlink_to(tmp_path.parent, target_is_directory=True)
+
+        assert (
+            resolve_root_anchored_path("@/./outside/../file", ProjectRootPath(tmp_path)).unwrap() == tmp_path / "file"
+        )
+
+    @pytest.mark.parametrize("value", ["", "file", "@file", "@/", "@/a/..", "@/a//b", "@/a/", "@/../a"])
+    def test_invalid_identifier_preserves_lexical_diagnostic(self, tmp_path: Path, value: str) -> None:
+        failures = resolve_root_anchored_path(value, ProjectRootPath(tmp_path)).unwrap_err()
+
+        assert len(failures) == 1
+        failure = failures[0]
+        assert isinstance(failure, InvalidProjectPath)
+        assert failure.code == "invalid_project_path"
+        assert failure.path == value
+
+    def test_follows_symlink_inside_root(self, tmp_path: Path) -> None:
+        target = tmp_path / "target"
+        target.mkdir()
+        (tmp_path / "link").symlink_to(target, target_is_directory=True)
+
+        assert resolve_root_anchored_path("@/link/file", ProjectRootPath(tmp_path)).unwrap() == target / "file"
+
+    @pytest.mark.parametrize("target", [".", ".."])
+    def test_rejects_symlink_to_root_or_outside(self, tmp_path: Path, target: str) -> None:
+        link = tmp_path / "link"
+        link.symlink_to(tmp_path / target, target_is_directory=True)
+
+        failures = resolve_root_anchored_path("@/link", ProjectRootPath(tmp_path)).unwrap_err()
+
+        assert len(failures) == 1
+        failure = failures[0]
+        assert isinstance(failure, InvalidProjectPath)
+        assert failure.code == "invalid_project_path"
+        assert failure.path == str(link)
+
+    def test_symlink_loop_preserves_resolution_failure(self, tmp_path: Path) -> None:
+        link = tmp_path / "loop"
+        link.symlink_to(link)
+
+        failures = resolve_root_anchored_path("@/loop/file", ProjectRootPath(tmp_path)).unwrap_err()
+
+        assert len(failures) == 1
+        failure = failures[0]
+        assert isinstance(failure, PathResolutionFailed)
+        assert failure.code == "path_resolution_failed"
+        assert failure.path == str(link / "file")
+        assert isinstance(failure.cause, (OSError, RuntimeError))
+
+    def test_permission_failure_preserves_diagnostic_and_private_cause(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        cause = PermissionError(" permission denied ")
+        mocker.patch.object(Path, "resolve", side_effect=cause)
+
+        failures = resolve_root_anchored_path("@/file", ProjectRootPath(tmp_path)).unwrap_err()
+
+        assert len(failures) == 1
+        failure = failures[0]
+        assert isinstance(failure, PathResolutionFailed)
+        assert failure.cause == cause
+        assert failure.as_record() == {
+            "type": "error",
+            "code": "path_resolution_failed",
+            "message": failure.format_message(),
+            "path": str(tmp_path / "file"),
+            "reason": str(cause).strip(),
+        }
+
+    def test_unexpected_exception_propagates(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        mocker.patch.object(Path, "resolve", side_effect=ValueError("unexpected failure"))
+
+        with pytest.raises(ValueError, match="unexpected failure"):
+            resolve_root_anchored_path("@/file", ProjectRootPath(tmp_path))

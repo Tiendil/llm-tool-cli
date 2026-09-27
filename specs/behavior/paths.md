@@ -51,6 +51,16 @@ Consumers MUST enforce any required existence or directory-kind constraints sepa
 
 Root resolution MUST remain separate from lexical identifier normalization and MUST NOT establish containment of any project path.
 
+## Root-anchored resolution
+
+Resolving a root-anchored identifier inside an already resolved project root MUST first apply lexical identifier normalization, then resolve the normalized path below that root with filesystem containment enforcement.
+The supplied root MUST determine the base independently of the current working directory.
+Resolution MUST NOT expand home markers or require the target to exist or have a particular filesystem kind.
+Lexical normalization failures and filesystem containment or resolution failures MUST preserve their respective diagnostics.
+
+**Example:** `@/a/../b` resolves to `b` below the supplied root.
+If `a` is a symlink, normalization removes `a/..` before filesystem resolution, while resolving `@/a/b` follows that symlink and enforces containment of its target.
+
 ## Filesystem containment
 
 Resolving a supplied filesystem path inside an already resolved project root MUST produce an absolute path strictly below that root or report a failure.

@@ -9,6 +9,7 @@ from llm_tool_cli.paths.filesystem import (
     ResolvedProjectPath,
     resolve_inside_project,
     resolve_project_root,
+    resolve_root_anchored_path,
 )
 from llm_tool_cli.paths.normalization import ProjectPathId, normalize_project_path_id
 
@@ -19,4 +20,5 @@ __all__ = [
     "normalize_project_path_id",
     "resolve_inside_project",
     "resolve_project_root",
+    "resolve_root_anchored_path",
 ]

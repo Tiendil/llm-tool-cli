@@ -3,8 +3,9 @@
 from pathlib import Path
 from typing import NewType
 
-from llm_tool_cli.core.result import Err, Ok, Result
+from llm_tool_cli.core.result import Err, Ok, Result, unwrap_to_error
 from llm_tool_cli.paths.errors import InvalidProjectPath, PathResolutionFailed
+from llm_tool_cli.paths.normalization import normalize_project_path_id
 
 ProjectRootPath = NewType("ProjectRootPath", Path)
 ResolvedProjectPath = NewType("ResolvedProjectPath", Path)
@@ -39,3 +40,16 @@ def resolve_inside_project(path: Path, root: ProjectRootPath) -> Result[Resolved
         return Err([InvalidProjectPath(path=str(path))])
 
     return Ok(ResolvedProjectPath(resolved))
+
+
+@unwrap_to_error
+def resolve_root_anchored_path(value: str, root: ProjectRootPath) -> Result[ResolvedProjectPath]:
+    """Normalize an ``@/`` identifier and resolve it strictly below the root.
+
+    The root must already be resolved. Normalize identifier segments before
+    resolving symlinks and checking containment, without requiring an existing
+    target. Preserve lexical and filesystem resolution diagnostics.
+    """
+    normalized = normalize_project_path_id(value).unwrap()
+    path = root.joinpath(*normalized.removeprefix("@/").split("/"))
+    return resolve_inside_project(path, root)
