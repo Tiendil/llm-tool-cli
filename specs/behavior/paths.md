@@ -87,6 +87,17 @@ It MUST support files, directories, and missing targets without imposing existen
 **Example:** A resolved path `/project/notes/Project Plan.md` under `/project` converts to `@/notes/Project Plan.md`.
 When the supplied resolved path is a symlink's target, the identifier represents that target rather than the original symlink spelling.
 
+## Filesystem path identifiers
+
+Conversion of a supplied filesystem path and filesystem root to a canonical identifier MUST resolve the root first, enforce filesystem containment of the path, and return the resolved path's identifier.
+Neither input needs to have been resolved by the caller.
+Relative roots and paths MUST each use the process current working directory as their base; the supplied root MUST NOT implicitly become the base of a relative path.
+Conversion MUST NOT interpret `@/` identifiers, expand home markers, or require an existing target or a particular filesystem kind.
+Root resolution failures MUST take precedence over target resolution and containment failures.
+Failures MUST retain the diagnostics of the failed resolution or containment operation.
+
+**Example:** With the working directory `/workspace`, a filesystem path `project/notes.md` and root `project` produce `@/notes.md`, while the path `notes.md` is outside that root.
+
 ## Errors
 
 Rejected input MUST produce one failure diagnostic with the stable code `invalid_project_path`.

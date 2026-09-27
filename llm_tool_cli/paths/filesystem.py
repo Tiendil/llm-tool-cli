@@ -11,6 +11,20 @@ ProjectRootPath = NewType("ProjectRootPath", Path)
 ResolvedProjectPath = NewType("ResolvedProjectPath", Path)
 
 
+@unwrap_to_error
+def project_path_id_from_filesystem(path: Path, root: Path) -> Result[ProjectPathId]:
+    """Resolve a filesystem path and convert it to a project identifier.
+
+    Resolve the supplied root first, then enforce containment strictly below it.
+    Relative roots and paths use the process working directory. Do not expand
+    home markers, interpret identifiers, or require an existing target.
+    Preserve root and target resolution failures and containment diagnostics.
+    """
+    project_root = resolve_project_root(root).unwrap()
+    resolved = resolve_inside_project(path, project_root).unwrap()
+    return Ok(project_path_id_from_resolved(resolved, project_root))
+
+
 def project_path_id_from_resolved(path: ResolvedProjectPath, root: ProjectRootPath) -> ProjectPathId:
     """Convert a resolved path strictly below its resolved root to an identifier.
 
