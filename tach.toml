@@ -28,4 +28,4 @@ depends_on = ["llm_tool_cli.core"]
 
 [[modules]]
 path = "llm_tool_cli.protocol"
-depends_on = []
+depends_on = ["llm_tool_cli.core"]

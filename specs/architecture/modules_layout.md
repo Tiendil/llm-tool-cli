@@ -83,11 +83,14 @@ These semantic path constructors MUST preserve the supplied `Path` without runti
 The configuration module MUST use the shared `ProjectConfigPath` for successful path values returned by `find_config`, `resolve_config_path`, and `locate_config`.
 It MUST preserve each operation's existing discovery, resolution, and symlink behavior.
 
-The protocol module MUST own shared output protocols, JSON Lines serialization, and direct text writing.
+The protocol module MUST own shared output protocols, cell construction, JSON Lines serialization, and direct text writing.
 Its public package interface MUST export `Protocol`, `to_jsonl`, and `write_output` from `llm_tool_cli.protocol`.
 The protocol enum MUST live in `protocol.entities`, record serialization in `protocol.serialization`, and text writing in `protocol.streams`.
-These utilities MUST depend only on the standard library.
-Record construction, cells, renderers, CLI defaults and parsing, error classification, and exit selection MUST remain consumer-owned.
+The protocol enum, record serialization, and text writing MUST depend only on the standard library.
+The public `llm_tool_cli.protocol.cells` submodule MUST own the complete `Cell` entity, its construction helpers and compact identifier, `MetaValue`, and `to_meta_value`.
+Cells MUST inherit the shared `BaseEntity` from the core module.
+The public `llm_tool_cli.protocol.errors` submodule MUST own the internal `ContentWithoutMediaType` exception under a protocol-specific `InternalError` root derived from the shared internal-error base.
+Consumer-specific cell kinds and content, external record construction, renderers, CLI defaults and parsing, error classification, and exit selection MUST remain consumer-owned.
 
 ## Import boundaries
 
