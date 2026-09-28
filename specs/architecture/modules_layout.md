@@ -88,6 +88,7 @@ Its public package interface MUST export `Protocol`, `to_jsonl`, and `write_outp
 The protocol enum MUST live in `protocol.entities`, record serialization in `protocol.serialization`, and text writing in `protocol.streams`.
 The protocol enum, record serialization, and text writing MUST depend only on the standard library.
 The public `llm_tool_cli.protocol.cells` submodule MUST own the complete `Cell` entity, its construction helpers and compact identifier, `MetaValue`, and `to_meta_value`.
+The public `llm_tool_cli.protocol.cell_shortcuts` submodule MUST provide `info`, `operation_succeeded`, and `operation_failed` for constructing common Markdown cells.
 Cells MUST inherit the shared `BaseEntity` from the core module.
 The public `llm_tool_cli.protocol.errors` submodule MUST own the internal `ContentWithoutMediaType` exception under a protocol-specific `InternalError` root derived from the shared internal-error base.
 Consumer-specific cell kinds and content, external record construction, renderers, CLI defaults and parsing, error classification, and exit selection MUST remain consumer-owned.

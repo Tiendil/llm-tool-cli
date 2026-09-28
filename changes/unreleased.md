@@ -8,6 +8,7 @@
 
 ### Changes
 
+- Add `protocol.cell_shortcuts` for constructing informational, successful-operation, and failed-operation Markdown cells through the shared cell model.
 - Add `protocol.cells.Cell`, metadata helpers, and the shared `ContentWithoutMediaType` internal exception, preserving cell construction and compact UUID identifiers without owning output formatting.
 - Add `protocol.Protocol`, `protocol.to_jsonl`, and `protocol.write_output` for shared protocol names, compact Unicode JSON Lines, and direct text output without automatic newlines or flushing.
 - Reject empty inputs in shared mixed path normalization with an empty diagnostic `path`, preserving root-resolution failure precedence.

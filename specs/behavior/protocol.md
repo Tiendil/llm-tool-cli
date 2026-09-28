@@ -25,7 +25,7 @@ A cell MUST carry:
 - string-keyed metadata, empty by default.
 
 Cells MUST use the shared entity validation and copying conventions.
-Kinds and media types MUST remain consumer-defined rather than a closed library-owned set.
+General cell construction MUST accept consumer-defined kinds and media types rather than a closed library-owned set.
 The compact cell identifier MUST be the URL-safe Base64 encoding of the UUID bytes without padding.
 
 Cell construction helpers MUST support general cells, metadata-only cells, and Markdown cells.
@@ -34,6 +34,10 @@ Markdown construction MUST use `text/markdown` as the media type.
 The helpers MUST collect additional named metadata into the cell's metadata mapping.
 They MUST raise an internal exception when content is supplied without a media type, including when the supplied content is an empty string.
 Cell construction MUST NOT render or write output.
+
+Cell shortcuts MUST construct Markdown cells for informational messages, successful operations, and failed operations with the respective kinds `info`, `operation_succeeded`, and `operation_failed`.
+They MUST use the supplied message as content and collect additional named metadata through the shared cell construction behavior.
+They MUST support empty messages and omitted metadata.
 
 Metadata values MUST support strings, integers, booleans, null values, and lists of strings.
 Conversion of arbitrary values to metadata MUST preserve values of those types, including empty lists, and use their string representation for other values.
