@@ -2,17 +2,18 @@
 
 ## Goal of the document
 
-This document defines shared output protocol names, output cells, JSON Lines serialization, and direct text writing.
+This document defines shared output protocol names, output cells, cell and error formatting, JSON Lines serialization, and direct text writing.
 
 ## Scope
 
-This specification covers reusable protocol mechanics for callers that construct their own output.
-External record schemas, rendering layouts, command parsing, defaults, error classification, exit status selection, and command execution are out of scope.
+This specification covers reusable protocol mechanics for callers that construct and render output.
+Consumer-specific records and journal layouts, command parsing, defaults, error classification, exit status selection, and command execution are out of scope.
 
 ## Output protocols
 
 The library MUST provide the stable output protocol values `human`, `llm`, and `automation`.
-Consumers MUST select their own defaults and interpret each protocol through their own renderers.
+Consumers MUST select their own defaults and project application data into cells or their own records.
+Shared formatter selection MUST support each protocol and raise an internal exception with the supplied mode when the mode is unsupported.
 
 ## Output cells
 
@@ -44,6 +45,47 @@ Conversion of arbitrary values to metadata MUST preserve values of those types, 
 Conversion MUST NOT strip string whitespace or recursively convert unsupported collections.
 
 **Example:** A list of strings remains a list, while a mixed list or a floating-point value becomes its string representation.
+
+## Cell formatting
+
+Formatters MUST return UTF-8 bytes, including the required record terminators.
+They MUST NOT write output, choose streams, classify errors, or select exit statuses.
+Formatting MUST NOT mutate the cell.
+Text cell boundaries MUST use the caller-supplied tool label without changing it.
+The label MUST NOT affect automation records or error formatting.
+
+### Human and LLM cells
+
+Text formatting MUST emit the cell kind, then the media type when present, then metadata in sorted key order.
+Metadata values MUST use their string representation, including `True`, `False`, and `None` for boolean and null values.
+Nonempty content MUST follow a blank line and have surrounding whitespace stripped.
+Absent or empty content MUST omit that content section.
+
+Human cells MUST begin with `----- <label> CELL <id> -----`, using the compact cell identifier.
+Fields MUST use `key = value` lines.
+Each human cell MUST end with two newlines.
+
+LLM cells MUST begin with `--<label>-CELL <id> BEGIN--` and end with `--<label>-CELL <id> END--`, using the compact cell identifier.
+Fields MUST use `key=value` lines.
+Each LLM cell MUST end with one newline after its closing boundary.
+
+### Automation cells
+
+Automation cells MUST use the shared JSON Lines serialization.
+Each record MUST include `id` and `content` fields together with metadata as top-level fields.
+The `id` field MUST default to the compact cell identifier.
+Nonempty content MUST have surrounding whitespace stripped; absent or empty content MUST become JSON null.
+The formatter MUST NOT automatically add the cell kind, media type, or tool label.
+
+Metadata named `id` MUST override the generated identifier in the record.
+The cell content MUST override metadata named `content`.
+These precedence rules preserve the existing flattened record contract.
+
+## Error formatting
+
+Human and LLM error formatting MUST return the shared environment error's formatted message followed by a newline.
+Automation error formatting MUST serialize the shared error's native diagnostic record as one JSON Line, without a cell envelope or tool label.
+Error formatting MUST preserve the error's diagnostic fields and MUST NOT translate the error into a consumer-specific type.
 
 ## JSON Lines serialization
 

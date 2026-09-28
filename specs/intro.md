@@ -28,7 +28,7 @@ Detailed requirements for individual specifications are out of scope except for 
 - `specs/architecture/entities.md` describes entity modeling, typed data conventions including static typing suppressions, and validation and serialization boundaries.
 - `specs/architecture/errors.md` describes independent internal-exception and environment-error hierarchies, result propagation, warnings, and consumer presentation boundaries.
 - `specs/architecture/tests.md` describes test organization, result and failure coverage, and test isolation.
-- `specs/behavior/protocol.md` describes shared output protocols, cell construction and common message shortcuts, metadata conversion, compact Unicode JSON Lines serialization, and direct text writing.
+- `specs/behavior/protocol.md` describes shared output protocols, cell construction and common message shortcuts, metadata conversion, cell and error formatting with caller-supplied labels, compact Unicode JSON Lines serialization, and direct text writing.
 - `specs/behavior/paths.md` describes lexical project-path identifiers, canonical identifier checks and component extraction, mixed identifier and filesystem normalization and resolution with home expansion, explicit normalization bases, absolute-input restrictions, filesystem containment and conversion, and failure diagnostics.
 - `specs/documentation/readme.md` describes the content and tone of the brief root README.
 - `specs/documentation/changelog.md` describes Changy source files, version-record structure, and entry formatting.

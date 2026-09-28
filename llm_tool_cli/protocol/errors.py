@@ -1,4 +1,4 @@
-"""Internal failures in output protocol construction."""
+"""Internal failures in output protocol construction and formatting."""
 
 from typing import ClassVar
 
@@ -11,3 +11,7 @@ class InternalError(core_errors.InternalError):
 
 class ContentWithoutMediaType(InternalError):
     message_template: ClassVar[str] = "Cannot set content when media_type is None."
+
+
+class UnsupportedFormatterMode(InternalError):
+    message_template: ClassVar[str] = "Formatter for mode '{mode}' is not implemented."
