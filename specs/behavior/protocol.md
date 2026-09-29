@@ -41,6 +41,10 @@ Cell shortcuts MUST construct Markdown cells for informational messages, success
 They MUST return protocol-independent content logic cells using the caller-supplied message and additional named metadata.
 They MUST support empty messages and omitted metadata.
 
+The skill-document shortcut MUST construct a protocol-independent Markdown content cell with kind `skill`.
+It MUST use the caller-supplied document name as `document` metadata, include `type = skill` metadata, and use the supplied document text as content.
+It MUST accept application-defined document names and empty content without loading resources or selecting a protocol.
+
 Metadata values MUST support strings, integers, booleans, null values, and lists of strings.
 Conversion of arbitrary values to metadata MUST preserve values of those types, including empty lists, and use their string representation for other values.
 Conversion MUST NOT strip string whitespace or recursively convert unsupported collections.

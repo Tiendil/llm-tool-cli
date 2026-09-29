@@ -12,6 +12,8 @@
 
 ### Changes
 
+- Add `protocol.cell_shortcuts.skill(document, content)` to construct shared Markdown skill cells with `document` and `type = skill` metadata.
+
 - Add a shared typed `EnvironmentErrorCell` with deferred projection of the native diagnostic record and corrective guidance into all output protocols.
 
 - Add shared `ContentCell` logic cells and make sequence rendering project and flatten logic cells before calculating output positions. Message shortcuts return logic cells; output identifiers are created during projection.

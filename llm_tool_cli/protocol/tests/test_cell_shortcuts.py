@@ -35,6 +35,28 @@ class TestInfo:
         assert cell.meta == {"scope": "workspace"}
 
 
+class TestSkill:
+    @pytest.mark.parametrize("protocol", list(Protocol))
+    @pytest.mark.parametrize("content", ["# Custom guide\n\nInstructions for café.", ""])
+    def test_shared_skill_payload(self, protocol: Protocol, content: str) -> None:
+        cell = cell_shortcuts.skill(document="custom-guide", content=content)
+
+        outputs = cell.render(protocol)
+
+        assert len(outputs) == 1
+        assert outputs[0].model_dump(exclude={"id"}) == {
+            "kind": "skill",
+            "media_type": "text/markdown",
+            "content": content,
+            "meta": {"type": "skill", "document": "custom-guide"},
+        }
+
+    def test_empty_document_name(self) -> None:
+        cell = cell_shortcuts.skill(document="", content="Instructions.")
+
+        assert cell.meta == {"type": "skill", "document": ""}
+
+
 class TestEnvironmentError:
     @pytest.mark.parametrize("protocol", list(Protocol))
     def test_retains_error_until_projection(self, protocol: Protocol) -> None:
