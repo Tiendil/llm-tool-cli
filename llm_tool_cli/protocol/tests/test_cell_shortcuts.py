@@ -12,7 +12,27 @@ class TestOperationSucceeded:
         assert cell.kind == "operation_succeeded"
         assert cell.media_type == "text/markdown"
         assert cell.content == "Done."
-        assert cell.meta == {"operation": "setup"}
+        assert cell.meta == {"type": "operation_succeeded", "operation": "setup"}
+
+    @pytest.mark.parametrize("protocol", list(Protocol))
+    @pytest.mark.parametrize("message", ["Done.", ""])
+    def test_default_success_payload(self, protocol: Protocol, message: str) -> None:
+        cell = cell_shortcuts.operation_succeeded(message)
+
+        outputs = cell.render(protocol)
+
+        assert len(outputs) == 1
+        assert outputs[0].model_dump(exclude={"id"}) == {
+            "kind": "operation_succeeded",
+            "media_type": "text/markdown",
+            "content": message,
+            "meta": {"type": "operation_succeeded"},
+        }
+
+    def test_explicit_metadata_retains_precedence(self) -> None:
+        cell = cell_shortcuts.operation_succeeded("Done.", type="custom_success", path="config.toml")
+
+        assert cell.meta == {"type": "custom_success", "path": "config.toml"}
 
 
 class TestOperationFailed:

@@ -4,7 +4,12 @@ from llm_tool_cli.protocol.output_cells.base import MetaValue
 
 
 def operation_succeeded(message: str, **meta: MetaValue) -> ContentCell:
-    return ContentCell(kind="operation_succeeded", media_type="text/markdown", content=message, meta=meta)
+    return ContentCell(
+        kind="operation_succeeded",
+        media_type="text/markdown",
+        content=message,
+        meta={"type": "operation_succeeded", **meta},
+    )
 
 
 def operation_failed(message: str, **meta: MetaValue) -> ContentCell:

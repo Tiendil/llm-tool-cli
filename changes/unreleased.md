@@ -12,6 +12,8 @@
 
 ### Changes
 
+- Default successful-operation cells to `type = operation_succeeded` metadata while preserving explicit caller metadata.
+
 - Add `protocol.cell_shortcuts.skill(document, content)` to construct shared Markdown skill cells with `document` and `type = skill` metadata.
 
 - Add a shared typed `EnvironmentErrorCell` with deferred projection of the native diagnostic record and corrective guidance into all output protocols.

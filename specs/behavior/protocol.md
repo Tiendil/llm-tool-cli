@@ -40,6 +40,8 @@ Output cell construction MUST NOT render or write output.
 Cell shortcuts MUST construct Markdown cells for informational messages, successful operations, and failed operations with the respective kinds `info`, `operation_succeeded`, and `operation_failed`.
 They MUST return protocol-independent content logic cells using the caller-supplied message and additional named metadata.
 They MUST support empty messages and omitted metadata.
+The successful-operation shortcut MUST default to `type = operation_succeeded` metadata when the caller omits it.
+Explicit caller metadata MUST retain precedence over that default.
 
 The skill-document shortcut MUST construct a protocol-independent Markdown content cell with kind `skill`.
 It MUST use the caller-supplied document name as `document` metadata, include `type = skill` metadata, and use the supplied document text as content.
