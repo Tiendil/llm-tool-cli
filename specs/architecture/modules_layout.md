@@ -99,6 +99,8 @@ Logic cells MUST NOT own output identifiers, cached output cells, filesystem acc
 The public `llm_tool_cli.protocol.cell_shortcuts` submodule MUST provide `info`, `operation_succeeded`, and `operation_failed` for constructing common Markdown content logic cells without selecting an output-cell type.
 It MUST also provide `skill(document: str, content: str) -> ContentCell` for constructing skill-document content logic cells.
 Consumers MUST own document selection, resource loading, and loading failures.
+The same shortcut submodule MUST provide `version(value: str) -> ContentCell` for constructing metadata-only version cells.
+Consumers MUST own package-version lookup and its failures.
 Output cells, logic cells, and rendering contexts MUST inherit the shared `BaseEntity` from the core module.
 The public `llm_tool_cli.protocol.output_cells` package MUST expose `HumanOutputCell`, `LLMOutputCell`, and `AutomationOutputCell` subclasses, whose `render` methods own complete protocol-specific cell formatting.
 Its `human`, `llm`, and `automation` submodules MUST own the respective implementations.

@@ -12,6 +12,8 @@
 
 ### Changes
 
+- Add `protocol.cell_shortcuts.version(value)` to construct metadata-only version cells with shared `type` and `version` metadata.
+
 - Add `protocol.rendering.write_cells` to render complete logic-cell batches, decode UTF-8, and write to the caller-selected standard stream.
 
 - Default successful-operation cells to `type = operation_succeeded` metadata while preserving explicit caller metadata.

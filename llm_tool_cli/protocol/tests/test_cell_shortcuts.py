@@ -77,6 +77,23 @@ class TestSkill:
         assert cell.meta == {"type": "skill", "document": ""}
 
 
+class TestVersion:
+    @pytest.mark.parametrize("protocol", list(Protocol))
+    @pytest.mark.parametrize("value", ["1.2.3", "1.2.3rc1+local", ""])
+    def test_shared_version_payload(self, protocol: Protocol, value: str) -> None:
+        cell = cell_shortcuts.version(value)
+
+        outputs = cell.render(protocol)
+
+        assert len(outputs) == 1
+        assert outputs[0].model_dump(exclude={"id"}) == {
+            "kind": "version",
+            "media_type": None,
+            "content": None,
+            "meta": {"type": "version", "version": value},
+        }
+
+
 class TestEnvironmentError:
     @pytest.mark.parametrize("protocol", list(Protocol))
     def test_retains_error_until_projection(self, protocol: Protocol) -> None:

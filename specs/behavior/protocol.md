@@ -47,6 +47,10 @@ The skill-document shortcut MUST construct a protocol-independent Markdown conte
 It MUST use the caller-supplied document name as `document` metadata, include `type = skill` metadata, and use the supplied document text as content.
 It MUST accept application-defined document names and empty content without loading resources or selecting a protocol.
 
+The version shortcut MUST construct a protocol-independent metadata-only cell with kind `version`.
+It MUST include `type = version` and the caller-supplied version string as `version` metadata, with no media type or content.
+It MUST preserve the supplied string without parsing it or looking up package metadata.
+
 Metadata values MUST support strings, integers, booleans, null values, and lists of strings.
 Conversion of arbitrary values to metadata MUST preserve values of those types, including empty lists, and use their string representation for other values.
 Conversion MUST NOT strip string whitespace or recursively convert unsupported collections.

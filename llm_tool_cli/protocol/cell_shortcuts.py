@@ -26,5 +26,9 @@ def skill(document: str, content: str) -> ContentCell:
     )
 
 
+def version(value: str) -> ContentCell:
+    return ContentCell(kind="version", meta={"type": "version", "version": value})
+
+
 def environment_error(error: EnvironmentError) -> EnvironmentErrorCell:
     return EnvironmentErrorCell(error=error)
