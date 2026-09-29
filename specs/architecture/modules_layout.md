@@ -104,6 +104,8 @@ The public `llm_tool_cli.protocol.output_cells` package MUST expose `HumanOutput
 Its `human`, `llm`, and `automation` submodules MUST own the respective implementations.
 Logic-cell projections MUST construct the corresponding concrete output-cell subtype before final rendering.
 The public `llm_tool_cli.protocol.rendering.render_cells` function MUST accept an iterable of logic cells and explicit keyword-only `protocol` and `tool_label` arguments, project the logic cells for that protocol, calculate rendering contexts for the complete output-cell sequence, and concatenate rendered bytes.
+The same public submodule MUST provide `write_cells(cells, *, protocol, tool_label, stderr=False) -> None`, composing sequence rendering, UTF-8 decoding, and shared text writing with caller-selected stream routing.
+The rendering function MUST remain free of output side effects; the writing function MUST own emission without classifying cells or selecting exit statuses.
 Output-cell type selection MUST belong to logic-cell projections rather than a separate selector exposed to application code.
 The `llm_tool_cli.protocol.cell_shortcuts.environment_error(error)` helper MUST construct a shared `EnvironmentErrorCell`; it MUST NOT serialize the error, select a protocol, or render content.
 The public `llm_tool_cli.protocol.errors` submodule MUST own the internal `ContentWithoutMediaType` and `UnsupportedFormatterMode` exceptions under a protocol-specific `InternalError` root derived from the shared internal-error base.

@@ -12,6 +12,8 @@
 
 ### Changes
 
+- Add `protocol.rendering.write_cells` to render complete logic-cell batches, decode UTF-8, and write to the caller-selected standard stream.
+
 - Default successful-operation cells to `type = operation_succeeded` metadata while preserving explicit caller metadata.
 
 - Add `protocol.cell_shortcuts.skill(document, content)` to construct shared Markdown skill cells with `document` and `type = skill` metadata.

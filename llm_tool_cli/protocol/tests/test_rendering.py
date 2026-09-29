@@ -1,12 +1,15 @@
+import io
 import json
+import sys
 
 import pytest
+from pytest_mock import MockerFixture
 
 from llm_tool_cli.protocol import Protocol
 from llm_tool_cli.protocol.logic_cells import ContentCell
 from llm_tool_cli.protocol.logic_cells.base import LogicCell
 from llm_tool_cli.protocol.output_cells.base import OutputCell, RenderContext
-from llm_tool_cli.protocol.rendering import render_cells
+from llm_tool_cli.protocol.rendering import render_cells, write_cells
 
 
 class PositionedOutputCell(OutputCell):
@@ -73,3 +76,76 @@ class TestRenderCells:
 
         assert first.pop("id") != second.pop("id")
         assert first == second == {"content": None}
+
+
+class TestWriteCells:
+    @pytest.mark.parametrize("protocol", list(Protocol))
+    @pytest.mark.parametrize("stderr", [False, True])
+    def test_unicode_and_stream_selection(
+        self, capsys: pytest.CaptureFixture[str], protocol: Protocol, stderr: bool
+    ) -> None:
+        cell = ContentCell(kind="message", media_type="text/markdown", content="café 日本語", meta={"type": "message"})
+
+        write_cells([cell], protocol=protocol, tool_label="TOOL", stderr=stderr)
+
+        captured = capsys.readouterr()
+        output = captured.err if stderr else captured.out
+        assert (captured.out if stderr else captured.err) == ""
+        if protocol == Protocol.automation:
+            records = [json.loads(line) for line in output.splitlines()]
+            assert len(records) == 1
+            assert records[0].pop("id")
+            assert records == [{"content": "café 日本語", "type": "message"}]
+            assert output.endswith("\n")
+        else:
+            assert "café 日本語" in output
+            if protocol == Protocol.human:
+                assert output.startswith("----- TOOL CELL ")
+                assert output.endswith("\n\n")
+            else:
+                assert output.startswith("--TOOL-CELL ")
+                assert output.endswith(" END--\n")
+
+    def test_generator_batch_uses_stdout_by_default(self, capsys: pytest.CaptureFixture[str]) -> None:
+        cells = (PositionedLogicCell(items=items) for items in [("café", "second"), (), ("third",)])
+
+        write_cells(cells, protocol=Protocol.human, tool_label="  TOOL  ")
+
+        captured = capsys.readouterr()
+        assert captured.out == "  TOOL   0/3: café\n  TOOL   1/3: second\n  TOOL   2/3: third\n"
+        assert captured.err == ""
+
+    @pytest.mark.parametrize("cells", [[], [PositionedLogicCell(items=())]])
+    def test_empty_output(self, capsys: pytest.CaptureFixture[str], cells: list[LogicCell]) -> None:
+        write_cells(cells, protocol=Protocol.human, tool_label="TOOL")
+
+        captured = capsys.readouterr()
+        assert captured.out == captured.err == ""
+
+    @pytest.mark.parametrize(
+        ("last_output", "exception_type"),
+        [(RuntimeError("render failed"), RuntimeError), (b"\xff", UnicodeDecodeError)],
+    )
+    def test_render_or_decode_failure_writes_nothing(
+        self,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+        last_output: bytes | Exception,
+        exception_type: type[Exception],
+    ) -> None:
+        mocker.patch.object(PositionedOutputCell, "render", side_effect=[b"first\n", last_output])
+        cell = PositionedLogicCell(items=("first", "second"))
+
+        with pytest.raises(exception_type):
+            write_cells([cell], protocol=Protocol.human, tool_label="TOOL")
+
+        captured = capsys.readouterr()
+        assert captured.out == captured.err == ""
+
+    def test_stream_failure_propagates(self, mocker: MockerFixture) -> None:
+        stream = io.StringIO()
+        mocker.patch.object(stream, "write", side_effect=OSError("write failed"))
+        mocker.patch.object(sys, "stdout", stream)
+
+        with pytest.raises(OSError, match="write failed"):
+            write_cells([ContentCell(kind="message")], protocol=Protocol.human, tool_label="TOOL")

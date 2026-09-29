@@ -143,3 +143,13 @@ Writing MUST preserve supplied text, including empty text, surrounding whitespac
 It MUST NOT add a newline, flush explicitly, or change the stream's encoding.
 Callers MUST supply any required line or record terminators.
 Stream failures MUST propagate to the caller.
+
+## Cell writing
+
+Cell writing MUST accept an iterable of logic cells, an explicit protocol, and a tool label.
+It MUST render the complete sequence, decode the rendered UTF-8 bytes, and write the resulting text through the shared text-writing behavior.
+It MUST preserve cell ordering, batch positions and totals, framing, Unicode content, and record terminators.
+It MUST use standard output by default and standard error only when requested by the caller, independently of cell kind and protocol.
+Empty sequences and empty projections MUST produce no output text.
+Rendering and decoding failures MUST propagate before any text is written; stream failures MUST also propagate.
+Error classification, stream-routing policy, and exit status selection MUST remain consumer-owned.
