@@ -12,6 +12,8 @@
 
 ### Changes
 
+- Add `skills.load_skill_text(package, document)` to read packaged UTF-8 Markdown, returning shared `SkillUnreadable` diagnostics with document, reason, and private cause on read failures.
+
 - Add `protocol.cell_shortcuts.version(value)` to construct metadata-only version cells with shared `type` and `version` metadata.
 
 - Add `protocol.rendering.write_cells` to render complete logic-cell batches, decode UTF-8, and write to the caller-selected standard stream.

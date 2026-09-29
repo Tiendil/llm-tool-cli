@@ -98,7 +98,7 @@ Its `environment_error` submodule MUST own error-cell content, corrective guidan
 Logic cells MUST NOT own output identifiers, cached output cells, filesystem access, or output writing.
 The public `llm_tool_cli.protocol.cell_shortcuts` submodule MUST provide `info`, `operation_succeeded`, and `operation_failed` for constructing common Markdown content logic cells without selecting an output-cell type.
 It MUST also provide `skill(document: str, content: str) -> ContentCell` for constructing skill-document content logic cells.
-Consumers MUST own document selection, resource loading, and loading failures.
+Consumers MUST own document selection and supply already loaded text to the shortcut.
 The same shortcut submodule MUST provide `version(value: str) -> ContentCell` for constructing metadata-only version cells.
 Consumers MUST own package-version lookup and its failures.
 Output cells, logic cells, and rendering contexts MUST inherit the shared `BaseEntity` from the core module.
@@ -112,6 +112,11 @@ Output-cell type selection MUST belong to logic-cell projections rather than a s
 The `llm_tool_cli.protocol.cell_shortcuts.environment_error(error)` helper MUST construct a shared `EnvironmentErrorCell`; it MUST NOT serialize the error, select a protocol, or render content.
 The public `llm_tool_cli.protocol.errors` submodule MUST own the internal `ContentWithoutMediaType` and `UnsupportedFormatterMode` exceptions under a protocol-specific `InternalError` root derived from the shared internal-error base.
 Consumer-specific cell kinds and content, domain record construction and rendering, journal models and formatting, CLI defaults and parsing, output routing, error classification, and exit selection MUST remain consumer-owned.
+
+The skills module MUST own packaged skill-document loading independently of protocol cells.
+Its public interface MUST provide `llm_tool_cli.skills.load_skill_text(package: str, document: str) -> Result[str]`, with implementation in `skills.fixtures`.
+The public `llm_tool_cli.skills.errors` submodule MUST own `SkillUnreadable` under a module-specific `EnvironmentError` root derived from the shared environment-error base.
+Application document enums, package selection, and Markdown resources MUST remain consumer-owned.
 
 ## Import boundaries
 
