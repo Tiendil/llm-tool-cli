@@ -2,7 +2,7 @@
 
 ## Goal of the document
 
-This document defines shared output protocol names, output cells, cell and error formatting, JSON Lines serialization, and direct text writing.
+This document defines shared output protocol names, output cells, logic-cell rendering, cell formatting and environment-error cells, JSON Lines serialization, and direct text writing.
 
 ## Scope
 
@@ -13,11 +13,12 @@ Consumer-specific records and journal layouts, command parsing, defaults, error 
 
 The library MUST provide the stable output protocol values `human`, `llm`, and `automation`.
 Consumers MUST select their own defaults and project application data into cells or their own records.
-Shared formatter selection MUST support each protocol and raise an internal exception with the supplied mode when the mode is unsupported.
+Logic-cell projections MUST support each protocol and choose the corresponding output-cell type.
 
 ## Output cells
 
-A cell MUST carry:
+An output cell MUST contain prepared content and metadata and own final rendering for its selected protocol.
+It MUST carry:
 
 - a UUID identifier, generated as a new UUID version 4 when omitted.
 - a consumer-defined kind.
@@ -34,10 +35,10 @@ Metadata-only construction MUST set both media type and content to absent.
 Markdown construction MUST use `text/markdown` as the media type.
 The helpers MUST collect additional named metadata into the cell's metadata mapping.
 They MUST raise an internal exception when content is supplied without a media type, including when the supplied content is an empty string.
-Cell construction MUST NOT render or write output.
+Output cell construction MUST NOT render or write output.
 
 Cell shortcuts MUST construct Markdown cells for informational messages, successful operations, and failed operations with the respective kinds `info`, `operation_succeeded`, and `operation_failed`.
-They MUST use the supplied message as content and collect additional named metadata through the shared cell construction behavior.
+They MUST return protocol-independent content logic cells using the caller-supplied message and additional named metadata.
 They MUST support empty messages and omitted metadata.
 
 Metadata values MUST support strings, integers, booleans, null values, and lists of strings.
@@ -46,13 +47,34 @@ Conversion MUST NOT strip string whitespace or recursively convert unsupported c
 
 **Example:** A list of strings remains a list, while a mixed list or a floating-point value becomes its string representation.
 
+## Logic cells
+
+A logic cell MUST hold the consumer data needed to produce output cells for a selected protocol.
+Rendering MUST select the consumer-defined projection for that protocol and return an ordered list of zero or more output cells of the corresponding protocol-specific type.
+Each supported protocol MUST have an explicit projection; consumers MAY share projection logic when the desired cell payloads are the same.
+Consumers MUST own domain-specific projection payloads and ordering; shared logic cells MUST own their common projection contracts.
+Rendering MUST leave the input data unchanged and MUST NOT load files, execute commands, or write output.
+Output identifiers MUST belong to the produced output cells, independently of the logic cell.
+Repeated rendering MUST recompute output cells rather than reuse cached output cells.
+Callers with already prepared content MUST be able to use a shared content logic cell that projects the same kind, media type, content, and metadata into one output cell for each protocol.
+Content logic cells MUST support metadata-only output and reject content without a media type, including empty content.
+They MUST NOT retain generated output identifiers or cached projections.
+Application cell-emission boundaries MUST accept logic cells; output-cell construction belongs to their projections.
+
+**Example:** The same dependency data can become one grouped Markdown output cell for a text protocol and several metadata-only output cells for automation.
+
 ## Cell formatting
 
-Formatters MUST return UTF-8 bytes, including the required record terminators.
-They MUST NOT write output, choose streams, classify errors, or select exit statuses.
+Each output cell MUST render itself as UTF-8 bytes, including the required record terminators, without selecting a protocol again.
+Rendering MUST NOT write output, choose streams, classify errors, or select exit statuses.
 Formatting MUST NOT mutate the cell.
+Rendering context MUST provide the cell's zero-based position, the total number of output cells in the supplied sequence, and the caller's tool label.
+The position MUST be nonnegative and smaller than the positive total.
+Sequence rendering MUST accept logic cells and a selected protocol, flatten their projections in input order, calculate positions and totals for the complete output-cell sequence, and concatenate the rendered bytes without additional separators.
+An empty sequence MUST produce empty bytes; a single cell MUST receive position zero and total one.
+The standard output-cell types MUST preserve their boundaries for both single-cell and multiple-cell sequences.
 Text cell boundaries MUST use the caller-supplied tool label without changing it.
-The label MUST NOT affect automation records or error formatting.
+The label MUST NOT affect automation records.
 
 ### Human and LLM cells
 
@@ -75,17 +97,29 @@ Automation cells MUST use the shared JSON Lines serialization.
 Each record MUST include `id` and `content` fields together with metadata as top-level fields.
 The `id` field MUST default to the compact cell identifier.
 Nonempty content MUST have surrounding whitespace stripped; absent or empty content MUST become JSON null.
-The formatter MUST NOT automatically add the cell kind, media type, or tool label.
+Rendering MUST NOT automatically add the cell kind, media type, or tool label.
 
 Metadata named `id` MUST override the generated identifier in the record.
 The cell content MUST override metadata named `content`.
 These precedence rules preserve the existing flattened record contract.
 
-## Error formatting
+## Environment-error cells
 
-Human and LLM error formatting MUST return the shared environment error's formatted message followed by a newline.
-Automation error formatting MUST serialize the shared error's native diagnostic record as one JSON Line, without a cell envelope or tool label.
-Error formatting MUST preserve the error's diagnostic fields and MUST NOT translate the error into a consumer-specific type.
+The library MUST provide an environment-error logic cell that retains the concrete structured error, including its typed context and corrective guidance, until projection.
+Construction MUST NOT serialize the error or prepare output content.
+Each projection MUST produce one output cell with kind `error` and media type `text/markdown`, using the ordinary rendering path.
+The error's formatted message MUST become cell content rather than duplicated `message` metadata, without adding an introductory prefix.
+Corrective guidance MUST be formatted against the error and have surrounding whitespace stripped.
+One fix MUST follow the message on a new line prefixed with `Way to fix: `.
+Multiple fixes MUST follow a blank line, the heading `Ways to fix:`, and another blank line, with each fix prefixed by `- ` on its own line.
+Absent guidance MUST add no text.
+The same content and metadata MUST be used for all supported protocols.
+The remaining native diagnostic record fields, including `type = error`, `code`, and serialized context, MUST become metadata through the shared metadata conversion rules.
+Construction MUST leave the error unchanged, retain its native code, and exclude private causes and message templates.
+Optional null context MUST be retained according to the native diagnostic record contract.
+Error cells MUST use ordinary cell identifiers, framing, serialization, and sequence rendering in every protocol.
+The core environment-error model MUST remain independent of cell construction and rendering.
+Stream routing and exit status selection MUST remain consumer-owned.
 
 ## JSON Lines serialization
 

@@ -1,13 +1,19 @@
-from llm_tool_cli.protocol.cells import Cell, MetaValue
+from llm_tool_cli.core.errors import EnvironmentError
+from llm_tool_cli.protocol.logic_cells import ContentCell, EnvironmentErrorCell
+from llm_tool_cli.protocol.output_cells.base import MetaValue
 
 
-def operation_succeeded(message: str, **meta: MetaValue) -> Cell:
-    return Cell.build(kind="operation_succeeded", media_type="text/markdown", content=message, **meta)
+def operation_succeeded(message: str, **meta: MetaValue) -> ContentCell:
+    return ContentCell(kind="operation_succeeded", media_type="text/markdown", content=message, meta=meta)
 
 
-def operation_failed(message: str, **meta: MetaValue) -> Cell:
-    return Cell.build(kind="operation_failed", media_type="text/markdown", content=message, **meta)
+def operation_failed(message: str, **meta: MetaValue) -> ContentCell:
+    return ContentCell(kind="operation_failed", media_type="text/markdown", content=message, meta=meta)
 
 
-def info(message: str, **meta: MetaValue) -> Cell:
-    return Cell.build(kind="info", media_type="text/markdown", content=message, **meta)
+def info(message: str, **meta: MetaValue) -> ContentCell:
+    return ContentCell(kind="info", media_type="text/markdown", content=message, meta=meta)
+
+
+def environment_error(error: EnvironmentError) -> EnvironmentErrorCell:
+    return EnvironmentErrorCell(error=error)

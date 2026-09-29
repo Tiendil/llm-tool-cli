@@ -1,4 +1,8 @@
-from llm_tool_cli.protocol import cell_shortcuts
+import pytest
+
+from llm_tool_cli.core.errors import EnvironmentError
+from llm_tool_cli.protocol import Protocol, cell_shortcuts
+from llm_tool_cli.protocol.logic_cells import EnvironmentErrorCell
 
 
 class TestOperationSucceeded:
@@ -29,3 +33,15 @@ class TestInfo:
         assert cell.media_type == "text/markdown"
         assert cell.content == "Ready."
         assert cell.meta == {"scope": "workspace"}
+
+
+class TestEnvironmentError:
+    @pytest.mark.parametrize("protocol", list(Protocol))
+    def test_retains_error_until_projection(self, protocol: Protocol) -> None:
+        error = EnvironmentError(code="unavailable", message="Try later.", ways_to_fix=["Retry."])
+
+        cell = cell_shortcuts.environment_error(error)
+
+        assert isinstance(cell, EnvironmentErrorCell)
+        assert cell.error == error
+        assert cell.render(protocol)[0].content == "Try later.\nWay to fix: Retry."

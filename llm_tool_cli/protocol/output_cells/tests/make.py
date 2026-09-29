@@ -1,9 +1,9 @@
 import uuid
 
-from llm_tool_cli.protocol.cells import Cell
+from llm_tool_cli.protocol.output_cells.base import OutputCell
 
 
-def cell(**kwargs: object) -> Cell:
+def cell(cell_type: type[OutputCell], **kwargs: object) -> OutputCell:
     values = {
         "id": uuid.UUID("12345678-1234-5678-9234-567812345678"),
         "kind": "sample_status",
@@ -12,4 +12,4 @@ def cell(**kwargs: object) -> Cell:
         "meta": {"zeta": 2, "alpha": "first", "enabled": True, "missing": None},
     }
     values.update(kwargs)
-    return Cell.model_validate(values)
+    return cell_type.model_validate(values)

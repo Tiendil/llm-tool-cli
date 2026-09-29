@@ -1,5 +1,9 @@
 ### Migration
 
+- `cell_shortcuts.environment_error(error)` now returns `protocol.logic_cells.EnvironmentErrorCell`, retaining the concrete error until projection. Access typed data through `cell.error`; obtain content and metadata from `cell.render(protocol)`. Error content now includes formatted corrective guidance when supplied.
+
+- Import `ContentCell` from `protocol.logic_cells` and `LogicCell` from `protocol.logic_cells.base` instead of the removed `protocol.cells` module. Construct `ContentCell` for prepared content and metadata, or subclass `LogicCell` for protocol-specific projections. Construct concrete output cells only inside projections; `OutputCell`, `RenderContext`, `MetaValue`, and `to_meta_value` live in `protocol.output_cells.base`. The `protocol.modes.get_output_cell_type` selector is removed, and message shortcuts no longer accept `cell_type`.
+- Replace the removed cell formatter family with `protocol.rendering.render_cells(logic_cells, protocol=..., tool_label=...)`. Construct shared diagnostics with `protocol.cell_shortcuts.environment_error(error)` and render them through that same logic-cell path. Output cells still support direct `render(RenderContext(...))` calls within output-layer integrations. The separate `render_error` function is removed.
 - Pass `.` instead of an empty string to `paths.normalize_path` when referring to an explicit directory base below the project root; empty inputs now return `invalid_project_path`.
 - Replace `Result[T, EnvironmentErrors]` annotations with `Result[T]`. Failures always carry `EnvironmentErrors`; `Err`, `UnwrapError`, and `map_err` no longer accept arbitrary error payloads.
 - Configuration operations now return `Result[T]`; handle or propagate environment-error values instead of catching configuration exceptions. Configuration error models accept keyword fields, expose formatted text through `format_message()`, and retain original exceptions through `cause`.
@@ -8,9 +12,17 @@
 
 ### Changes
 
-- Add shared human, LLM, and automation cell/error formatters with explicit text boundary labels, preserving cell layouts, JSON field precedence, and shared diagnostic records. Journal formatting remains consumer-owned.
+- Add a shared typed `EnvironmentErrorCell` with deferred projection of the native diagnostic record and corrective guidance into all output protocols.
+
+- Add shared `ContentCell` logic cells and make sequence rendering project and flatten logic cells before calculating output positions. Message shortcuts return logic cells; output identifiers are created during projection.
+
+- Render environment errors as ordinary cells with Markdown message content, native code and diagnostic metadata, generated identifiers, and standard protocol framing. Automation messages move from `message` to `content`; diagnostic context follows ordinary cell metadata conversion.
+
+- Let protocol-specific output cells own final rendering, with a shared context supplying position, sequence size, and tool label. Preserve cell layouts and JSON field precedence; journal formatting remains consumer-owned.
 - Add `protocol.cell_shortcuts` for constructing informational, successful-operation, and failed-operation Markdown cells through the shared cell model.
-- Add `protocol.cells.Cell`, metadata helpers, and the shared `ContentWithoutMediaType` internal exception, preserving cell construction and compact UUID identifiers.
+- Add `protocol.output_cells.base.OutputCell`, metadata helpers, and the shared `ContentWithoutMediaType` internal exception, preserving cell construction and compact UUID identifiers.
+- Organize shared logic cells in `protocol.logic_cells`, with `LogicCell` in `base` and `ContentCell` in `content`, alongside the existing `protocol.output_cells` package.
+- Add `protocol.logic_cells.base.LogicCell` for consumer data with separate human, LLM, and automation projections into ordered output cells.
 - Add `protocol.Protocol`, `protocol.to_jsonl`, and `protocol.write_output` for shared protocol names, compact Unicode JSON Lines, and direct text output without automatic newlines or flushing.
 - Reject empty inputs in shared mixed path normalization with an empty diagnostic `path`, preserving root-resolution failure precedence.
 - Add `paths.UntrustedPath` as a shared semantic type for filesystem inputs without established resolution or containment guarantees, preserving ordinary `Path` runtime behavior.
