@@ -16,6 +16,10 @@
 
 ### Changes
 
+- Standardize the shared Typer runtime dependency on `~=0.25.1`.
+
+- Add `cli.context.set_global_options` and `get_global_options` for shared Typer context storage, nested-command access, and invocation isolation. Add Typer as a runtime dependency.
+
 - Add `config.resolve_init_config_path` for explicit or current-directory initialization targets, with semantic path types and shared resolution diagnostics, without upward discovery or file creation.
 
 - Add shared `cli.entities.GlobalOptions` with a typed configuration path and protocol selection: explicit choices win, `skill` defaults to `llm`, and other commands default to `human`.
