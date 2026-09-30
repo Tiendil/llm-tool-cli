@@ -1,5 +1,9 @@
 ### Migration
 
+- Replace the removed production `scoped_settings` context manager with the `isolated_settings` pytest fixture from `core.tests.fixtures`. Import the fixture into a test module or `conftest.py` and request it before initializing the label.
+
+- Initialize `core.settings` with a `ToolLabel` before CLI parsing or shared sequence rendering. Remove `tool_label` from `render_cells` and `write_cells`, and replace `Annotated[Protocol | None, protocol_option(tool_label=...)]` with `cli.options.ProtocolOption`. Reading an unset label or installing a conflicting label raises an internal exception; tests can request `core.tests.fixtures.isolated_settings` and initialize their label through the real settings API.
+
 - Recover result-unwrapping diagnostics through `UnwrapError.errors` instead of casting `details["error"]`. Payloads must be lists of environment errors; the accessor and `unwrap_to_error` now re-raise the original exception for missing or malformed payloads.
 
 - Pass `paths.ProjectConfigPath` to `config.create_config` and `config.create_config_from_template`. The semantic type marks the configuration target without adding runtime validation or path resolution.
@@ -7,7 +11,7 @@
 - `cell_shortcuts.environment_error(error)` now returns `protocol.logic_cells.EnvironmentErrorCell`, retaining the concrete error until projection. Access typed data through `cell.error`; obtain content and metadata from `cell.render(protocol)`. Error content now includes formatted corrective guidance when supplied.
 
 - Import `ContentCell` from `protocol.logic_cells` and `LogicCell` from `protocol.logic_cells.base` instead of the removed `protocol.cells` module. Construct `ContentCell` for prepared content and metadata, or subclass `LogicCell` for protocol-specific projections. Construct concrete output cells only inside projections; `OutputCell`, `RenderContext`, `MetaValue`, and `to_meta_value` live in `protocol.output_cells.base`. The `protocol.modes.get_output_cell_type` selector is removed, and message shortcuts no longer accept `cell_type`.
-- Replace the removed cell formatter family with `protocol.rendering.render_cells(logic_cells, protocol=..., tool_label=...)`. Construct shared diagnostics with `protocol.cell_shortcuts.environment_error(error)` and render them through that same logic-cell path. Output cells still support direct `render(RenderContext(...))` calls within output-layer integrations. The separate `render_error` function is removed.
+- Replace the removed cell formatter family with `protocol.rendering.render_cells(logic_cells, protocol=...)`. Construct shared diagnostics with `protocol.cell_shortcuts.environment_error(error)` and render them through that same logic-cell path. Output cells still support direct `render(RenderContext(...))` calls within output-layer integrations. The separate `render_error` function is removed.
 - Pass `.` instead of an empty string to `paths.normalize_path` when referring to an explicit directory base below the project root; empty inputs now return `invalid_project_path`.
 - Replace `Result[T, EnvironmentErrors]` annotations with `Result[T]`. Failures always carry `EnvironmentErrors`; `Err`, `UnwrapError`, and `map_err` no longer accept arbitrary error payloads.
 - Configuration operations now return `Result[T]`; handle or propagate environment-error values instead of catching configuration exceptions. Configuration error models accept keyword fields, expose formatted text through `format_message()`, and retain original exceptions through `cause`.
@@ -15,6 +19,10 @@
 - Result exceptions expose payloads through `details` instead of `arguments` and use the shared `InternalError` message and string representation. Unwrap exceptions inherit directly from `InternalError`; the intermediate `ResultError` base is removed.
 
 ### Changes
+
+- Add typed process-wide application label initialization, idempotent same-label setup, explicit uninitialized/conflicting-label errors, and a shared pytest fixture for settings isolation. Sequence rendering reads the label once per batch; protocol parsing uses the same shared setting.
+
+- Add `cli.options.ProtocolOption` for common protocol aliases, help, and parsing. Unsupported values emit an LLM `invalid_arguments` error cell on stderr and exit with status `1`.
 
 - Add `cli.options.ConfigOption` for shared Typer `--config` parsing into `ProjectConfigPath`, deferring filesystem validation and resolution to configuration operations.
 

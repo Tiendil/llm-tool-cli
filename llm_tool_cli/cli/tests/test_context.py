@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Annotated
 
 import pytest
 import typer
@@ -8,7 +7,7 @@ from typer.testing import CliRunner
 
 from llm_tool_cli.cli.context import get_global_options, set_global_options
 from llm_tool_cli.cli.entities import GlobalOptions
-from llm_tool_cli.cli.options import ConfigOption
+from llm_tool_cli.cli.options import ConfigOption, ProtocolOption
 from llm_tool_cli.paths import ProjectConfigPath
 from llm_tool_cli.protocol import Protocol
 
@@ -38,7 +37,7 @@ class TestSetGlobalOptions:
         @app.callback()
         def initialize(
             context: typer.Context,
-            protocol: Annotated[Protocol | None, typer.Option()] = None,
+            protocol: ProtocolOption = None,
             config: ConfigOption = None,
         ) -> None:
             set_global_options(

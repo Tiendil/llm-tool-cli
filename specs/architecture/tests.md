@@ -38,6 +38,9 @@ Tests that require specific state MUST prepare it explicitly at the start of the
 Tests MUST prepare and mutate application-owned state through the production code that owns the corresponding state transition and invariants.
 Tests MUST NOT bypass production logic by writing directly to application-owned state unless the developer explicitly approves the exception.
 An approved exception MUST be documented next to the bypass and MUST explain why the required state cannot be produced through production code.
+The shared application-settings isolation fixture MAY reset private label storage as an approved test-only exception, because production initialization deliberately cannot clear or replace an installed label.
+It MUST use `pytest-mock` to restore the previous value after the test, including when the test fails.
+Tests using this fixture MUST exercise real settings initialization and access.
 Tests MAY inspect application-owned state directly to assert observable effects; this permission does not allow direct mutation.
 Tests MUST NOT clean up shared application-owned state after themselves unless the developer explicitly requests cleanup behavior.
 
@@ -76,6 +79,7 @@ Constructors MUST NOT contain assertions.
 Reusable setup, assertion, and workflow helpers SHOULD live in the owning test package's `helpers` module.
 Cleanup helpers for permitted cleanup SHOULD live there with the other test workflow utilities so their ownership is clear.
 The `helpers` module MUST NOT contain ordinary test-data constructors when those constructors fit the `make` module.
+Reusable pytest fixtures MUST live in the owning test package's `fixtures` module.
 Tests MAY reuse constructors, fixtures, and helpers from another module's `tests` package to avoid duplicating non-owned setup or to support integration coverage.
 Cross-module test helper reuse MUST remain test-only.
 Production code MUST NOT import test helpers.

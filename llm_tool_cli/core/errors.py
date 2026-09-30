@@ -31,6 +31,14 @@ class InternalError(Exception):
         return super().__str__()
 
 
+class ToolLabelNotInitialized(InternalError):
+    message_template = "Initialize the tool label before rendering cells."
+
+
+class ToolLabelAlreadyInitialized(InternalError):
+    message_template = "Tool label is already initialized as {current!r}; cannot initialize it as {requested!r}."
+
+
 class EnvironmentError(BaseEntity):
     """An expected operational failure returned as data.
 

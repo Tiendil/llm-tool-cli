@@ -78,12 +78,12 @@ Application cell-emission boundaries MUST accept logic cells; output-cell constr
 Each output cell MUST render itself as UTF-8 bytes, including the required record terminators, without selecting a protocol again.
 Rendering MUST NOT write output, choose streams, classify errors, or select exit statuses.
 Formatting MUST NOT mutate the cell.
-Rendering context MUST provide the cell's zero-based position, the total number of output cells in the supplied sequence, and the caller's tool label.
+Rendering context MUST provide the cell's zero-based position, the total number of output cells in the supplied sequence, and a tool label.
 The position MUST be nonnegative and smaller than the positive total.
-Sequence rendering MUST accept logic cells and a selected protocol, flatten their projections in input order, calculate positions and totals for the complete output-cell sequence, and concatenate the rendered bytes without additional separators.
+Sequence rendering MUST read the initialized application label once per batch, accept logic cells and a selected protocol, flatten their projections in input order, calculate positions and totals for the complete output-cell sequence, and concatenate the rendered bytes without additional separators.
 An empty sequence MUST produce empty bytes; a single cell MUST receive position zero and total one.
 The standard output-cell types MUST preserve their boundaries for both single-cell and multiple-cell sequences.
-Text cell boundaries MUST use the caller-supplied tool label without changing it.
+Text cell boundaries MUST use the rendering context's tool label without changing it.
 The label MUST NOT affect automation records.
 
 ### Human and LLM cells
@@ -150,7 +150,7 @@ Stream failures MUST propagate to the caller.
 
 ## Cell writing
 
-Cell writing MUST accept an iterable of logic cells, an explicit protocol, and a tool label.
+Cell writing MUST accept an iterable of logic cells and an explicit protocol, obtaining its label through shared sequence rendering.
 It MUST render the complete sequence, decode the rendered UTF-8 bytes, and write the resulting text through the shared text-writing behavior.
 It MUST preserve cell ordering, batch positions and totals, framing, Unicode content, and record terminators.
 It MUST use standard output by default and standard error only when requested by the caller, independently of cell kind and protocol.

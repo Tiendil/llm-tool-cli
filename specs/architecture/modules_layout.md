@@ -63,7 +63,10 @@ Its `protocol_for(command_name: str) -> Protocol` method MUST apply explicit pro
 The parsed options entity MUST remain independent of CLI frameworks and application execution contexts.
 The library MUST own the Typer runtime dependency and its supported version constraint for shared CLI context integration.
 The public `llm_tool_cli.cli.options` submodule MUST provide the Typer `ConfigOption` annotation, parsing `--config` values into `ProjectConfigPath | None` without filesystem validation or resolution.
-Consumers MUST use that annotation directly, own their remaining option parsing, and pass the invoked command name when selecting the effective protocol.
+The same submodule MUST provide `protocol_option(*, tool_label: str) -> typer.models.OptionInfo` for use with a `Protocol | None` parameter annotation.
+It MUST own protocol option aliases, help, value parsing, and invalid-value LLM error-cell emission with the supplied label before command execution.
+The public `llm_tool_cli.cli.errors` submodule MUST own `InvalidProtocol`, carrying `reason` under a module-specific `EnvironmentError` root derived from the shared environment-error base.
+Consumers MUST use these shared option definitions directly, own their remaining option parsing, and pass the invoked command name when selecting the effective protocol.
 
 The paths module MUST own lexical project-path operations, filesystem resolution and containment, and conversion of resolved filesystem paths to canonical identifiers, together with their semantic types and environment errors.
 Lexical operations MUST include canonical identifier checking, normalization, and component extraction.

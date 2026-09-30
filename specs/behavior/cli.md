@@ -1,13 +1,24 @@
-# Shared command-line options
+# Shared command-line setup and options
 
 ## Goal of the document
 
-This document describes shared invocation options, their availability within an invocation, and command output protocol selection.
+This document describes shared application setup, invocation options, and output protocol selection.
 
 ## Scope
 
-This specification covers reusable behavior for global command-line options and their parsing.
-Command execution, configuration loading, and output rendering are out of scope.
+This specification covers reusable application setup and global command-line option behavior.
+Command execution, configuration loading, and output-cell layouts are out of scope.
+
+## Application identity
+
+The application MUST initialize its process-wide tool label before command-line parsing or shared sequence rendering.
+The label MUST preserve its exact string value, including whitespace and an empty string.
+The label MUST remain separate from parsed invocation options and MUST NOT be obtained from workspace configuration.
+Reading an uninitialized label MUST raise an internal exception.
+Repeated initialization with the same label MUST succeed without changing it.
+Initialization with a different label MUST raise an internal exception and preserve the installed label.
+
+**Example:** An unsupported protocol can produce an error cell with the application's label before its root command callback runs.
 
 ## Global options
 
@@ -27,6 +38,18 @@ An option supplied without a value MUST remain a command-line parsing error.
 
 **Example:** A directory supplied as `--config PATH` reaches configuration loading and produces a shared configuration diagnostic.
 A command that only prints a version can run with that same option because it does not use configuration.
+
+## Protocol option
+
+`-p PROTOCOL` and `--protocol PROTOCOL` MUST be aliases for one optional global option accepted before the subcommand.
+Accepted values MUST be the exact, case-sensitive names of the shared output protocols.
+Omission MUST leave the protocol unspecified for command-default selection.
+Help MUST identify the option value as `PROTOCOL` and describe the accepted values and shared command defaults.
+
+An unsupported value MUST stop execution before the command runs, write one LLM error cell to stderr, and exit with status `1`.
+The cell MUST use the initialized application tool label, the diagnostic code `invalid_arguments`, and a `reason` identifying the rejected value and the accepted values.
+The fallback MUST always use LLM output because the requested protocol is invalid.
+Supplying the option without a value MUST remain a framework command-line parsing error.
 
 ## Invocation context
 
