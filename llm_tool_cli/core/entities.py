@@ -1,6 +1,14 @@
+from enum import IntEnum
 from typing import Self
 
 import pydantic
+
+
+class ExitCode(IntEnum):
+    success = 0
+    invalid_arguments = 1
+    configuration_error = 2
+    environment_error = 3
 
 
 class BaseEntity(pydantic.BaseModel):

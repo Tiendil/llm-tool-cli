@@ -106,6 +106,11 @@ Environment errors MUST expose stable error codes.
 Error codes MUST contain only lowercase ASCII letters, ASCII digits, `_`, and `.`.
 Their exact values and compatibility requirements MUST be specified with the owning capability.
 
+Environment errors MUST declare their process exit status through an inherited `cli_exit_code: ClassVar[ExitCode]`, independently of the diagnostic `code` and any exit-code context from external commands.
+The shared base MUST default to `ExitCode.environment_error`; module roots and concrete error classes MAY override that class attribute.
+The configuration-error root MUST declare `ExitCode.configuration_error`, and `InvalidArguments` MUST declare `ExitCode.invalid_arguments`.
+The `cli_exit_code` declaration MUST NOT become a per-instance model field or appear in serialized entities, diagnostic records, or cell metadata.
+
 Environment errors MUST carry a human-readable message and MAY carry corrective guidance and typed context fields so consumers can diagnose failures without implementation stack details.
 Messages and corrective guidance MAY reference context through `{error.<field>}` formatting.
 Environment-error string fields MUST use the shared base entity's normalization, including stripping surrounding whitespace.
@@ -170,17 +175,18 @@ Pydantic validation errors MAY be used directly inside tests for low-level entit
 ## Presentation boundaries
 
 Library operations outside an explicitly documented output or CLI integration boundary MUST NOT print errors or warnings, select terminal formatting, or terminate the process.
-Lower-level modules and error types MUST NOT know about CLI exit codes or HTTP status codes.
+Error types MAY declare process exit codes through the shared core contract without depending on CLI implementation or performing output or process termination.
+Lower-level modules and error types MUST NOT know about HTTP status codes.
 Consumers own application-level handling and presentation unless they explicitly delegate it to a library capability.
 
 A known error class alone MUST NOT make a failure part of a caller-correctable external error contract.
 A boundary MAY report an unexpected stored-state integrity failure as a generic failure, but MUST NOT assign it a stable capability error code or present it as a condition the caller can correct.
 
-When a consumer delegates CLI error handling to the library, the CLI boundary MUST map fatal errors to non-zero exit behavior.
-The CLI boundary MUST own the mapping from environment-error classes to exit codes.
-It MAY map module environment-error roots to exit categories and map concrete error classes when a module root is too broad.
-The mapping MUST define a default non-zero exit code for environment errors that are not explicitly mapped.
-The CLI boundary SHOULD choose the most specific matching non-zero exit category so it preserves the available failure classification.
+The shared core MUST aggregate an environment-error list by returning the highest declared exit code, or `ExitCode.success` for an empty list.
+Aggregation MUST preserve error values and their order and MUST NOT render output or terminate the process.
+CLI boundaries MUST use the shared aggregation contract rather than maintaining mappings from error types to exit codes.
+The shared CLI handling boundary MUST own validated unwrap-error recovery, ordered diagnostic emission, error stream selection, and process termination.
+Consumers MAY observe and re-raise failures for local journaling while retaining their runtime cleanup responsibilities.
 Warnings alone MUST NOT cause a non-zero CLI exit code.
 
 ## Non-fatal problems

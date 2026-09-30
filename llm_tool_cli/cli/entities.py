@@ -1,14 +1,8 @@
-from enum import IntEnum
-
-from llm_tool_cli.core.entities import BaseEntity
+from llm_tool_cli.core.entities import BaseEntity, ExitCode
 from llm_tool_cli.paths import ProjectConfigPath
 from llm_tool_cli.protocol import Protocol
 
-
-class ExitCode(IntEnum):
-    success = 0
-    invalid_arguments = 1
-    skill_unreadable = 3
+__all__ = ["ExitCode", "GlobalOptions"]
 
 
 class GlobalOptions(BaseEntity):

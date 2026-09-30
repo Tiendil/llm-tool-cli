@@ -2,7 +2,7 @@
 
 ## Goal of the document
 
-This document describes shared application setup, invocation options, output protocol selection, and built-in documentation and version commands.
+This document describes shared application setup, invocation options, output protocol selection, command error handling, and built-in documentation and version commands.
 
 ## Scope
 
@@ -70,7 +70,7 @@ Supplying the option without a value MUST remain a framework command-line parsin
 The library MUST provide a shared environment-error value for explicit argument-validation failures, including invalid protocol values and consumer-owned argument checks.
 It MUST use the stable code `invalid_arguments` and a textual `reason` field.
 Its formatted message MUST be the reason, using the shared environment-error normalization and serialization rules.
-Diagnostic construction MUST NOT select an output protocol or stream, write output, or choose an exit status; those responsibilities belong to the handling CLI boundary.
+Diagnostic construction MUST NOT select an output protocol or stream, write output, or terminate the process; those responsibilities belong to the handling CLI boundary, which MUST use the error class's declared exit status.
 Framework parsing failures MUST retain their existing framework diagnostics unless explicitly handled by a shared option or command.
 
 ## Invocation context
@@ -109,8 +109,7 @@ It MUST load the selected packaged document and write one skill cell to stdout, 
 The cell MUST carry Markdown content, kind `skill`, and metadata `type = skill` and `document` naming the selected document.
 Document contents MUST remain consumer-owned and use the existing shared cell normalization and formatting.
 
-A document read failure MUST emit the shared `skill_unreadable` error cell and exit with status `3`.
-Human and LLM diagnostics MUST go to stderr; automation diagnostics MUST go to stdout.
+A document read failure MUST use shared command error handling to emit the `skill_unreadable` diagnostic and exit with status `3`.
 Unexpected exceptions MUST propagate without being converted to expected read failures.
 
 ## Version command
@@ -128,10 +127,32 @@ Help MUST describe printing the installed package version without consumer-speci
 
 Metadata lookup failures, including missing distribution metadata, MUST propagate without being converted to environment-error cells or successful fallback output.
 
+## Command error handling
+
+The library MUST provide a shared error-handling scope for command execution using an already selected protocol.
+It MUST recover only failed result unwrapping, using the validated environment-error accessor from the shared result contract.
+It MUST report every recovered error in order as one batch of shared error cells and terminate with the aggregated exit status.
+Human and LLM error cells MUST use stderr; automation error cells MUST use stdout, independently of the error's package ownership.
+Malformed unwrapping payloads MUST propagate unchanged without partial diagnostic output.
+Unrelated exceptions and framework control-flow exceptions MUST propagate unchanged.
+Successful execution MUST leave the scope normally without emitting output or forcing process termination.
+
+The same reporting and termination operation MUST be available for explicit error lists, including argument validation before command execution.
+Early validation MUST supply its chosen fallback protocol; the reporter MUST use the same stream and exit rules as command failures.
+An empty error list MUST emit no diagnostics and terminate with the shared aggregation result.
+
+Shared commands MUST use this error-handling scope.
+Consumers MUST retain workspace loading, application runtime setup, error journaling, and cleanup.
+Consumer journaling MAY observe failures before propagating them to the shared handler and MUST NOT cause duplicate error-cell emission.
+
 ## Exit statuses
 
 Shared successful execution MUST use status `0`.
-Explicit shared invalid-argument diagnostics MUST use status `1`.
-Unreadable skill documents MUST use status `3`.
+Expected failures MUST use the exit status declared by their environment-error class.
+The defaults MUST be `1` for explicit shared invalid-argument diagnostics, `2` for configuration errors, and `3` for other environment errors, including unreadable skill documents.
+Error subclasses MUST inherit their parent class's status unless they declare an override.
+A CLI handling multiple environment errors MUST render all errors in their original order and use the highest declared status, independently of error order.
+An empty list or a list whose errors all declare status `0` MUST produce status `0`.
+Exit-status aggregation MUST be provided by the shared core error contract.
 Framework parsing failures MUST retain status `2`; they MUST NOT be changed to status `1` merely to use shared exit statuses.
-Consumer-specific failure categories MUST retain consumer-owned names and policies even when they use the same numeric status.
+Consumers MAY declare application-specific error-class overrides; output stream routing and process termination MUST remain at the handling CLI boundary.

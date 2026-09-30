@@ -7,13 +7,16 @@ The producing operation preserves any underlying low-level exception as ``cause`
 """
 
 from pathlib import Path
+from typing import ClassVar
 
 from llm_tool_cli.core import errors as core_errors
+from llm_tool_cli.core.entities import ExitCode
 
 
 class EnvironmentError(core_errors.EnvironmentError):
     """Classification and filesystem context for configuration failures."""
 
+    cli_exit_code: ClassVar[ExitCode] = ExitCode.configuration_error
     path: Path
     reason: str
     message: str = "{error.path}: {error.reason}"

@@ -3,7 +3,7 @@ from typing import ClassVar, Self
 
 import pydantic
 
-from llm_tool_cli.core.entities import BaseEntity
+from llm_tool_cli.core.entities import BaseEntity, ExitCode
 
 
 class InternalError(Exception):
@@ -46,6 +46,7 @@ class EnvironmentError(BaseEntity):
     reference those fields using ``{error.field}``.
     """
 
+    cli_exit_code: ClassVar[ExitCode] = ExitCode.environment_error
     code: str
     message: str
     ways_to_fix: list[str] = pydantic.Field(default_factory=list)
@@ -75,6 +76,11 @@ class EnvironmentError(BaseEntity):
 
 
 EnvironmentErrors = list[EnvironmentError]
+
+
+def exit_code_for_errors(errors: EnvironmentErrors) -> ExitCode:
+    """Return the highest declared exit code, or success for an empty list."""
+    return max((error.cli_exit_code for error in errors), default=ExitCode.success)
 
 
 class EnvironmentErrorsProxy(InternalError):

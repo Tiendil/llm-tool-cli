@@ -214,7 +214,7 @@ Coverage SHOULD include the following implemented responsibilities:
 - warnings.
 - errors and exit behavior.
 
-When the library owns a delegated CLI error boundary, tests SHOULD verify fatal-error exit categories and the default non-zero exit code for unmapped environment errors so the mapping preserves failure classification.
+When the library owns a delegated CLI error boundary, tests SHOULD verify inherited exit codes, aggregation, protocol-based streams, ordered diagnostics, and propagation of unexpected exceptions and malformed unwrap payloads.
 Tests SHOULD verify that fatal errors use the boundary's documented error representation so consumers can recognize them.
 Tests SHOULD verify that warnings alone do not cause a non-zero exit code when the operation otherwise succeeds, so non-fatal problems remain distinct from failure.
 Warning tests MUST follow the specified warning architecture and MUST NOT introduce warning storage or delivery channels solely for testing.

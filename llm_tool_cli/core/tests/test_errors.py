@@ -4,7 +4,14 @@ from typing import ClassVar
 
 import pytest
 
-from llm_tool_cli.core.errors import EnvironmentError, EnvironmentErrors, EnvironmentErrorsProxy, InternalError
+from llm_tool_cli.core.entities import ExitCode
+from llm_tool_cli.core.errors import (
+    EnvironmentError,
+    EnvironmentErrors,
+    EnvironmentErrorsProxy,
+    InternalError,
+    exit_code_for_errors,
+)
 
 
 class BrokenState(InternalError):
@@ -91,7 +98,27 @@ class ResourceUnavailable(EnvironmentError):
     reason: str
 
 
+class ReportedProblem(ResourceUnavailable):
+    cli_exit_code: ClassVar[ExitCode] = ExitCode.success
+
+
+class ArgumentRejected(ResourceUnavailable):
+    cli_exit_code: ClassVar[ExitCode] = ExitCode.invalid_arguments
+
+
+class ConfigurationRejected(ResourceUnavailable):
+    cli_exit_code: ClassVar[ExitCode] = ExitCode.configuration_error
+
+
 class TestEnvironmentError:
+    @pytest.mark.parametrize("error_type", [ResourceUnavailable, ReportedProblem])
+    def test_cli_exit_code__is_not_serialized(self, error_type: type[ResourceUnavailable]) -> None:
+        error = error_type(path=Path("resource.txt"), reason="denied")
+
+        assert "cli_exit_code" not in error.model_dump()
+        assert "cli_exit_code" not in error.as_record()
+        assert error_type.from_json(error.to_json()).cli_exit_code == error.cli_exit_code
+
     def test_format_message__substitutes_typed_context(self) -> None:
         error = ResourceUnavailable(path=Path("resource.txt"), reason="access denied")
 
@@ -135,6 +162,37 @@ class TestEnvironmentError:
         error = ResourceUnavailable(path=Path("resource.txt"), reason="not configured")
 
         assert error.cause is None
+
+
+class TestExitCodeForErrors:
+    @pytest.mark.parametrize(
+        ("error_types", "expected"),
+        [
+            ([], 0),
+            ([ReportedProblem, ReportedProblem], 0),
+            ([ResourceUnavailable], 3),
+            ([ArgumentRejected], 1),
+            ([ConfigurationRejected], 2),
+            ([ReportedProblem, ArgumentRejected], 1),
+            ([ArgumentRejected, ConfigurationRejected], 2),
+            ([ConfigurationRejected, ArgumentRejected], 2),
+            ([ArgumentRejected, ConfigurationRejected, ResourceUnavailable, ReportedProblem], 3),
+            ([ReportedProblem, ResourceUnavailable, ConfigurationRejected, ArgumentRejected], 3),
+        ],
+    )
+    def test_highest_code_without_changing_errors(
+        self, error_types: list[type[ResourceUnavailable]], expected: int
+    ) -> None:
+        errors: EnvironmentErrors = [
+            error_type(path=Path(f"resource-{index}.txt"), reason="denied")
+            for index, error_type in enumerate(error_types)
+        ]
+        records = [error.as_record() for error in errors]
+
+        result = exit_code_for_errors(errors)
+
+        assert result == expected
+        assert [error.as_record() for error in errors] == records
 
 
 class TestEnvironmentErrorsProxy:

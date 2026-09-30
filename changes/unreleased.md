@@ -2,7 +2,7 @@
 
 - Import `cli.errors.InvalidArguments` instead of the removed `InvalidProtocol`. The shared diagnostic also supports consumer-owned argument validation, preserving its `invalid_arguments` code and `reason` field.
 
-- Replace imports of `EXIT_SUCCESS`, `EXIT_INVALID_ARGUMENTS`, and `EXIT_SKILL_UNREADABLE` from the removed `cli.constants` module with `cli.entities.ExitCode.success`, `ExitCode.invalid_arguments`, and `ExitCode.skill_unreadable` respectively.
+- Replace imports of `EXIT_SUCCESS`, `EXIT_INVALID_ARGUMENTS`, and `EXIT_SKILL_UNREADABLE` from the removed `cli.constants` module with `core.entities.ExitCode.success`, `ExitCode.invalid_arguments`, and `ExitCode.environment_error` respectively. Replace the removed `ExitCode.skill_unreadable` alias with `ExitCode.environment_error`.
 
 - Replace the removed production `scoped_settings` context manager with the `isolated_settings` pytest fixture from `core.tests.fixtures`. Import the fixture into a test module or `conftest.py` and request it before initializing the label.
 
@@ -23,6 +23,11 @@
 - Result exceptions expose payloads through `details` instead of `arguments` and use the shared `InternalError` message and string representation. Unwrap exceptions inherit directly from `InternalError`; the intermediate `ResultError` base is removed.
 
 ### Changes
+
+- Add `cli.handling.handle_command_errors(protocol=...)` and `report_errors_and_exit(errors, protocol=...)` for shared unwrap-error recovery, ordered error cells, human/LLM stderr and automation stdout routing, and highest-code termination. Shared commands and protocol validation use these boundaries; unexpected exceptions and malformed unwrap payloads propagate unchanged.
+
+- Declare inherited `cli_exit_code` attributes on environment-error classes and add `core.errors.exit_code_for_errors` to select the highest code without changing diagnostic order; empty lists return success. Configuration errors declare status `2`, invalid arguments declare `1`, and other shared errors default to `3`. The class attribute remains outside serialized diagnostics and separate from external-command exit-code context.
+- Move `ExitCode` to `core.entities`, adding configuration and general environment-error categories. Preserve the direct `cli.entities` re-export; remove the unused `skill_unreadable` alias. Skill read failures retain exit status `3` through the inherited environment-error default.
 
 - Add `protocol.cell_shortcuts.configuration_created(ProjectConfigPath)` for a common initialization success message and configuration-path metadata in every output protocol.
 
