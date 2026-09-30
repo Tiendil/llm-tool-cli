@@ -16,6 +16,8 @@
 
 ### Changes
 
+- Add `config.resolve_init_config_path` for explicit or current-directory initialization targets, with semantic path types and shared resolution diagnostics, without upward discovery or file creation.
+
 - Add shared `cli.entities.GlobalOptions` with a typed configuration path and protocol selection: explicit choices win, `skill` defaults to `llm`, and other commands default to `human`.
 
 - Add typed `UnwrapError.errors` access with validation and original-list preservation, keeping `details["error"]` as the single payload storage location.

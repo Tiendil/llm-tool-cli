@@ -16,8 +16,11 @@ from llm_tool_cli.config import (
     locate_config,
     read_toml,
     resolve_config_path,
+    resolve_init_config_path,
 )
-from llm_tool_cli.paths import ProjectConfigPath
+from llm_tool_cli.core.errors import EnvironmentErrors
+from llm_tool_cli.core.result import Err
+from llm_tool_cli.paths import PathInput, ProjectConfigPath
 
 
 @pytest.fixture
@@ -161,6 +164,81 @@ class TestResolveConfigPath:
         assert caught.code == "config_path_resolution_failed"
         assert caught.path == tmp_path / "custom.toml"
         assert isinstance(caught.cause, PermissionError)
+
+
+class TestResolveInitConfigPath:
+    def test_default_stays_in_cwd_without_reading_or_creating(self, tmp_path: Path) -> None:
+        parent_config = tmp_path / "config.toml"
+        parent_config.write_text("invalid TOML [", encoding="utf-8")
+        cwd = PathInput(tmp_path / "missing")
+
+        selected = resolve_init_config_path("config.toml", cwd=cwd).unwrap()
+
+        assert selected == tmp_path / "missing/config.toml"
+        assert not cwd.exists()
+        assert parent_config.read_text(encoding="utf-8") == "invalid TOML ["
+
+    @pytest.mark.parametrize("absolute", [False, True])
+    def test_explicit_path_overrides_filename(self, tmp_path: Path, absolute: bool) -> None:
+        path = tmp_path / "custom.toml" if absolute else Path("nested/../custom.toml")
+        cwd = PathInput(tmp_path / "elsewhere" if absolute else tmp_path)
+
+        selected = resolve_init_config_path("config.toml", path=ProjectConfigPath(path), cwd=cwd).unwrap()
+
+        assert selected == tmp_path / "custom.toml"
+        assert not selected.exists()
+
+    def test_home_relative_path(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        home = tmp_path / "home"
+        mocker.patch.dict("os.environ", {"HOME": str(home)})
+
+        selected = resolve_init_config_path(
+            "config.toml", path=ProjectConfigPath(Path("~/custom.toml")), cwd=PathInput(tmp_path)
+        ).unwrap()
+
+        assert selected == home / "custom.toml"
+        assert not home.exists()
+
+    def test_relative_cwd(self, tmp_path: Path) -> None:
+        with contextlib.chdir(tmp_path):
+            selected = resolve_init_config_path("config.toml", cwd=PathInput(Path("nested"))).unwrap()
+
+        assert selected == tmp_path / "nested/config.toml"
+
+    @pytest.mark.parametrize("explicit", [False, True])
+    def test_follows_symlink_without_modifying_existing_target(self, tmp_path: Path, explicit: bool) -> None:
+        target = tmp_path / "target.toml"
+        target.write_text("original", encoding="utf-8")
+        link = ProjectConfigPath(tmp_path / "config.toml")
+        link.symlink_to(target)
+
+        selected = resolve_init_config_path(
+            "config.toml", path=link if explicit else None, cwd=PathInput(tmp_path)
+        ).unwrap()
+
+        assert selected == target
+        assert target.read_text(encoding="utf-8") == "original"
+        assert link.is_symlink()
+
+    @pytest.mark.parametrize("explicit", [False, True])
+    def test_resolution_failure_propagates(self, tmp_path: Path, mocker: MockerFixture, explicit: bool) -> None:
+        failures: EnvironmentErrors = [
+            errors.PathResolutionFailed(path=tmp_path / name, reason="permission denied")
+            for name in ("first.toml", "second.toml")
+        ]
+        mocker.patch("llm_tool_cli.config.files.resolve_config_path", return_value=Err(failures))
+
+        result = resolve_init_config_path(
+            "config.toml", path=ProjectConfigPath(Path("custom.toml")) if explicit else None, cwd=PathInput(tmp_path)
+        )
+
+        assert result.unwrap_err() == failures
+
+    def test_unexpected_failure_propagates(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        mocker.patch.object(Path, "resolve", side_effect=TypeError("unexpected failure"))
+
+        with pytest.raises(TypeError, match="unexpected failure"):
+            resolve_init_config_path("config.toml", cwd=PathInput(tmp_path))
 
 
 class TestLocateConfig:

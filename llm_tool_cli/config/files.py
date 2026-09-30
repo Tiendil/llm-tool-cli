@@ -6,7 +6,7 @@ import tomli
 
 from llm_tool_cli.config import errors
 from llm_tool_cli.core.result import Err, Ok, Result, unwrap_to_error
-from llm_tool_cli.paths import ProjectConfigPath
+from llm_tool_cli.paths import PathInput, ProjectConfigPath
 
 
 def find_config(filename: str, start_dir: Path) -> Result[ProjectConfigPath | None]:
@@ -42,6 +42,19 @@ def resolve_config_path(path: Path, cwd: Path) -> Result[ProjectConfigPath]:
         return Ok(ProjectConfigPath(candidate.resolve()))
     except (OSError, RuntimeError) as exc:
         return Err([errors.PathResolutionFailed(path=candidate, reason=str(exc)).with_cause(exc)])
+
+
+def resolve_init_config_path(
+    filename: str, *, path: ProjectConfigPath | None = None, cwd: PathInput
+) -> Result[ProjectConfigPath]:
+    """Select and resolve a configuration target without upward discovery.
+
+    An explicit path takes precedence over the filename under ``cwd``.
+    Reuse ``resolve_config_path`` for home expansion, symlink resolution, and
+    unchanged failure propagation. No file is read or created, and neither the
+    target nor its parent is required to exist.
+    """
+    return resolve_config_path(path if path is not None else Path(filename), cwd)
 
 
 @unwrap_to_error

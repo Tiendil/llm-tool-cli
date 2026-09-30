@@ -13,6 +13,7 @@ from llm_tool_cli.config.files import (
     locate_config,
     read_toml,
     resolve_config_path,
+    resolve_init_config_path,
 )
 
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "locate_config",
     "read_toml",
     "resolve_config_path",
+    "resolve_init_config_path",
 ]

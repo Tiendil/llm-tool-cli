@@ -86,14 +86,17 @@ Its public interfaces MUST include:
 - `llm_tool_cli.paths.errors.InvalidProjectPath` and `llm_tool_cli.paths.errors.PathResolutionFailed`.
 
 These semantic path constructors MUST preserve the supplied `Path` without runtime validation or conversion.
-The configuration module MUST use the shared `ProjectConfigPath` for successful path values returned by `find_config`, `resolve_config_path`, and `locate_config`.
+
+The configuration module MUST own reusable configuration selection, loading, and creation, with behavior specified in `specs/behavior/config.md`.
+Its public package interface MUST expose the operations implemented in `config.files`.
+The configuration module MUST use the shared `ProjectConfigPath` for successful path values returned by `find_config`, `resolve_config_path`, `resolve_init_config_path`, and `locate_config`.
 The target path parameter of `create_config` and `create_config_from_template` MUST also use `ProjectConfigPath`, without requiring resolution or existence.
-It MUST preserve each operation's existing discovery, resolution, and symlink behavior.
 The configuration module MUST also expose `llm_tool_cli.config.create_config_from_template(path, *, package, template) -> Result[None]`, implemented in `config.files`.
-It MUST compose packaged UTF-8 template reading from `fixtures/<template>` with the existing exclusive `create_config` operation.
-The public `config.errors` submodule MUST own `TemplateUnreadable`, with code `config_template_unreadable`, target `path`, `template`, `reason`, and the private original exception cause.
-Template reading MUST precede target creation; creation failures MUST propagate unchanged.
-Template contents, target selection, and subsequent configuration validation and workspace construction MUST remain consumer-owned.
+Packaged configuration templates MUST be located at `fixtures/<template>` within the caller-selected package.
+The public `config.errors` submodule MUST own configuration environment errors, including `TemplateUnreadable` with target `path`, `template`, `reason`, and the private original exception cause.
+The configuration module MUST expose `llm_tool_cli.config.resolve_init_config_path(filename: str, *, path: ProjectConfigPath | None = None, cwd: PathInput) -> Result[ProjectConfigPath]`, implemented in `config.files`.
+Consumers MUST supply the default filename and invocation working directory.
+Template contents, application schemas, and workspace construction and installation MUST remain consumer-owned.
 
 The protocol module MUST own shared output protocols, cell construction, cell formatting and environment-error cell construction, JSON Lines serialization, and direct text writing.
 Its public package interface MUST export `Protocol`, `to_jsonl`, and `write_output` from `llm_tool_cli.protocol`.
