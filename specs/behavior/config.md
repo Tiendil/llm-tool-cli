@@ -76,6 +76,14 @@ A template-read failure MUST leave the target untouched, including when the targ
 Successful template reading MUST use the same exclusive creation behavior as supplied text.
 Creation failures MUST propagate unchanged.
 
+## Configuration initialization
+
+Initialization MUST combine initialization target selection with template-based creation, in that order.
+The caller MUST supply the default filename, working directory, resource package, and template, and MAY supply an explicit target path.
+Initialization MUST return the resolved configuration path only after successful creation.
+A failed stage MUST stop initialization and propagate its diagnostics unchanged without attempting subsequent stages.
+Initialization MUST NOT load or validate the created configuration or construct or install an application workspace.
+
 ## Failure diagnostics
 
 Expected failures MUST use the shared environment-error result contract.

@@ -103,13 +103,14 @@ These semantic path constructors MUST preserve the supplied `Path` without runti
 
 The configuration module MUST own reusable configuration selection, loading, and creation, with behavior specified in `specs/behavior/config.md`.
 Its public package interface MUST expose the operations implemented in `config.files`.
-The configuration module MUST use the shared `ProjectConfigPath` for successful path values returned by `find_config`, `resolve_config_path`, `resolve_init_config_path`, and `locate_config`.
+The configuration module MUST use the shared `ProjectConfigPath` for successful path values returned by `find_config`, `resolve_config_path`, `resolve_init_config_path`, `initialize_config`, and `locate_config`.
 The target path parameter of `create_config` and `create_config_from_template` MUST also use `ProjectConfigPath`, without requiring resolution or existence.
 The configuration module MUST also expose `llm_tool_cli.config.create_config_from_template(path, *, package, template) -> Result[None]`, implemented in `config.files`.
 Packaged configuration templates MUST be located at `fixtures/<template>` within the caller-selected package.
 The public `config.errors` submodule MUST own configuration environment errors, including `TemplateUnreadable` with target `path`, `template`, `reason`, and the private original exception cause.
 The configuration module MUST expose `llm_tool_cli.config.resolve_init_config_path(filename: str, *, path: ProjectConfigPath | None = None, cwd: PathInput) -> Result[ProjectConfigPath]`, implemented in `config.files`.
 Consumers MUST supply the default filename and invocation working directory.
+The configuration module MUST expose `llm_tool_cli.config.initialize_config(filename: str, *, package: str, template: str, cwd: PathInput, path: ProjectConfigPath | None = None) -> Result[ProjectConfigPath]`, implemented in `config.files` by composing shared initialization target selection and template-based creation.
 Template contents, application schemas, and workspace construction and installation MUST remain consumer-owned.
 
 The protocol module MUST own shared output protocols, cell construction, cell formatting and environment-error cell construction, JSON Lines serialization, and direct text writing.

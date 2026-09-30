@@ -12,6 +12,7 @@ from llm_tool_cli.config import (
     create_config_from_template,
     errors,
     find_config,
+    initialize_config,
     load_config,
     locate_config,
     read_toml,
@@ -19,7 +20,7 @@ from llm_tool_cli.config import (
     resolve_init_config_path,
 )
 from llm_tool_cli.core.errors import EnvironmentErrors
-from llm_tool_cli.core.result import Err
+from llm_tool_cli.core.result import Err, Result
 from llm_tool_cli.paths import PathInput, ProjectConfigPath
 
 
@@ -239,6 +240,151 @@ class TestResolveInitConfigPath:
 
         with pytest.raises(TypeError, match="unexpected failure"):
             resolve_init_config_path("config.toml", cwd=PathInput(tmp_path))
+
+
+class TestInitializeConfig:
+    @pytest.mark.parametrize("relative_cwd", [False, True])
+    def test_default_path_does_not_reuse_parent_config(
+        self, tmp_path: Path, config_package: str, relative_cwd: bool
+    ) -> None:
+        text = "# café\ninvalid TOML ["
+        (tmp_path / "fixtures/starter.toml").write_text(text, encoding="utf-8")
+        parent_config = tmp_path / "config.toml"
+        parent_config.write_text("original", encoding="utf-8")
+        project = tmp_path / "project"
+        project.mkdir()
+
+        with contextlib.chdir(tmp_path):
+            selected = initialize_config(
+                "config.toml",
+                package=config_package,
+                template="starter.toml",
+                cwd=PathInput(Path("project") if relative_cwd else project),
+            ).unwrap()
+
+        assert selected == project / "config.toml"
+        assert selected.read_text(encoding="utf-8") == text
+        assert parent_config.read_text(encoding="utf-8") == "original"
+
+    @pytest.mark.parametrize("absolute", [False, True])
+    def test_explicit_path_overrides_filename(self, tmp_path: Path, config_package: str, absolute: bool) -> None:
+        (tmp_path / "fixtures/starter.toml").write_text("version = 1\n", encoding="utf-8")
+        path = tmp_path / "custom.toml" if absolute else Path("custom.toml")
+
+        selected = initialize_config(
+            "config.toml",
+            package=config_package,
+            template="starter.toml",
+            cwd=PathInput(tmp_path / "elsewhere" if absolute else tmp_path),
+            path=ProjectConfigPath(path),
+        ).unwrap()
+
+        assert selected == tmp_path / "custom.toml"
+        assert selected.read_text(encoding="utf-8") == "version = 1\n"
+        assert not (tmp_path / "config.toml").exists()
+
+    def test_home_relative_path(self, tmp_path: Path, config_package: str, monkeypatch: pytest.MonkeyPatch) -> None:
+        (tmp_path / "fixtures/starter.toml").write_text("version = 1\n", encoding="utf-8")
+        home_dir = tmp_path / "home"
+        home_dir.mkdir()
+        monkeypatch.setenv("HOME", str(home_dir))
+
+        selected = initialize_config(
+            "config.toml",
+            package=config_package,
+            template="starter.toml",
+            cwd=PathInput(tmp_path),
+            path=ProjectConfigPath(Path("~/custom.toml")),
+        ).unwrap()
+
+        assert selected == home_dir / "custom.toml"
+        assert selected.read_text(encoding="utf-8") == "version = 1\n"
+
+    def test_existing_file(self, tmp_path: Path, config_package: str) -> None:
+        (tmp_path / "fixtures/starter.toml").write_text("version = 1\n", encoding="utf-8")
+        path = tmp_path / "config.toml"
+        path.write_text("original", encoding="utf-8")
+
+        failure = initialize_config(
+            "config.toml", package=config_package, template="starter.toml", cwd=PathInput(tmp_path)
+        ).unwrap_err()[0]
+
+        assert isinstance(failure, errors.AlreadyExists)
+        assert failure.path == path
+        assert path.read_text(encoding="utf-8") == "original"
+
+    def test_missing_parent_is_not_created(self, tmp_path: Path, config_package: str) -> None:
+        (tmp_path / "fixtures/starter.toml").write_text("version = 1\n", encoding="utf-8")
+        cwd = tmp_path / "missing"
+
+        failure = initialize_config(
+            "config.toml", package=config_package, template="starter.toml", cwd=PathInput(cwd)
+        ).unwrap_err()[0]
+
+        assert isinstance(failure, errors.Unwritable)
+        assert failure.path == cwd / "config.toml"
+        assert not cwd.exists()
+
+    def test_concurrent_creation_preserves_existing_config(
+        self, tmp_path: Path, config_package: str, mocker: MockerFixture
+    ) -> None:
+        (tmp_path / "fixtures/starter.toml").write_text("version = 1\n", encoding="utf-8")
+
+        def create_concurrently(path: ProjectConfigPath, text: str) -> Result[None]:
+            path.write_text("original", encoding="utf-8")
+            return create_config(path, text)
+
+        mocker.patch("llm_tool_cli.config.files.create_config", side_effect=create_concurrently)
+
+        failure = initialize_config(
+            "config.toml", package=config_package, template="starter.toml", cwd=PathInput(tmp_path)
+        ).unwrap_err()[0]
+
+        assert isinstance(failure, errors.AlreadyExists)
+        assert failure.path == tmp_path / "config.toml"
+        assert failure.path.read_text(encoding="utf-8") == "original"
+
+    def test_resolution_failure_stops_before_template_reading(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        failures: EnvironmentErrors = [
+            errors.PathResolutionFailed(path=tmp_path / name, reason="permission denied")
+            for name in ("first.toml", "second.toml")
+        ]
+        mocker.patch("llm_tool_cli.config.files.resolve_init_config_path", return_value=Err(failures))
+        read_template = mocker.patch("llm_tool_cli.config.files.importlib.resources.files")
+
+        result = initialize_config("config.toml", package="unused", template="starter.toml", cwd=PathInput(tmp_path))
+
+        assert result.unwrap_err() == failures
+        read_template.assert_not_called()
+
+    @pytest.mark.parametrize("content", [None, b"\xff"])
+    def test_template_read_failure_preserves_cause(
+        self, tmp_path: Path, config_package: str, content: bytes | None
+    ) -> None:
+        if content is not None:
+            (tmp_path / "fixtures/starter.toml").write_bytes(content)
+
+        failure = initialize_config(
+            "config.toml", package=config_package, template="starter.toml", cwd=PathInput(tmp_path)
+        ).unwrap_err()[0]
+
+        assert isinstance(failure, errors.TemplateUnreadable)
+        assert isinstance(failure.cause, FileNotFoundError if content is None else UnicodeDecodeError)
+        assert failure.path == tmp_path / "config.toml"
+        assert failure.template == "starter.toml"
+        assert failure.reason == str(failure.cause)
+        assert not failure.path.exists()
+
+    def test_write_failures_propagate(self, tmp_path: Path, config_package: str, mocker: MockerFixture) -> None:
+        (tmp_path / "fixtures/starter.toml").write_text("version = 1\n", encoding="utf-8")
+        failures: EnvironmentErrors = [errors.Unwritable(path=tmp_path / "config.toml", reason="read-only filesystem")]
+        mocker.patch("llm_tool_cli.config.files.create_config", return_value=Err(failures))
+
+        result = initialize_config(
+            "config.toml", package=config_package, template="starter.toml", cwd=PathInput(tmp_path)
+        )
+
+        assert result.unwrap_err() == failures
 
 
 class TestLocateConfig:

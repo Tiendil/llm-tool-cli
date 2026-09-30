@@ -24,6 +24,8 @@
 
 ### Changes
 
+- Add `config.initialize_config` to select and resolve a target, create a packaged starter, and return its path, preserving shared diagnostics and creation guarantees.
+
 - Unify explicit invalid-argument diagnostics in `cli.errors.InvalidArguments`, preserving protocol-option messages, LLM error cells, stream routing, and exit status.
 
 - Add `cli.commands.version.register_version_command(app, distribution=...)` for installed version lookup and protocol-aware version-cell output, preserving configuration independence and metadata failure propagation.

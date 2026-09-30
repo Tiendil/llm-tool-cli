@@ -146,3 +146,23 @@ def create_config_from_template(path: ProjectConfigPath, *, package: str, templa
     except (OSError, UnicodeDecodeError) as exc:
         return Err([errors.TemplateUnreadable(path=path, template=template, reason=str(exc)).with_cause(exc)])
     return create_config(path, text)
+
+
+@unwrap_to_error
+def initialize_config(
+    filename: str,
+    *,
+    package: str,
+    template: str,
+    cwd: PathInput,
+    path: ProjectConfigPath | None = None,
+) -> Result[ProjectConfigPath]:
+    """Resolve an initialization target and create the selected packaged starter.
+
+    Return the resolved path only after successful creation. Resolution, template
+    reading, and creation failures propagate unchanged, stopping the sequence.
+    No configuration loading, schema validation, or workspace construction occurs.
+    """
+    selected_path = resolve_init_config_path(filename, path=path, cwd=cwd).unwrap()
+    create_config_from_template(selected_path, package=package, template=template).unwrap()
+    return Ok(selected_path)
