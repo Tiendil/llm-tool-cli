@@ -1,5 +1,7 @@
 ### Migration
 
+- Recover result-unwrapping diagnostics through `UnwrapError.errors` instead of casting `details["error"]`. Payloads must be lists of environment errors; the accessor and `unwrap_to_error` now re-raise the original exception for missing or malformed payloads.
+
 - Pass `paths.ProjectConfigPath` to `config.create_config` and `config.create_config_from_template`. The semantic type marks the configuration target without adding runtime validation or path resolution.
 
 - `cell_shortcuts.environment_error(error)` now returns `protocol.logic_cells.EnvironmentErrorCell`, retaining the concrete error until projection. Access typed data through `cell.error`; obtain content and metadata from `cell.render(protocol)`. Error content now includes formatted corrective guidance when supplied.
@@ -13,6 +15,8 @@
 - Result exceptions expose payloads through `details` instead of `arguments` and use the shared `InternalError` message and string representation. Unwrap exceptions inherit directly from `InternalError`; the intermediate `ResultError` base is removed.
 
 ### Changes
+
+- Add typed `UnwrapError.errors` access with validation and original-list preservation, keeping `details["error"]` as the single payload storage location.
 
 - Add `config.create_config_from_template(path, package=..., template=...)` to read a packaged UTF-8 starter and create it exclusively. Template read failures return `config.errors.TemplateUnreadable` with target `path`, `template`, `reason`, and private cause; file-creation diagnostics propagate unchanged.
 

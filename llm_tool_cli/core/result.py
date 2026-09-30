@@ -15,6 +15,20 @@ class UnwrapError(InternalError):
     def __init__(self, error: EnvironmentErrors) -> None:
         super().__init__("Called unwrap on an Err value.", details={"error": error})
 
+    @property
+    def errors(self) -> EnvironmentErrors:
+        """Return the original error list, or re-raise this exception if malformed.
+
+        The payload lives only in ``details["error"]``. Lists, including empty
+        lists, are returned unchanged after verifying every item is an
+        environment error. Other payloads are internal failures, not recoverable
+        diagnostics.
+        """
+        errors = self.details.get("error")
+        if isinstance(errors, list) and all(isinstance(error, EnvironmentError) for error in errors):
+            return errors
+        raise self
+
 
 class UnwrapErrError(InternalError):
     def __init__(self, value: object) -> None:
@@ -99,6 +113,6 @@ def unwrap_to_error(func: Callable[P, Result[T]]) -> Callable[P, Result[T]]:
         try:
             return func(*args, **kwargs)
         except UnwrapError as e:
-            return Err(cast(EnvironmentErrors, e.details["error"]))
+            return Err(e.errors)
 
     return wrapper

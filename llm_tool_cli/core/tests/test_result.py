@@ -18,6 +18,58 @@ class OtherFailure(EnvironmentError):
     message: str = "Other failure"
 
 
+class TestUnwrapError:
+    def test_errors__preserves_list_values_and_order(self) -> None:
+        failures: EnvironmentErrors = [SpecificFailure(), OtherFailure()]
+        exception = UnwrapError(error=failures)
+
+        recovered = exception.errors
+
+        assert recovered == [SpecificFailure(), OtherFailure()]
+        recovered.append(ExpectedFailure())
+        assert failures == [SpecificFailure(), OtherFailure(), ExpectedFailure()]
+
+    def test_errors__accepts_empty_list(self) -> None:
+        assert UnwrapError(error=[]).errors == []
+
+    def test_errors__reads_current_details_payload(self) -> None:
+        exception = UnwrapError(error=[ExpectedFailure()])
+        exception.details["error"] = [OtherFailure()]
+
+        assert exception.errors == [OtherFailure()]
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            None,
+            "unexpected payload",
+            ExpectedFailure(),
+            (ExpectedFailure(),),
+            iter([ExpectedFailure()]),
+            [ExpectedFailure(), "unexpected payload"],
+        ],
+    )
+    def test_errors__rejects_malformed_payload(self, payload: object) -> None:
+        exception = UnwrapError(error=[])
+        exception.details["error"] = payload
+
+        with pytest.raises(UnwrapError) as caught:
+            _ = exception.errors
+
+        assert caught.value == exception
+        assert caught.value.details == {"error": payload}
+
+    def test_errors__rejects_missing_payload(self) -> None:
+        exception = UnwrapError(error=[])
+        del exception.details["error"]
+
+        with pytest.raises(UnwrapError) as caught:
+            _ = exception.errors
+
+        assert caught.value == exception
+        assert caught.value.details == {}
+
+
 class TestResult:
     @pytest.mark.parametrize("errors", [[], [ExpectedFailure()], [ExpectedFailure(), OtherFailure()]])
     def test_is_err__without_type_accepts_any_error_list(self, errors: EnvironmentErrors) -> None:
@@ -163,15 +215,29 @@ class TestUnwrapToError:
         with pytest.raises(UnwrapErrError):
             composed()
 
-    def test_converts_unwrap_error_to_error_result(self) -> None:
+    @pytest.mark.parametrize("errors", [[], [ExpectedFailure(), SpecificFailure(), OtherFailure()]])
+    def test_converts_unwrap_error_to_error_result(self, errors: EnvironmentErrors) -> None:
         @unwrap_to_error
         def composed() -> Result[str]:
-            return Err([ExpectedFailure()]).unwrap()
+            return Err(errors).unwrap()
 
         result = composed()
 
         assert result.is_err()
-        assert result.unwrap_err() == [ExpectedFailure()]
+        assert result.unwrap_err() == errors
+
+    def test_malformed_unwrap_payload_remains_an_exception(self) -> None:
+        exception = UnwrapError(error=[])
+        exception.details["error"] = [ExpectedFailure(), "unexpected payload"]
+
+        @unwrap_to_error
+        def composed() -> Result[str]:
+            raise exception
+
+        with pytest.raises(UnwrapError) as caught:
+            composed()
+
+        assert caught.value == exception
 
     def test_preserves_success_result(self) -> None:
         @unwrap_to_error

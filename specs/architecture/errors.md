@@ -70,8 +70,14 @@ Independent validation failures discovered in one pass SHOULD be collected into 
 Propagation MUST preserve existing error values unless translation adds domain meaning or implements recovery.
 Package ownership alone MUST NOT require wrapping a returned error.
 
+`UnwrapError` MUST expose a read-only `errors` property typed as `EnvironmentErrors`.
+The property MUST return the list stored in `details["error"]` without copying the list or its error values, preserving order and allowing an empty list.
+That details entry MUST remain the single payload storage location.
+If the entry is missing, is not a list, or contains a value outside the shared `EnvironmentError` hierarchy, the property MUST raise the original `UnwrapError` rather than normalize or partially recover the payload.
+
 The `unwrap_to_error` decorator SHOULD be used when it makes composition of result-returning functions easier to follow.
 It MUST convert only the technical `UnwrapError` raised by unsuccessful unwrapping back into `Err` with the original payload.
+It MUST recover that payload through `UnwrapError.errors`, allowing malformed payload exceptions to propagate unchanged.
 It MUST NOT hide arbitrary exceptions or misuse of error unwrapping on a successful result.
 Callers MUST maintain compatibility between propagated error payloads and their declared return contracts.
 
