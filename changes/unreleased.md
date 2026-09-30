@@ -24,6 +24,8 @@
 
 ### Changes
 
+- Add `protocol.cell_shortcuts.configuration_created(ProjectConfigPath)` for a common initialization success message and configuration-path metadata in every output protocol.
+
 - Add `config.initialize_config` to select and resolve a target, create a packaged starter, and return its path, preserving shared diagnostics and creation guarantees.
 
 - Unify explicit invalid-argument diagnostics in `cli.errors.InvalidArguments`, preserving protocol-option messages, LLM error cells, stream routing, and exit status.

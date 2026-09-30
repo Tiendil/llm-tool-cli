@@ -1,4 +1,5 @@
 from llm_tool_cli.core.errors import EnvironmentError
+from llm_tool_cli.paths import ProjectConfigPath
 from llm_tool_cli.protocol.logic_cells import ContentCell, EnvironmentErrorCell
 from llm_tool_cli.protocol.output_cells.base import MetaValue
 
@@ -10,6 +11,10 @@ def operation_succeeded(message: str, **meta: MetaValue) -> ContentCell:
         content=message,
         meta={"type": "operation_succeeded", **meta},
     )
+
+
+def configuration_created(path: ProjectConfigPath) -> ContentCell:
+    return operation_succeeded("Configuration created.", path=str(path))
 
 
 def operation_failed(message: str, **meta: MetaValue) -> ContentCell:

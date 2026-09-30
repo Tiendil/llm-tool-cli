@@ -43,6 +43,10 @@ They MUST support empty messages and omitted metadata.
 The successful-operation shortcut MUST default to `type = operation_succeeded` metadata when the caller omits it.
 Explicit caller metadata MUST retain precedence over that default.
 
+The configuration-creation shortcut MUST construct a protocol-independent Markdown content cell with kind `operation_succeeded` and content `Configuration created.`.
+It MUST include `type = operation_succeeded` and the string representation of the caller-supplied configuration path as `path` metadata in every protocol.
+It MUST NOT resolve, validate, read, or create the supplied path.
+
 The skill-document shortcut MUST construct a protocol-independent Markdown content cell with kind `skill`.
 It MUST use the caller-supplied document name as `document` metadata, include `type = skill` metadata, and use the supplied document text as content.
 It MUST accept application-defined document names and empty content without loading resources or selecting a protocol.

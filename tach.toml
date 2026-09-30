@@ -32,7 +32,7 @@ depends_on = ["llm_tool_cli.core"]
 
 [[modules]]
 path = "llm_tool_cli.protocol"
-depends_on = ["llm_tool_cli.core"]
+depends_on = ["llm_tool_cli.core", "llm_tool_cli.paths"]
 
 [[modules]]
 path = "llm_tool_cli.skills"

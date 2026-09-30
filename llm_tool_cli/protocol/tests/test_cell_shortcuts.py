@@ -1,6 +1,9 @@
+from pathlib import Path
+
 import pytest
 
 from llm_tool_cli.core.errors import EnvironmentError
+from llm_tool_cli.paths import ProjectConfigPath
 from llm_tool_cli.protocol import Protocol, cell_shortcuts
 from llm_tool_cli.protocol.logic_cells import EnvironmentErrorCell
 
@@ -33,6 +36,23 @@ class TestOperationSucceeded:
         cell = cell_shortcuts.operation_succeeded("Done.", type="custom_success", path="config.toml")
 
         assert cell.meta == {"type": "custom_success", "path": "config.toml"}
+
+
+class TestConfigurationCreated:
+    @pytest.mark.parametrize("protocol", list(Protocol))
+    @pytest.mark.parametrize("path", ["/project/config.toml", "folder name/café.toml"])
+    def test_shared_creation_payload_preserves_path(self, protocol: Protocol, path: str) -> None:
+        cell = cell_shortcuts.configuration_created(ProjectConfigPath(Path(path)))
+
+        outputs = cell.render(protocol)
+
+        assert len(outputs) == 1
+        assert outputs[0].model_dump(exclude={"id"}) == {
+            "kind": "operation_succeeded",
+            "media_type": "text/markdown",
+            "content": "Configuration created.",
+            "meta": {"type": "operation_succeeded", "path": path},
+        }
 
 
 class TestOperationFailed:
