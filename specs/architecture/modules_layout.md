@@ -167,5 +167,8 @@ Cross-module production dependencies MUST use declared public boundaries.
 Implementation submodules inside the same owning module MAY import each other directly.
 Production code MUST NOT import tests, test helpers, or repository development scripts.
 
+The public test-only `llm_tool_cli.protocol.tests.helpers.assert_error_cells(records, errors)` boundary MUST accept parsed automation records with identifiers and expected `EnvironmentErrors`.
+It MUST own common error-cell assertions; callers MUST own output parsing and record filtering.
+
 Configured module boundaries MUST reflect implemented ownership and dependency direction.
 New modules MUST update the architecture configuration when their addition changes a configured boundary.

@@ -247,6 +247,11 @@ Tests MAY use specialized testing tools for their own domain boundaries, subject
 
 ## Assertions
 
+The shared protocol test helper MUST verify automation error-cell count, order, UUID4 identifiers, and native diagnostic payloads with `message` moved to `content`, without modifying supplied records.
+This helper covers diagnostics without corrective guidance whose context fields retain their native JSON representation.
+Consumer integration tests SHOULD reuse this assertion while keeping output parsing, record filtering, and application-specific policies local.
+Generic error-cell projection tests MUST retain independent expected payloads so they verify the shared projection itself.
+
 Tests SHOULD assert structured values before rendered text when structured data is available.
 Tests for machine-readable output SHOULD parse that output before asserting its contents.
 Rendered output tests SHOULD assert exact output only for stable public or persisted-state contracts so incidental wording does not become an accidental contract.
