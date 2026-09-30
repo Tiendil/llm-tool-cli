@@ -81,6 +81,12 @@ Retrieval MUST return the stored options without changing them or resolving thei
 When the context contains no recognized global options, retrieval MUST return options with both protocol and configuration path unspecified, without storing the fallback.
 Independent invocations MUST NOT share retained options.
 
+Constructing a shared command context MUST retrieve the invocation's global options and select its protocol using the invoked command name, treating an absent name as an empty name.
+Construction MUST NOT resolve configuration paths, load a workspace, or emit output.
+The context MUST write supplied cell iterables with its selected protocol through shared cell writing, using stdout by default and stderr when explicitly requested.
+Cell writing MUST preserve complete batches and their order; environment-error reporting MUST remain the responsibility of the shared command error handler.
+The shared skill and version commands MUST use this context; consumers MAY extend it with application-specific responsibilities.
+
 **Example:** A protocol and configuration path supplied to the root command remain available inside a nested command group.
 A later invocation without those options receives unspecified values instead of inheriting the earlier choices.
 

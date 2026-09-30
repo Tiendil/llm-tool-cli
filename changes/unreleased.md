@@ -24,6 +24,8 @@
 
 ### Changes
 
+- Add `cli.context.CommandContext` for invocation-option retrieval, command protocol selection, and cell writing. Shared skill and version commands use it; consumers can extend it with their application-specific context behavior.
+
 - Add `cli.handling.handle_command_errors(protocol=...)` and `report_errors_and_exit(errors, protocol=...)` for shared unwrap-error recovery, ordered error cells, human/LLM stderr and automation stdout routing, and highest-code termination. Shared commands and protocol validation use these boundaries; unexpected exceptions and malformed unwrap payloads propagate unchanged.
 
 - Declare inherited `cli_exit_code` attributes on environment-error classes and add `core.errors.exit_code_for_errors` to select the highest code without changing diagnostic order; empty lists return success. Configuration errors declare status `2`, invalid arguments declare `1`, and other shared errors default to `3`. The class attribute remains outside serialized diagnostics and separate from external-command exit-code context.

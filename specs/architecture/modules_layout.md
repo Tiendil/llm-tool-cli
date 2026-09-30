@@ -61,6 +61,10 @@ The CLI module MUST own shared parsed global options and command-specific protoc
 Its public `llm_tool_cli.cli.entities` submodule MUST provide `GlobalOptions`, inheriting the shared entity base and containing `protocol: Protocol | None` and `config_path: ProjectConfigPath | None`, both defaulting to `None`.
 Its `protocol_for(command_name: str) -> Protocol` method MUST apply explicit protocol precedence and the shared command-default rule without storing derived state.
 The parsed options entity MUST remain independent of CLI frameworks and application execution contexts.
+The public `llm_tool_cli.cli.context.CommandContext(context: typer.Context)` class MUST own retrieval of invocation options and selection of the invoked command's protocol, exposing `global_options` and `protocol`.
+Its `write_cells(cells: Iterable[LogicCell], *, stderr: bool = False) -> None` method MUST use shared cell writing with that protocol and the requested stream.
+Consumer command contexts MAY inherit this implementation while retaining their own workspace loading, emitters, runtime setup, journaling, and cleanup.
+Shared skill and version commands MUST use this context for protocol selection and cell writing.
 The library MUST own the Typer runtime dependency and its supported version constraint for shared CLI context integration.
 The public `llm_tool_cli.cli.application.create_app(*, help: str) -> typer.Typer` factory MUST own shared application construction, help aliases, and completion-option availability.
 It MUST return an ordinary Typer application; consumers MUST register their root callbacks and application-specific commands themselves.
@@ -75,7 +79,7 @@ The same submodule MUST provide `protocol_option(*, tool_label: str) -> typer.mo
 It MUST own protocol option aliases, help, value parsing, and invalid-value LLM error-cell emission with the supplied label before command execution.
 The public `llm_tool_cli.cli.errors` submodule MUST own `InvalidArguments`, carrying `reason` under a module-specific `EnvironmentError` root derived from the shared environment-error base.
 Shared protocol parsing and consumer-owned validation reporting `invalid_arguments` MUST use this same diagnostic type directly, without local wrappers or duplicate error models.
-Consumers MUST use these shared option definitions directly, own their remaining option parsing, and pass the invoked command name when selecting the effective protocol.
+Consumers MUST use these shared option definitions directly, own their remaining option parsing, and use the shared command context to retrieve options and select the effective protocol.
 
 The paths module MUST own lexical project-path operations, filesystem resolution and containment, and conversion of resolved filesystem paths to canonical identifiers, together with their semantic types and environment errors.
 Lexical operations MUST include canonical identifier checking, normalization, and component extraction.
