@@ -129,7 +129,7 @@ Construction MUST leave the error unchanged, retain its native code, and exclude
 Optional null context MUST be retained according to the native diagnostic record contract.
 Error cells MUST use ordinary cell identifiers, framing, serialization, and sequence rendering in every protocol.
 The core environment-error model MUST remain independent of cell construction and rendering.
-Stream routing and exit status selection MUST remain consumer-owned.
+Stream routing and exit status selection MUST belong to the calling CLI boundary.
 
 ## JSON Lines serialization
 
@@ -156,4 +156,4 @@ It MUST preserve cell ordering, batch positions and totals, framing, Unicode con
 It MUST use standard output by default and standard error only when requested by the caller, independently of cell kind and protocol.
 Empty sequences and empty projections MUST produce no output text.
 Rendering and decoding failures MUST propagate before any text is written; stream failures MUST also propagate.
-Error classification, stream-routing policy, and exit status selection MUST remain consumer-owned.
+Error classification, stream-routing policy, and exit status selection MUST belong to the calling CLI boundary.

@@ -3,6 +3,7 @@ from typing import Annotated
 
 import typer
 
+from llm_tool_cli.cli.entities import ExitCode
 from llm_tool_cli.cli.errors import InvalidProtocol
 from llm_tool_cli.paths import ProjectConfigPath
 from llm_tool_cli.protocol import Protocol
@@ -32,7 +33,7 @@ def _parse_protocol(value: str) -> Protocol:
         choices = ", ".join(protocol.value for protocol in Protocol)
         failure = InvalidProtocol(reason=f"invalid protocol `{value}`; expected one of: {choices}")
         write_cells([environment_error(failure)], protocol=Protocol.llm, stderr=True)
-        raise typer.Exit(1) from error
+        raise typer.Exit(ExitCode.invalid_arguments) from error
 
 
 ProtocolOption = Annotated[

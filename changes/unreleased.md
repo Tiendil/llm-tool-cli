@@ -1,5 +1,7 @@
 ### Migration
 
+- Replace imports of `EXIT_SUCCESS`, `EXIT_INVALID_ARGUMENTS`, and `EXIT_SKILL_UNREADABLE` from the removed `cli.constants` module with `cli.entities.ExitCode.success`, `ExitCode.invalid_arguments`, and `ExitCode.skill_unreadable` respectively.
+
 - Replace the removed production `scoped_settings` context manager with the `isolated_settings` pytest fixture from `core.tests.fixtures`. Import the fixture into a test module or `conftest.py` and request it before initializing the label.
 
 - Initialize `core.settings` with a `ToolLabel` before CLI parsing or shared sequence rendering. Remove `tool_label` from `render_cells` and `write_cells`, and replace `Annotated[Protocol | None, protocol_option(tool_label=...)]` with `cli.options.ProtocolOption`. Reading an unset label or installing a conflicting label raises an internal exception; tests can request `core.tests.fixtures.isolated_settings` and initialize their label through the real settings API.
@@ -19,6 +21,9 @@
 - Result exceptions expose payloads through `details` instead of `arguments` and use the shared `InternalError` message and string representation. Unwrap exceptions inherit directly from `InternalError`; the intermediate `ResultError` base is removed.
 
 ### Changes
+
+- Add `cli.application.create_app` with shared `-h`/`--help` aliases and shell completion options. Add `cli.commands.skills.register_skill_command` for consumer-owned document enums and resource packages, preserving protocol defaults, cell output, and read-failure behavior.
+- Add `cli.entities.ExitCode`, an `IntEnum` for success, explicit invalid arguments, and unreadable skill documents; framework parsing and consumer-specific failure statuses remain unchanged.
 
 - Add typed process-wide application label initialization, idempotent same-label setup, explicit uninitialized/conflicting-label errors, and a shared pytest fixture for settings isolation. Sequence rendering reads the label once per batch; protocol parsing uses the same shared setting.
 

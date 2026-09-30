@@ -2,12 +2,26 @@
 
 ## Goal of the document
 
-This document describes shared application setup, invocation options, and output protocol selection.
+This document describes shared application setup, invocation options, output protocol selection, and built-in documentation commands.
 
 ## Scope
 
-This specification covers reusable application setup and global command-line option behavior.
-Command execution, configuration loading, and output-cell layouts are out of scope.
+This specification covers reusable application setup and shared command-line behavior.
+Consumer-specific command execution, configuration loading, and output-cell layouts are out of scope.
+
+## Application setup
+
+The library MUST construct independently configurable applications using the consumer's help description.
+Consumers MUST retain ownership of their root callbacks and command registration.
+`-h` and `--help` MUST display generated help and exit successfully at the root and subcommand levels.
+Help MUST describe registered commands, arguments, and options using the framework's normal text output.
+Help MUST NOT require project configuration.
+
+The root application MUST expose `--show-completion` and `--install-completion` using the framework's shell integration.
+Showing completion MUST print a script without installing it.
+Installing completion MUST require explicit invocation of the installation option.
+Application construction and ordinary command execution MUST NOT install completion.
+Completion MUST include registered command names, options, and declared document choices.
 
 ## Application identity
 
@@ -71,3 +85,30 @@ Selection MUST leave the stored options unchanged and MUST NOT retain a previous
 
 **Example:** With no explicit protocol, printing a skill document selects LLM output, while the next version command selects human output.
 An explicit `human` protocol selects human output for the skill command as well.
+
+## Skill command
+
+The shared `skill [DOCUMENT]` command MUST use the consumer's packaged documents and declared document choices.
+The consumer's choices MUST include `usage`.
+Omitting the document argument MUST select `usage`.
+Explicit document names MUST match the supplied choices exactly and case-sensitively.
+Help and shell completion MUST use the same document choices as validation.
+Unknown names MUST remain framework argument errors with exit status `2`, before document loading.
+The command MUST NOT load workspace configuration or require a consumer command context.
+
+The command MUST select its protocol through the shared invocation options and command-default rule.
+It MUST load the selected packaged document and write one skill cell to stdout, exiting with status `0`.
+The cell MUST carry Markdown content, kind `skill`, and metadata `type = skill` and `document` naming the selected document.
+Document contents MUST remain consumer-owned and use the existing shared cell normalization and formatting.
+
+A document read failure MUST emit the shared `skill_unreadable` error cell and exit with status `3`.
+Human and LLM diagnostics MUST go to stderr; automation diagnostics MUST go to stdout.
+Unexpected exceptions MUST propagate without being converted to expected read failures.
+
+## Exit statuses
+
+Shared successful execution MUST use status `0`.
+Explicit shared invalid-argument diagnostics MUST use status `1`.
+Unreadable skill documents MUST use status `3`.
+Framework parsing failures MUST retain status `2`; they MUST NOT be changed to status `1` merely to use shared exit statuses.
+Consumer-specific failure categories MUST retain consumer-owned names and policies even when they use the same numeric status.

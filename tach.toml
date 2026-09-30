@@ -20,7 +20,7 @@ depends_on = []
 
 [[modules]]
 path = "llm_tool_cli.cli"
-depends_on = ["llm_tool_cli.core", "llm_tool_cli.paths", "llm_tool_cli.protocol"]
+depends_on = ["llm_tool_cli.core", "llm_tool_cli.paths", "llm_tool_cli.protocol", "llm_tool_cli.skills"]
 
 [[modules]]
 path = "llm_tool_cli.config"
