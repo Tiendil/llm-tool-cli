@@ -12,7 +12,7 @@ Consumer-specific records and journal layouts, command parsing, defaults, error 
 ## Output protocols
 
 The library MUST provide the stable output protocol values `human`, `llm`, and `automation`.
-Consumers MUST select their own defaults and project application data into cells or their own records.
+Consumers MUST project application data into cells or their own records.
 Logic-cell projections MUST support each protocol and choose the corresponding output-cell type.
 
 ## Output cells

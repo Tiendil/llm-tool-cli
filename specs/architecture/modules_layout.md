@@ -57,6 +57,12 @@ The shared callback exception bridge MUST be publicly available as `llm_tool_cli
 The shared base entity MUST be publicly available as `llm_tool_cli.core.entities.BaseEntity`.
 Capability errors MUST remain with their owning capabilities, and consumer presentation metadata MUST remain with the consumer.
 
+The CLI module MUST own shared parsed global options and command-specific protocol defaults.
+Its public `llm_tool_cli.cli.entities` submodule MUST provide `GlobalOptions`, inheriting the shared entity base and containing `protocol: Protocol | None` and `config_path: ProjectConfigPath | None`, both defaulting to `None`.
+Its `protocol_for(command_name: str) -> Protocol` method MUST apply explicit protocol precedence and the shared command-default rule without storing derived state.
+This module MUST remain independent of CLI frameworks and application execution contexts.
+Consumers MUST own option parsing and pass the invoked command name when selecting the effective protocol.
+
 The paths module MUST own lexical project-path operations, filesystem resolution and containment, and conversion of resolved filesystem paths to canonical identifiers, together with their semantic types and environment errors.
 Lexical operations MUST include canonical identifier checking, normalization, and component extraction.
 Lexical normalization MUST remain independent of filesystem resolution.
@@ -117,7 +123,7 @@ The rendering function MUST remain free of output side effects; the writing func
 Output-cell type selection MUST belong to logic-cell projections rather than a separate selector exposed to application code.
 The `llm_tool_cli.protocol.cell_shortcuts.environment_error(error)` helper MUST construct a shared `EnvironmentErrorCell`; it MUST NOT serialize the error, select a protocol, or render content.
 The public `llm_tool_cli.protocol.errors` submodule MUST own the internal `ContentWithoutMediaType` and `UnsupportedFormatterMode` exceptions under a protocol-specific `InternalError` root derived from the shared internal-error base.
-Consumer-specific cell kinds and content, domain record construction and rendering, journal models and formatting, CLI defaults and parsing, output routing, error classification, and exit selection MUST remain consumer-owned.
+Consumer-specific cell kinds and content, domain record construction and rendering, journal models and formatting, CLI parsing, output routing, error classification, and exit selection MUST remain consumer-owned.
 
 The skills module MUST own packaged skill-document loading independently of protocol cells.
 Its public interface MUST provide `llm_tool_cli.skills.load_skill_text(package: str, document: str) -> Result[str]`, with implementation in `skills.fixtures`.
