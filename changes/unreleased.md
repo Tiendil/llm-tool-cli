@@ -1,5 +1,7 @@
 ### Migration
 
+- Replace `paths.UntrustedPath` imports, annotations, and constructor calls with `paths.PathInput`. The duplicate type is removed; runtime path behavior is unchanged.
+
 - Applications created by `cli.application.create_app` now include the shared root callback and remain command groups even with one registered command. Remove callbacks that only declare `--protocol` and `--config` and store `GlobalOptions`; register commands on the returned application.
 
 - Import `cli.errors.InvalidArguments` instead of the removed `InvalidProtocol`. The shared diagnostic also supports consumer-owned argument validation, preserving its `invalid_arguments` code and `reason` field.
@@ -93,7 +95,7 @@
 - Add `protocol.logic_cells.base.LogicCell` for consumer data with separate human, LLM, and automation projections into ordered output cells.
 - Add `protocol.Protocol`, `protocol.to_jsonl`, and `protocol.write_output` for shared protocol names, compact Unicode JSON Lines, and direct text output without automatic newlines or flushing.
 - Reject empty inputs in shared mixed path normalization with an empty diagnostic `path`, preserving root-resolution failure precedence.
-- Add `paths.UntrustedPath` as a shared semantic type for filesystem inputs without established resolution or containment guarantees, preserving ordinary `Path` runtime behavior.
+- Use `paths.PathInput` as the single shared semantic type for filesystem inputs without established resolution, existence, or containment guarantees, preserving ordinary `Path` runtime behavior.
 - Add `paths.resolve_project_path` for resolving identifier or filesystem inputs below a project root, with home expansion, optional rejection of absolute inputs, and shared failure diagnostics.
 - Add `paths.normalize_path` for mixed identifier and filesystem inputs, with explicit directory bases, home expansion, shared containment, and structured resolution failures.
 - Add `paths.project_path_id_from_filesystem` to resolve a supplied filesystem root and path, enforce containment, and return a canonical identifier with shared failure diagnostics.

@@ -12,7 +12,6 @@ ProjectConfigPath = NewType("ProjectConfigPath", Path)
 ProjectRootPath = NewType("ProjectRootPath", Path)
 RelativeProjectPath = NewType("RelativeProjectPath", Path)
 ResolvedProjectPath = NewType("ResolvedProjectPath", Path)
-UntrustedPath = NewType("UntrustedPath", Path)
 
 
 @unwrap_to_error

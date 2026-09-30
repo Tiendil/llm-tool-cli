@@ -95,7 +95,6 @@ Its public interfaces MUST include:
 - `llm_tool_cli.paths.resolve_project_path`, accepting a textual identifier or filesystem input, a filesystem root, and an `allow_absolute` option defaulting to `True`, and returning a result containing a `ResolvedProjectPath` with home expansion and project-root containment.
 - `llm_tool_cli.paths.resolve_project_root` and `llm_tool_cli.paths.ProjectRootPath`.
 - `llm_tool_cli.paths.resolve_inside_project` and `llm_tool_cli.paths.ResolvedProjectPath`.
-- `llm_tool_cli.paths.UntrustedPath`, a semantic filesystem input type that establishes no resolution, existence, or project-containment guarantees and adds no runtime validation or conversion to the supplied `Path`.
 - `llm_tool_cli.paths.PathInput`, a `NewType` over `pathlib.Path` marking a supplied filesystem path without resolution, existence, or containment guarantees.
 - `llm_tool_cli.paths.ProjectConfigPath`, a `NewType` over `pathlib.Path` marking a configuration file path without requiring resolution or existence.
 - `llm_tool_cli.paths.RelativeProjectPath`, a `NewType` over `pathlib.Path` marking a filesystem path interpreted relative to a project root, with validation policies owned by the consumer.
