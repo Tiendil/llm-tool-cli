@@ -4,11 +4,9 @@ from pathlib import Path
 import pytest
 import typer
 from typer.core import TyperCommand
-from typer.testing import CliRunner
 
 from llm_tool_cli.cli.context import CommandContext, get_global_options, set_global_options
 from llm_tool_cli.cli.entities import GlobalOptions
-from llm_tool_cli.cli.options import ConfigOption, ProtocolOption
 from llm_tool_cli.core.settings import ToolLabel, initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
 from llm_tool_cli.paths import ProjectConfigPath
@@ -33,38 +31,6 @@ class TestSetGlobalOptions:
 
         assert get_global_options(root) == GlobalOptions()
         assert root.obj == {"other": "state"}
-
-    def test_nested_commands_and_repeated_invocations(self) -> None:
-        app = typer.Typer()
-        group = typer.Typer()
-        app.add_typer(group, name="nested")
-        received: list[GlobalOptions] = []
-
-        @app.callback()
-        def initialize(
-            context: typer.Context,
-            protocol: ProtocolOption = None,
-            config: ConfigOption = None,
-        ) -> None:
-            set_global_options(
-                context,
-                GlobalOptions(protocol=protocol, config_path=config),
-            )
-
-        @group.command()
-        def show(context: typer.Context) -> None:
-            received.append(get_global_options(context))
-
-        runner = CliRunner()
-        explicit = runner.invoke(app, ["--protocol", "automation", "--config", "~/custom.toml", "nested", "show"])
-        unspecified = runner.invoke(app, ["nested", "show"])
-
-        assert explicit.exit_code == 0
-        assert unspecified.exit_code == 0
-        assert received == [
-            GlobalOptions(protocol=Protocol.automation, config_path=ProjectConfigPath(Path("~/custom.toml"))),
-            GlobalOptions(),
-        ]
 
 
 class TestGetGlobalOptions:

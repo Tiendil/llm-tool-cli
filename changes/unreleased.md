@@ -1,5 +1,7 @@
 ### Migration
 
+- Applications created by `cli.application.create_app` now include the shared root callback and remain command groups even with one registered command. Remove callbacks that only declare `--protocol` and `--config` and store `GlobalOptions`; register commands on the returned application.
+
 - Import `cli.errors.InvalidArguments` instead of the removed `InvalidProtocol`. The shared diagnostic also supports consumer-owned argument validation, preserving its `invalid_arguments` code and `reason` field.
 
 - Replace imports of `EXIT_SUCCESS`, `EXIT_INVALID_ARGUMENTS`, and `EXIT_SKILL_UNREADABLE` from the removed `cli.constants` module with `core.entities.ExitCode.success`, `ExitCode.invalid_arguments`, and `ExitCode.environment_error` respectively. Replace the removed `ExitCode.skill_unreadable` alias with `ExitCode.environment_error`.
@@ -23,6 +25,8 @@
 - Result exceptions expose payloads through `details` instead of `arguments` and use the shared `InternalError` message and string representation. Unwrap exceptions inherit directly from `InternalError`; the intermediate `ResultError` base is removed.
 
 ### Changes
+
+- Register shared protocol and configuration options and store invocation options in `cli.application.create_app`, preserving the factory signature, help, completions, parsing diagnostics, and command defaults.
 
 - Add `cli.context.CommandContext` for invocation-option retrieval, command protocol selection, and cell writing. Shared skill and version commands use it; consumers can extend it with their application-specific context behavior.
 

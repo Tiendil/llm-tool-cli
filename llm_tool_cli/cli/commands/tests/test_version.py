@@ -10,9 +10,6 @@ from typer.testing import CliRunner
 
 from llm_tool_cli.cli.application import create_app
 from llm_tool_cli.cli.commands.version import register_version_command
-from llm_tool_cli.cli.context import set_global_options
-from llm_tool_cli.cli.entities import GlobalOptions
-from llm_tool_cli.cli.options import ConfigOption, ProtocolOption
 from llm_tool_cli.core.settings import ToolLabel, initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
 
@@ -30,10 +27,6 @@ def version_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, isolated_settin
     monkeypatch.syspath_prepend(str(tmp_path))
     monkeypatch.chdir(tmp_path)
     app = create_app(help="Inspect the test package version.")
-
-    @app.callback()
-    def root(context: typer.Context, protocol: ProtocolOption = None, config: ConfigOption = None) -> None:
-        set_global_options(context, GlobalOptions(protocol=protocol, config_path=config))
 
     register_version_command(app, distribution="sample-distribution")
     return app

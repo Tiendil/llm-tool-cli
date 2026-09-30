@@ -11,9 +11,6 @@ from typer.testing import CliRunner
 
 from llm_tool_cli.cli.application import create_app
 from llm_tool_cli.cli.commands.skills import register_skill_command
-from llm_tool_cli.cli.context import set_global_options
-from llm_tool_cli.cli.entities import GlobalOptions
-from llm_tool_cli.cli.options import ConfigOption, ProtocolOption
 from llm_tool_cli.core.settings import ToolLabel, initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
 
@@ -40,10 +37,6 @@ def skill_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, isolated_settings
             f"  # {document.value}\nCafé 日本語\n\n", encoding="utf-8"
         )
     app = create_app(help="Read test documentation.")
-
-    @app.callback()
-    def root(context: typer.Context, protocol: ProtocolOption = None, config: ConfigOption = None) -> None:
-        set_global_options(context, GlobalOptions(protocol=protocol, config_path=config))
 
     register_skill_command(app, package=package, documents=Document)
     return app

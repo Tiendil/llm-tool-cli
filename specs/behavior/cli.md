@@ -12,7 +12,9 @@ Consumer-specific command execution, configuration loading, and output-cell layo
 ## Application setup
 
 The library MUST construct independently configurable applications using the consumer's help description.
-Consumers MUST retain ownership of their root callbacks and command registration.
+Each application MUST be a command group with shared global options registered at its root, even when it has only one command.
+The library MUST store the parsed global options before the selected command executes, without loading configuration or selecting a command's default protocol at the root.
+Consumers MUST retain ownership of application-specific command registration and startup.
 `-h` and `--help` MUST display generated help and exit successfully at the root and subcommand levels.
 Help MUST describe registered commands, arguments, and options using the framework's normal text output.
 Help MUST NOT require project configuration.

@@ -66,8 +66,9 @@ Its `write_cells(cells: Iterable[LogicCell], *, stderr: bool = False) -> None` m
 Consumer command contexts MAY inherit this implementation while retaining their own workspace loading, emitters, runtime setup, journaling, and cleanup.
 Shared skill and version commands MUST use this context for protocol selection and cell writing.
 The library MUST own the Typer runtime dependency and its supported version constraint for shared CLI context integration.
-The public `llm_tool_cli.cli.application.create_app(*, help: str) -> typer.Typer` factory MUST own shared application construction, help aliases, and completion-option availability.
-It MUST return an ordinary Typer application; consumers MUST register their root callbacks and application-specific commands themselves.
+The public `llm_tool_cli.cli.application.create_app(*, help: str) -> typer.Typer` factory MUST own shared application construction, the root callback, help aliases, and completion-option availability.
+The root callback MUST declare `ProtocolOption` and `ConfigOption`, retaining unspecified values as `None`, and store their parsed values as `GlobalOptions` through the shared context boundary.
+The factory MUST return an ordinary Typer application; consumers MUST register application-specific commands themselves.
 The public `llm_tool_cli.cli.commands.skills.register_skill_command(app, *, package: str, documents: type[StrEnum]) -> None` boundary MUST register the complete shared skill command using the supplied document enum and resource package.
 The CLI module MUST compose shared skill loading, protocol selection, cell writing, and read-failure handling without depending on consumer command contexts.
 The public `llm_tool_cli.cli.commands.version.register_version_command(app, *, distribution: str) -> None` boundary MUST register the complete shared version command using the supplied distribution name.
@@ -75,11 +76,11 @@ The CLI module MUST own installed package-version lookup, protocol selection, an
 The public `llm_tool_cli.cli.entities` submodule MUST provide `ExitCode`, an `enum.IntEnum` with `success = 0`, `invalid_arguments = 1`, and `skill_unreadable = 3` for their respective shared CLI outcomes.
 The enum MUST preserve the integer exit-status contract without replacing consumer-specific failure categories.
 The public `llm_tool_cli.cli.options` submodule MUST provide the Typer `ConfigOption` annotation, parsing `--config` values into `ProjectConfigPath | None` without filesystem validation or resolution.
-The same submodule MUST provide `protocol_option(*, tool_label: str) -> typer.models.OptionInfo` for use with a `Protocol | None` parameter annotation.
-It MUST own protocol option aliases, help, value parsing, and invalid-value LLM error-cell emission with the supplied label before command execution.
+The same submodule MUST provide the Typer `ProtocolOption` annotation for `Protocol | None` values.
+It MUST own protocol option aliases, help, value parsing, and invalid-value LLM error-cell emission with the initialized application label before command execution.
 The public `llm_tool_cli.cli.errors` submodule MUST own `InvalidArguments`, carrying `reason` under a module-specific `EnvironmentError` root derived from the shared environment-error base.
 Shared protocol parsing and consumer-owned validation reporting `invalid_arguments` MUST use this same diagnostic type directly, without local wrappers or duplicate error models.
-Consumers MUST use these shared option definitions directly, own their remaining option parsing, and use the shared command context to retrieve options and select the effective protocol.
+The shared application factory MUST register these option definitions; consumers MUST own their remaining option parsing and use the shared command context to retrieve options and select the effective protocol.
 
 The paths module MUST own lexical project-path operations, filesystem resolution and containment, and conversion of resolved filesystem paths to canonical identifiers, together with their semantic types and environment errors.
 Lexical operations MUST include canonical identifier checking, normalization, and component extraction.
