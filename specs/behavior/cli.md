@@ -2,7 +2,7 @@
 
 ## Goal of the document
 
-This document describes shared application setup, invocation options, output protocol selection, and built-in documentation commands.
+This document describes shared application setup, invocation options, output protocol selection, and built-in documentation and version commands.
 
 ## Scope
 
@@ -104,6 +104,21 @@ Document contents MUST remain consumer-owned and use the existing shared cell no
 A document read failure MUST emit the shared `skill_unreadable` error cell and exit with status `3`.
 Human and LLM diagnostics MUST go to stderr; automation diagnostics MUST go to stdout.
 Unexpected exceptions MUST propagate without being converted to expected read failures.
+
+## Version command
+
+The shared `version` command MUST report the installed version of the consumer-supplied distribution.
+It MUST look up package metadata when the command executes, without caching the version during registration.
+Registration and help MUST NOT require the distribution's metadata to be available.
+The command MUST NOT accept positional arguments or command-specific options.
+It MUST NOT load workspace configuration or require a consumer command context.
+
+The command MUST select its protocol through the shared invocation options and command-default rule.
+It MUST write one shared metadata-only version cell to stdout and exit with status `0`.
+The cell MUST contain the installed version string using the shared version-cell contract.
+Help MUST describe printing the installed package version without consumer-specific wording.
+
+Metadata lookup failures, including missing distribution metadata, MUST propagate without being converted to environment-error cells or successful fallback output.
 
 ## Exit statuses
 

@@ -66,6 +66,8 @@ The public `llm_tool_cli.cli.application.create_app(*, help: str) -> typer.Typer
 It MUST return an ordinary Typer application; consumers MUST register their root callbacks and application-specific commands themselves.
 The public `llm_tool_cli.cli.commands.skills.register_skill_command(app, *, package: str, documents: type[StrEnum]) -> None` boundary MUST register the complete shared skill command using the supplied document enum and resource package.
 The CLI module MUST compose shared skill loading, protocol selection, cell writing, and read-failure handling without depending on consumer command contexts.
+The public `llm_tool_cli.cli.commands.version.register_version_command(app, *, distribution: str) -> None` boundary MUST register the complete shared version command using the supplied distribution name.
+The CLI module MUST own installed package-version lookup, protocol selection, and version-cell emission without depending on consumer command contexts.
 The public `llm_tool_cli.cli.entities` submodule MUST provide `ExitCode`, an `enum.IntEnum` with `success = 0`, `invalid_arguments = 1`, and `skill_unreadable = 3` for their respective shared CLI outcomes.
 The enum MUST preserve the integer exit-status contract without replacing consumer-specific failure categories.
 The public `llm_tool_cli.cli.options` submodule MUST provide the Typer `ConfigOption` annotation, parsing `--config` values into `ProjectConfigPath | None` without filesystem validation or resolution.
@@ -126,7 +128,7 @@ The public `llm_tool_cli.protocol.cell_shortcuts` submodule MUST provide `info`,
 It MUST also provide `skill(document: str, content: str) -> ContentCell` for constructing skill-document content logic cells.
 Callers MUST select the document and supply already loaded text to the shortcut.
 The same shortcut submodule MUST provide `version(value: str) -> ContentCell` for constructing metadata-only version cells.
-Consumers MUST own package-version lookup and its failures.
+Package-version lookup and its failure policy MUST belong to the calling CLI boundary, independently of version-cell construction.
 Output cells, logic cells, and rendering contexts MUST inherit the shared `BaseEntity` from the core module.
 The public `llm_tool_cli.protocol.output_cells` package MUST expose `HumanOutputCell`, `LLMOutputCell`, and `AutomationOutputCell` subclasses, whose `render` methods own complete protocol-specific cell formatting.
 Its `human`, `llm`, and `automation` submodules MUST own the respective implementations.

@@ -22,6 +22,8 @@
 
 ### Changes
 
+- Add `cli.commands.version.register_version_command(app, distribution=...)` for installed version lookup and protocol-aware version-cell output, preserving configuration independence and metadata failure propagation.
+
 - Add `cli.application.create_app` with shared `-h`/`--help` aliases and shell completion options. Add `cli.commands.skills.register_skill_command` for consumer-owned document enums and resource packages, preserving protocol defaults, cell output, and read-failure behavior.
 - Add `cli.entities.ExitCode`, an `IntEnum` for success, explicit invalid arguments, and unreadable skill documents; framework parsing and consumer-specific failure statuses remain unchanged.
 
