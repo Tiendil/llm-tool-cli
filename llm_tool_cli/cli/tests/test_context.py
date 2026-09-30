@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 
 from llm_tool_cli.cli.context import get_global_options, set_global_options
 from llm_tool_cli.cli.entities import GlobalOptions
+from llm_tool_cli.cli.options import ConfigOption
 from llm_tool_cli.paths import ProjectConfigPath
 from llm_tool_cli.protocol import Protocol
 
@@ -38,11 +39,11 @@ class TestSetGlobalOptions:
         def initialize(
             context: typer.Context,
             protocol: Annotated[Protocol | None, typer.Option()] = None,
-            config: Annotated[Path | None, typer.Option()] = None,
+            config: ConfigOption = None,
         ) -> None:
             set_global_options(
                 context,
-                GlobalOptions(protocol=protocol, config_path=None if config is None else ProjectConfigPath(config)),
+                GlobalOptions(protocol=protocol, config_path=config),
             )
 
         @group.command()

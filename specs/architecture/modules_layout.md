@@ -62,7 +62,8 @@ Its public `llm_tool_cli.cli.entities` submodule MUST provide `GlobalOptions`, i
 Its `protocol_for(command_name: str) -> Protocol` method MUST apply explicit protocol precedence and the shared command-default rule without storing derived state.
 The parsed options entity MUST remain independent of CLI frameworks and application execution contexts.
 The library MUST own the Typer runtime dependency and its supported version constraint for shared CLI context integration.
-Consumers MUST own option parsing and pass the invoked command name when selecting the effective protocol.
+The public `llm_tool_cli.cli.options` submodule MUST provide the Typer `ConfigOption` annotation, parsing `--config` values into `ProjectConfigPath | None` without filesystem validation or resolution.
+Consumers MUST use that annotation directly, own their remaining option parsing, and pass the invoked command name when selecting the effective protocol.
 
 The paths module MUST own lexical project-path operations, filesystem resolution and containment, and conversion of resolved filesystem paths to canonical identifiers, together with their semantic types and environment errors.
 Lexical operations MUST include canonical identifier checking, normalization, and component extraction.
@@ -127,7 +128,7 @@ The rendering function MUST remain free of output side effects; the writing func
 Output-cell type selection MUST belong to logic-cell projections rather than a separate selector exposed to application code.
 The `llm_tool_cli.protocol.cell_shortcuts.environment_error(error)` helper MUST construct a shared `EnvironmentErrorCell`; it MUST NOT serialize the error, select a protocol, or render content.
 The public `llm_tool_cli.protocol.errors` submodule MUST own the internal `ContentWithoutMediaType` and `UnsupportedFormatterMode` exceptions under a protocol-specific `InternalError` root derived from the shared internal-error base.
-Consumer-specific cell kinds and content, domain record construction and rendering, journal models and formatting, CLI parsing, output routing, error classification, and exit selection MUST remain consumer-owned.
+Consumer-specific cell kinds and content, domain record construction and rendering, journal models and formatting, consumer-specific CLI parsing, output routing, error classification, and exit selection MUST remain consumer-owned.
 
 The skills module MUST own packaged skill-document loading independently of protocol cells.
 Its public interface MUST provide `llm_tool_cli.skills.load_skill_text(package: str, document: str) -> Result[str]`, with implementation in `skills.fixtures`.

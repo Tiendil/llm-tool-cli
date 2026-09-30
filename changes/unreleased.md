@@ -16,6 +16,8 @@
 
 ### Changes
 
+- Add `cli.options.ConfigOption` for shared Typer `--config` parsing into `ProjectConfigPath`, deferring filesystem validation and resolution to configuration operations.
+
 - Standardize the shared Typer runtime dependency on `~=0.25.1`.
 
 - Add `cli.context.set_global_options` and `get_global_options` for shared Typer context storage, nested-command access, and invocation isolation. Add Typer as a runtime dependency.

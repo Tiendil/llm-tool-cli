@@ -6,14 +6,27 @@ This document describes shared invocation options, their availability within an 
 
 ## Scope
 
-This specification covers reusable behavior for parsed global command-line options.
-Argument parsing, command execution, configuration loading, and output rendering are out of scope.
+This specification covers reusable behavior for global command-line options and their parsing.
+Command execution, configuration loading, and output rendering are out of scope.
 
 ## Global options
 
 Global options MUST distinguish an explicitly selected protocol from an unspecified protocol.
 They MUST carry an optional configuration file path without expanding home markers, resolving the path, or checking the filesystem.
 An absent configuration path MUST remain absent for later configuration selection.
+
+## Configuration option
+
+`--config PATH` MUST be an optional global option accepted before the subcommand.
+Its value MUST be parsed as a filesystem path, preserving home markers and relative paths for shared configuration resolution.
+Omission MUST leave the configuration path unspecified.
+Parsing MUST NOT expand home markers, resolve the path, or check its existence, file type, or readability.
+Filesystem validation and its diagnostics MUST belong to the configuration operation that uses the path.
+An unusable configuration path MUST NOT prevent execution of a command that does not use configuration.
+An option supplied without a value MUST remain a command-line parsing error.
+
+**Example:** A directory supplied as `--config PATH` reaches configuration loading and produces a shared configuration diagnostic.
+A command that only prints a version can run with that same option because it does not use configuration.
 
 ## Invocation context
 
