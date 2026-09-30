@@ -169,6 +169,8 @@ Production code MUST NOT import tests, test helpers, or repository development s
 
 The public test-only `llm_tool_cli.protocol.tests.helpers.assert_error_cells(records, errors)` boundary MUST accept parsed automation records with identifiers and expected `EnvironmentErrors`.
 It MUST own common error-cell assertions; callers MUST own output parsing and record filtering.
+The same test-only module MUST provide `cell_payloads(records)`, accepting parsed automation records and returning payload copies without generated identifiers after validating those identifiers.
+The error-cell assertion MUST reuse this helper.
 
 Configured module boundaries MUST reflect implemented ownership and dependency direction.
 New modules MUST update the architecture configuration when their addition changes a configured boundary.

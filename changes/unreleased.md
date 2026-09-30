@@ -26,6 +26,8 @@
 
 ### Changes
 
+- Share generated cell-ID validation and payload extraction through `protocol.tests.helpers.cell_payloads`, returning copies without identifiers and reusing it in error-cell assertions.
+
 - Provide `protocol.tests.helpers.assert_error_cells` for shared assertions on parsed automation diagnostics, preserving count, order, identifiers, and native payload checks without modifying supplied records.
 
 - Register shared protocol and configuration options and store invocation options in `cli.application.create_app`, preserving the factory signature, help, completions, parsing diagnostics, and command defaults.
