@@ -97,6 +97,8 @@ class TestParseProtocol:
         assert result.stderr.count(" END--\n") == 1
         assert "kind=error\n" in result.stderr
         assert "code=invalid_arguments\n" in result.stderr
+        assert "type=error\n" in result.stderr
+        assert "\nreason=" in result.stderr
         assert f"`{value}`" in result.stderr
         for protocol in Protocol:
             assert protocol.value in result.stderr

@@ -73,7 +73,8 @@ The enum MUST preserve the integer exit-status contract without replacing consum
 The public `llm_tool_cli.cli.options` submodule MUST provide the Typer `ConfigOption` annotation, parsing `--config` values into `ProjectConfigPath | None` without filesystem validation or resolution.
 The same submodule MUST provide `protocol_option(*, tool_label: str) -> typer.models.OptionInfo` for use with a `Protocol | None` parameter annotation.
 It MUST own protocol option aliases, help, value parsing, and invalid-value LLM error-cell emission with the supplied label before command execution.
-The public `llm_tool_cli.cli.errors` submodule MUST own `InvalidProtocol`, carrying `reason` under a module-specific `EnvironmentError` root derived from the shared environment-error base.
+The public `llm_tool_cli.cli.errors` submodule MUST own `InvalidArguments`, carrying `reason` under a module-specific `EnvironmentError` root derived from the shared environment-error base.
+Shared protocol parsing and consumer-owned validation reporting `invalid_arguments` MUST use this same diagnostic type directly, without local wrappers or duplicate error models.
 Consumers MUST use these shared option definitions directly, own their remaining option parsing, and pass the invoked command name when selecting the effective protocol.
 
 The paths module MUST own lexical project-path operations, filesystem resolution and containment, and conversion of resolved filesystem paths to canonical identifiers, together with their semantic types and environment errors.

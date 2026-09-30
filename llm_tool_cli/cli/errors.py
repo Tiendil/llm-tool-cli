@@ -5,7 +5,7 @@ class EnvironmentError(core_errors.EnvironmentError):
     """An expected command-line input failure."""
 
 
-class InvalidProtocol(EnvironmentError):
+class InvalidArguments(EnvironmentError):
     code: str = "invalid_arguments"
     message: str = "{error.reason}"
     reason: str

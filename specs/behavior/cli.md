@@ -61,9 +61,17 @@ Omission MUST leave the protocol unspecified for command-default selection.
 Help MUST identify the option value as `PROTOCOL` and describe the accepted values and shared command defaults.
 
 An unsupported value MUST stop execution before the command runs, write one LLM error cell to stderr, and exit with status `1`.
-The cell MUST use the initialized application tool label, the diagnostic code `invalid_arguments`, and a `reason` identifying the rejected value and the accepted values.
+The cell MUST use the initialized application tool label and the shared invalid-argument diagnostic, with a `reason` identifying the rejected value and the accepted values.
 The fallback MUST always use LLM output because the requested protocol is invalid.
 Supplying the option without a value MUST remain a framework command-line parsing error.
+
+## Invalid-argument diagnostics
+
+The library MUST provide a shared environment-error value for explicit argument-validation failures, including invalid protocol values and consumer-owned argument checks.
+It MUST use the stable code `invalid_arguments` and a textual `reason` field.
+Its formatted message MUST be the reason, using the shared environment-error normalization and serialization rules.
+Diagnostic construction MUST NOT select an output protocol or stream, write output, or choose an exit status; those responsibilities belong to the handling CLI boundary.
+Framework parsing failures MUST retain their existing framework diagnostics unless explicitly handled by a shared option or command.
 
 ## Invocation context
 

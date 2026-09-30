@@ -1,5 +1,7 @@
 ### Migration
 
+- Import `cli.errors.InvalidArguments` instead of the removed `InvalidProtocol`. The shared diagnostic also supports consumer-owned argument validation, preserving its `invalid_arguments` code and `reason` field.
+
 - Replace imports of `EXIT_SUCCESS`, `EXIT_INVALID_ARGUMENTS`, and `EXIT_SKILL_UNREADABLE` from the removed `cli.constants` module with `cli.entities.ExitCode.success`, `ExitCode.invalid_arguments`, and `ExitCode.skill_unreadable` respectively.
 
 - Replace the removed production `scoped_settings` context manager with the `isolated_settings` pytest fixture from `core.tests.fixtures`. Import the fixture into a test module or `conftest.py` and request it before initializing the label.
@@ -21,6 +23,8 @@
 - Result exceptions expose payloads through `details` instead of `arguments` and use the shared `InternalError` message and string representation. Unwrap exceptions inherit directly from `InternalError`; the intermediate `ResultError` base is removed.
 
 ### Changes
+
+- Unify explicit invalid-argument diagnostics in `cli.errors.InvalidArguments`, preserving protocol-option messages, LLM error cells, stream routing, and exit status.
 
 - Add `cli.commands.version.register_version_command(app, distribution=...)` for installed version lookup and protocol-aware version-cell output, preserving configuration independence and metadata failure propagation.
 
