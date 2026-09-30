@@ -67,6 +67,14 @@ class AlreadyExists(EnvironmentError):
     code: str = "config_already_exists"
 
 
+class TemplateUnreadable(EnvironmentError):
+    """A packaged starter could not be read as UTF-8 for the target path."""
+
+    code: str = "config_template_unreadable"
+    message: str = "could not read configuration template `{error.template}`: {error.reason}"
+    template: str
+
+
 class Unwritable(EnvironmentError):
     """Starter text could not be encoded or written to the target."""
 

@@ -81,7 +81,13 @@ Its public interfaces MUST include:
 
 These semantic path constructors MUST preserve the supplied `Path` without runtime validation or conversion.
 The configuration module MUST use the shared `ProjectConfigPath` for successful path values returned by `find_config`, `resolve_config_path`, and `locate_config`.
+The target path parameter of `create_config` and `create_config_from_template` MUST also use `ProjectConfigPath`, without requiring resolution or existence.
 It MUST preserve each operation's existing discovery, resolution, and symlink behavior.
+The configuration module MUST also expose `llm_tool_cli.config.create_config_from_template(path, *, package, template) -> Result[None]`, implemented in `config.files`.
+It MUST compose packaged UTF-8 template reading from `fixtures/<template>` with the existing exclusive `create_config` operation.
+The public `config.errors` submodule MUST own `TemplateUnreadable`, with code `config_template_unreadable`, target `path`, `template`, `reason`, and the private original exception cause.
+Template reading MUST precede target creation; creation failures MUST propagate unchanged.
+Template contents, target selection, and subsequent configuration validation and workspace construction MUST remain consumer-owned.
 
 The protocol module MUST own shared output protocols, cell construction, cell formatting and environment-error cell construction, JSON Lines serialization, and direct text writing.
 Its public package interface MUST export `Protocol`, `to_jsonl`, and `write_output` from `llm_tool_cli.protocol`.

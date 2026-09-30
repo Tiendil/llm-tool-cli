@@ -7,6 +7,7 @@ validation rules, workspace construction, and presentation of failures.
 
 from llm_tool_cli.config.files import (
     create_config,
+    create_config_from_template,
     find_config,
     load_config,
     locate_config,
@@ -14,4 +15,12 @@ from llm_tool_cli.config.files import (
     resolve_config_path,
 )
 
-__all__ = ["create_config", "find_config", "load_config", "locate_config", "read_toml", "resolve_config_path"]
+__all__ = [
+    "create_config",
+    "create_config_from_template",
+    "find_config",
+    "load_config",
+    "locate_config",
+    "read_toml",
+    "resolve_config_path",
+]

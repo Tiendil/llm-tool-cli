@@ -1,3 +1,4 @@
+import importlib.resources
 from pathlib import Path
 
 import pydantic
@@ -97,7 +98,7 @@ def load_config[T: pydantic.BaseModel](path: Path, config_class: type[T]) -> Res
         return Err([errors.ValidationFailed(path=path, reason=str(exc)).with_cause(exc)])
 
 
-def create_config(path: Path, text: str) -> Result[None]:
+def create_config(path: ProjectConfigPath, text: str) -> Result[None]:
     """Create a starter from verbatim UTF-8 text, without overwriting any target.
 
     The parent must already exist. No discovery, path normalization, directory
@@ -115,3 +116,20 @@ def create_config(path: Path, text: str) -> Result[None]:
     except (OSError, UnicodeEncodeError) as exc:
         return Err([errors.Unwritable(path=path, reason=str(exc)).with_cause(exc)])
     return Ok(None)
+
+
+def create_config_from_template(path: ProjectConfigPath, *, package: str, template: str) -> Result[None]:
+    """Read a packaged UTF-8 starter and create it at the supplied target path.
+
+    Read ``fixtures/<template>`` from ``package`` before attempting creation.
+    Filesystem and decoding failures return ``Err([TemplateUnreadable(...)])``
+    with the target path, template name, reason, and private original cause.
+    Unexpected resource errors propagate. Otherwise, pass the loaded text to
+    ``create_config`` and return its result unchanged, including write failures.
+    No target selection, path resolution, or configuration validation occurs.
+    """
+    try:
+        text = importlib.resources.files(package).joinpath("fixtures", template).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        return Err([errors.TemplateUnreadable(path=path, template=template, reason=str(exc)).with_cause(exc)])
+    return create_config(path, text)
