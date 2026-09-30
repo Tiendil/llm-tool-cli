@@ -75,6 +75,10 @@ Content logic cells MUST support metadata-only output and reject content without
 They MUST NOT retain generated output identifiers or cached projections.
 Application cell-emission boundaries MUST accept logic cells; output-cell construction belongs to their projections.
 
+Callers whose data produces one cell with the same payload in every protocol MUST be able to reuse shared uniform projection behavior.
+Uniform projection MUST produce exactly one output cell of the selected protocol's type, preserving the supplied kind, media type, content, and metadata before final formatting.
+Each projection MUST recompute the output cell without retaining identifiers or cached projections.
+
 **Example:** The same dependency data can become one grouped Markdown output cell for a text protocol and several metadata-only output cells for automation.
 
 ## Cell formatting

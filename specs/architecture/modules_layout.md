@@ -126,6 +126,10 @@ The public `llm_tool_cli.protocol.output_cells.base` submodule MUST own the abst
 It MUST also own `RenderContext`, containing the zero-based cell `index`, sequence `total`, and `tool_label` supplied to `OutputCell.render(context) -> bytes`.
 The public `llm_tool_cli.protocol.logic_cells.base` submodule MUST provide the abstract `LogicCell` entity with `render(protocol) -> list[OutputCell]`, dispatching to the subclass's `render_human`, `render_llm`, or `render_automation` method.
 Consumer-specific logic-cell subclasses MUST remain consumer-owned and hold the data needed for their projections.
+The public `llm_tool_cli.protocol.logic_cells.uniform` submodule MUST provide `UniformCell`, a `LogicCell` specialization for one output cell with the same payload in every protocol.
+Its protocol projection methods MUST pass the corresponding output-cell class to the abstract `_render(cell_type: type[OutputCell]) -> OutputCell` method and wrap the returned cell in a one-item list.
+Shared content and environment-error cells MUST inherit this projection implementation; consumers MAY use it for their own uniform cells.
+Cells with multiple outputs or different protocol payloads MUST retain their own projections through `LogicCell`.
 The public `llm_tool_cli.protocol.logic_cells` package MUST expose `ContentCell`, a reusable logic cell holding prepared kind, media type, content, and metadata for a single output cell in each protocol.
 Its `content` submodule MUST own the implementation.
 The public `llm_tool_cli.protocol.logic_cells` package MUST also expose `EnvironmentErrorCell`, retaining a typed shared environment error until projection.

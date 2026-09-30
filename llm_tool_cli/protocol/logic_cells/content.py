@@ -3,12 +3,11 @@ from typing import Self
 import pydantic
 
 from llm_tool_cli.protocol.errors import ContentWithoutMediaType
-from llm_tool_cli.protocol.logic_cells.base import LogicCell
-from llm_tool_cli.protocol.output_cells import AutomationOutputCell, HumanOutputCell, LLMOutputCell
+from llm_tool_cli.protocol.logic_cells.uniform import UniformCell
 from llm_tool_cli.protocol.output_cells.base import MetaValue, OutputCell
 
 
-class ContentCell(LogicCell):
+class ContentCell(UniformCell):
     """Prepared content and metadata shared by all output protocols."""
 
     kind: str
@@ -22,14 +21,5 @@ class ContentCell(LogicCell):
             raise ContentWithoutMediaType()
         return self
 
-    def render_human(self) -> list[OutputCell]:
-        return self._render(HumanOutputCell)
-
-    def render_llm(self) -> list[OutputCell]:
-        return self._render(LLMOutputCell)
-
-    def render_automation(self) -> list[OutputCell]:
-        return self._render(AutomationOutputCell)
-
-    def _render(self, cell_type: type[OutputCell]) -> list[OutputCell]:
-        return [cell_type(kind=self.kind, media_type=self.media_type, content=self.content, meta=self.meta)]
+    def _render(self, cell_type: type[OutputCell]) -> OutputCell:
+        return cell_type(kind=self.kind, media_type=self.media_type, content=self.content, meta=self.meta)

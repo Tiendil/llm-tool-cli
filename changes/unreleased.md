@@ -26,6 +26,8 @@
 
 ### Changes
 
+- Provide `protocol.logic_cells.uniform.UniformCell` for one-cell projections with the same payload across protocols; reuse it in content and environment-error cells while preserving rendering and generated identifiers.
+
 - Share generated cell-ID validation and payload extraction through `protocol.tests.helpers.cell_payloads`, returning copies without identifiers and reusing it in error-cell assertions.
 
 - Provide `protocol.tests.helpers.assert_error_cells` for shared assertions on parsed automation diagnostics, preserving count, order, identifiers, and native payload checks without modifying supplied records.
