@@ -4,6 +4,7 @@ Lexical normalization is independent of the filesystem. Application-specific
 syntax belongs to callers. ``paths.errors`` exposes public path failures.
 """
 
+from llm_tool_cli.paths.enumeration import FileGlobPattern, enumerate_files
 from llm_tool_cli.paths.filesystem import (
     PathInput,
     ProjectConfigPath,
@@ -26,12 +27,14 @@ from llm_tool_cli.paths.normalization import (
 )
 
 __all__ = [
+    "FileGlobPattern",
     "PathInput",
     "ProjectConfigPath",
     "ProjectPathId",
     "ProjectRootPath",
     "RelativeProjectPath",
     "ResolvedProjectPath",
+    "enumerate_files",
     "is_project_path_id",
     "normalize_path",
     "normalize_project_path_id",

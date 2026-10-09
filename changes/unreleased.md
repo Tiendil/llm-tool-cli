@@ -1,5 +1,9 @@
 ### Migration
 
+- Pass `paths.FileGlobPattern` for explicit patterns supplied to `paths.enumerate_files`. Constructing the type preserves the string; enumeration still performs path validation and filesystem checks.
+
+- Project file paths no longer follow symbolic links below the resolved project root, including links to internal targets. Use ordinary project paths and directories instead; discovery skips links and explicit inputs reject them.
+
 - Replace `paths.UntrustedPath` imports, annotations, and constructor calls with `paths.PathInput`. The duplicate type is removed; runtime path behavior is unchanged.
 
 - Applications created by `cli.application.create_app` now include the shared root callback and remain command groups even with one registered command. Remove callbacks that only declare `--protocol` and `--config` and store `GlobalOptions`; register commands on the returned application.
@@ -27,6 +31,8 @@
 - Result exceptions expose payloads through `details` instead of `arguments` and use the shared `InternalError` message and string representation. Unwrap exceptions inherit directly from `InternalError`; the intermediate `ResultError` base is removed.
 
 ### Changes
+
+- Add shared deterministic file enumeration with glob matching, hidden-file discovery, symlink exclusion, and structured filesystem errors. Mixed path normalization now checks root-anchored inputs for prohibited links.
 
 - Provide `protocol.logic_cells.uniform.UniformCell` for one-cell projections with the same payload across protocols; reuse it in content and environment-error cells while preserving rendering and generated identifiers.
 

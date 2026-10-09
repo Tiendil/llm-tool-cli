@@ -2,7 +2,7 @@
 
 ## Goal of the document
 
-This document describes project-path identifiers, their conversion to and from filesystem paths, and their failure behavior.
+This document describes project-path identifiers, their conversion to and from filesystem paths, file enumeration, and their failure behavior.
 
 ## Scope
 
@@ -72,7 +72,7 @@ An explicit `.` MUST retain ordinary relative filesystem path semantics, and whi
 **Example:** With root `/project` and directory base `/project/nested`, `""` is invalid while `.` produces `@/nested`.
 
 Inputs starting with `@` MUST use lexical identifier normalization, including rejection of a missing `@/` prefix.
-This branch MUST NOT resolve the identifier's target or establish filesystem containment.
+After lexical normalization, this branch MUST check filesystem containment and reject symbolic links below the resolved project root, without requiring an existing target.
 An explicit filesystem base MUST NOT affect this branch.
 
 Other inputs MUST be interpreted as filesystem paths, with home markers expanded before resolution.
@@ -130,13 +130,16 @@ Resolution MUST NOT expand home markers or require the target to exist or have a
 Lexical normalization failures and filesystem containment or resolution failures MUST preserve their respective diagnostics.
 
 **Example:** `@/a/../b` resolves to `b` below the supplied root.
-If `a` is a symlink, normalization removes `a/..` before filesystem resolution, while resolving `@/a/b` follows that symlink and enforces containment of its target.
+If `a` is a symlink, normalization removes `a/..` before filesystem resolution, while resolving `@/a/b` rejects that symlink without following it.
 
 ## Filesystem containment
 
 Resolving a supplied filesystem path inside an already resolved project root MUST produce an absolute path strictly below that root or report a failure.
-Resolution MUST resolve symlinks and parent-directory segments before checking containment.
-It MUST reject the root itself and targets outside the root, including targets reached through symlinks.
+Resolution MUST reject any symbolic link encountered below the resolved project root before following it, including links to internal targets, broken links, and loops.
+This check MUST include intermediate path components and filesystem-input components followed by `..`.
+Symlinks used to select the project root or its ancestors MAY be resolved; they MUST NOT hide a symbolic link below that root.
+Resolution MUST resolve parent-directory segments and enforce containment.
+It MUST reject the root itself and targets outside the root.
 It MUST NOT require the target to exist or have a particular filesystem kind.
 
 Relative filesystem paths MUST use the process current working directory as their base.
@@ -156,7 +159,27 @@ Conversion MUST NOT access the filesystem, depend on the current working directo
 It MUST support files, directories, and missing targets without imposing existence or filename-extension requirements.
 
 **Example:** A resolved path `/project/notes/Project Plan.md` under `/project` converts to `@/notes/Project Plan.md`.
-When the supplied resolved path is a symlink's target, the identifier represents that target rather than the original symlink spelling.
+The supplied path MUST already satisfy the prohibition on symbolic links below the project root.
+
+## File enumeration
+
+File enumeration MUST return unique canonical identifiers for existing regular files matching a filesystem glob under the project root.
+The default pattern MUST recursively select all files.
+Patterns MUST accept project-root-anchored, root-relative, absolute, and home-relative forms with the same containment and input-normalization rules as mixed path resolution.
+A symbolic link in the literal prefix preceding the first wildcard MUST be rejected before traversal.
+The project root itself MUST be treated as a literal path even when its directory names contain glob metacharacters.
+
+Glob matching MUST use `/` as the separator and match case sensitively.
+Within a segment, `*`, `?`, and bracket character classes MUST retain shell-style matching semantics.
+A complete `**` segment MUST match zero or more directory levels; a terminal `**` MUST also select regular files at any depth.
+Hidden files and directories MUST be treated like ordinary entries, including when selected by wildcards.
+Files MUST be returned in lexicographic path-component order, with duplicates from recursive patterns removed.
+
+Enumeration MUST skip every symbolic link encountered through matching, including file links, directory links, broken links, and cycles, without following its target.
+Missing search locations and non-directory search prefixes MUST produce no matches.
+Directories and other non-regular files MUST NOT appear in results.
+Unreadable directories or other filesystem inspection failures MUST fail enumeration rather than produce a successful partial result.
+Consumer-specific extension checks, configured search-directory order, and domain identifier checks remain consumer responsibilities.
 
 ## Filesystem path identifiers
 
@@ -171,13 +194,16 @@ Failures MUST retain the diagnostics of the failed resolution or containment ope
 
 ## Errors
 
-Normalization and resolution MUST report rejected input with one failure diagnostic with the stable code `invalid_project_path`.
+Normalization, resolution, and enumeration MUST report rejected input, including prohibited symbolic links, with one failure diagnostic with the stable code `invalid_project_path`.
 Its `path` field MUST contain the rejected input with surrounding whitespace removed; containment failures MUST use the supplied filesystem path.
 Consumers MUST be able to identify this failure by its code without parsing the message.
 
-Filesystem failures that prevent root or containment resolution, including permission failures and symlink loops, MUST produce one failure diagnostic with the stable code `path_resolution_failed`.
+Filesystem failures that prevent root or containment resolution, including permission failures and loops during root resolution, MUST produce one failure diagnostic with the stable code `path_resolution_failed`.
 An inability to expand a home marker during mixed path normalization or resolution MUST use the same failure diagnostic.
 Its `path` field MUST contain the supplied filesystem root for root resolution, the supplied filesystem path for containment resolution, or the original textual input for home expansion.
 Its `reason` field MUST describe the resolution failure, with surrounding whitespace removed from both fields.
 The original exception MUST be retained as a private cause and MUST NOT appear in serialized diagnostics.
 Unexpected failures outside filesystem resolution MUST remain exceptions.
+
+Filesystem failures during enumeration MUST produce one failure diagnostic with the stable code `files_unreadable`, the resolved root in `path`, and a description in `reason`.
+The original exception MUST remain a private cause and MUST NOT appear in serialized diagnostics.

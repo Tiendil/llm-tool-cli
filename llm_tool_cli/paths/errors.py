@@ -22,3 +22,12 @@ class PathResolutionFailed(EnvironmentError):
     message: str = "could not resolve project path `{error.path}`: {error.reason}"
     path: str
     reason: str
+
+
+class FilesUnreadable(EnvironmentError):
+    """Project files could not be enumerated."""
+
+    code: str = "files_unreadable"
+    message: str = "could not discover files under `{error.path}`: {error.reason}"
+    path: str
+    reason: str

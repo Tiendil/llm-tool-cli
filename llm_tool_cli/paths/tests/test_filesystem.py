@@ -14,6 +14,15 @@ from llm_tool_cli.paths import (
     resolve_root_anchored_path,
 )
 from llm_tool_cli.paths.errors import InvalidProjectPath, PathResolutionFailed
+from llm_tool_cli.paths.filesystem import _project_path_input, _validate_no_symlinks
+
+
+class TestProjectPathInput:
+    @pytest.mark.parametrize("value", ["@/link/file", "link/file"])
+    def test_leaves_target_resolution_to_caller(self, tmp_path: Path, value: str) -> None:
+        (tmp_path / "link").symlink_to(tmp_path)
+
+        assert _project_path_input(value, ProjectRootPath(tmp_path)).unwrap() == tmp_path / "link/file"
 
 
 class TestResolveProjectPath:
@@ -62,12 +71,14 @@ class TestResolveProjectPath:
         assert resolve_project_path(value, tmp_path).unwrap_err() == [InvalidProjectPath(path=str(tmp_path / value))]
 
     @pytest.mark.parametrize("value", ["@/link/file", "link/file"])
-    def test_follows_symlink_inside_project(self, tmp_path: Path, value: str) -> None:
+    def test_rejects_symlink_inside_project(self, tmp_path: Path, value: str) -> None:
         target = tmp_path / "target"
         target.mkdir()
         (tmp_path / "link").symlink_to(target, target_is_directory=True)
 
-        assert resolve_project_path(value, tmp_path).unwrap() == target / "file"
+        assert resolve_project_path(value, tmp_path).unwrap_err() == [
+            InvalidProjectPath(path=str(tmp_path / "link" / "file"))
+        ]
 
     @pytest.mark.parametrize("value", ["@/link/file", "link/file"])
     def test_rejects_symlink_escape(self, tmp_path: Path, value: str) -> None:
@@ -120,16 +131,13 @@ class TestResolveProjectPath:
         assert isinstance(failure.cause, (OSError, RuntimeError))
 
     @pytest.mark.parametrize("value", ["@/loop/file", "loop/file"])
-    def test_preserves_target_resolution_failure(self, tmp_path: Path, value: str) -> None:
+    def test_rejects_target_symlink_loop(self, tmp_path: Path, value: str) -> None:
         link = tmp_path / "loop"
         link.symlink_to(link)
 
         failure = resolve_project_path(value, tmp_path).unwrap_err()[0]
 
-        assert isinstance(failure, PathResolutionFailed)
-        assert failure.code == "path_resolution_failed"
-        assert failure.path == str(link / "file")
-        assert isinstance(failure.cause, (OSError, RuntimeError))
+        assert failure == InvalidProjectPath(path=str(link / "file"))
 
     @pytest.mark.parametrize("cause", [RuntimeError("unknown home"), OSError("home lookup failed")])
     def test_returns_home_expansion_failure(self, tmp_path: Path, mocker: MockerFixture, cause: Exception) -> None:
@@ -192,17 +200,21 @@ class TestNormalizePath:
     def test_absolute_input_ignores_base(self, tmp_path: Path) -> None:
         assert normalize_path(str(tmp_path / "file"), tmp_path, cwd=tmp_path.parent).unwrap() == "@/file"
 
-    def test_identifier_ignores_base_and_target_symlinks(self, tmp_path: Path) -> None:
+    def test_identifier_checks_symlinks_independently_of_base(self, tmp_path: Path) -> None:
         (tmp_path / "outside").symlink_to(tmp_path.parent, target_is_directory=True)
 
-        assert normalize_path("@/outside/file", tmp_path, cwd=tmp_path.parent).unwrap() == "@/outside/file"
+        assert normalize_path("@/outside/file", tmp_path, cwd=tmp_path.parent).unwrap_err() == [
+            InvalidProjectPath(path=str(tmp_path / "outside/file"))
+        ]
 
-    def test_filesystem_input_uses_resolved_symlink_target(self, tmp_path: Path) -> None:
+    def test_filesystem_input_rejects_internal_symlink(self, tmp_path: Path) -> None:
         target = tmp_path / "target"
         target.mkdir()
         (tmp_path / "link").symlink_to(target, target_is_directory=True)
 
-        assert normalize_path("link/file", tmp_path).unwrap() == "@/target/file"
+        assert normalize_path("link/file", tmp_path).unwrap_err() == [
+            InvalidProjectPath(path=str(tmp_path / "link/file"))
+        ]
 
     def test_filesystem_input_rejects_symlink_escape(self, tmp_path: Path) -> None:
         link = tmp_path / "outside"
@@ -264,15 +276,13 @@ class TestNormalizePath:
         assert failure.path == str(root)
         assert isinstance(failure.cause, (OSError, RuntimeError))
 
-    def test_target_resolution_failure_preserves_diagnostic(self, tmp_path: Path) -> None:
+    def test_rejects_target_symlink_loop(self, tmp_path: Path) -> None:
         link = tmp_path / "loop"
         link.symlink_to(link)
 
         failure = normalize_path("loop/file", tmp_path).unwrap_err()[0]
 
-        assert isinstance(failure, PathResolutionFailed)
-        assert failure.path == str(link / "file")
-        assert isinstance(failure.cause, (OSError, RuntimeError))
+        assert failure == InvalidProjectPath(path=str(link / "file"))
 
     @pytest.mark.parametrize("cause", [RuntimeError("unknown home"), OSError("home lookup failed")])
     def test_home_expansion_failure_preserves_diagnostic(
@@ -342,13 +352,15 @@ class TestProjectPathIdFromFilesystem:
 
         assert project_path_id_from_filesystem(link / "file", link).unwrap() == "@/file"
 
-    def test_uses_resolved_target_identifier(self, tmp_path: Path) -> None:
+    def test_rejects_internal_symlink(self, tmp_path: Path) -> None:
         target = tmp_path / "target"
         target.mkdir()
         link = tmp_path / "link"
         link.symlink_to(target, target_is_directory=True)
 
-        assert project_path_id_from_filesystem(link / "file", tmp_path).unwrap() == "@/target/file"
+        assert project_path_id_from_filesystem(link / "file", tmp_path).unwrap_err() == [
+            InvalidProjectPath(path=str(link / "file"))
+        ]
 
     def test_resolves_parent_segments(self, tmp_path: Path) -> None:
         path = tmp_path / "nested" / ".." / "file"
@@ -368,12 +380,11 @@ class TestProjectPathIdFromFilesystem:
 
         assert project_path_id_from_filesystem(path, tmp_path).unwrap_err() == [InvalidProjectPath(path=str(path))]
 
-    @pytest.mark.parametrize("failing_part", ["root", "target"])
-    def test_preserves_resolution_failure(self, tmp_path: Path, failing_part: str) -> None:
+    def test_preserves_root_resolution_failure(self, tmp_path: Path) -> None:
         link = tmp_path / "loop"
         link.symlink_to(link)
-        root = link if failing_part == "root" else tmp_path
-        path = tmp_path / "file" if failing_part == "root" else link
+        root = link
+        path = tmp_path / "file"
 
         failures = project_path_id_from_filesystem(path, root).unwrap_err()
 
@@ -422,15 +433,6 @@ class TestProjectPathIdFromResolved:
         resolved = resolve_inside_project(tmp_path / relative, root).unwrap()
 
         assert project_path_id_from_resolved(resolved, root) == "@/" + relative
-
-    def test_uses_resolved_symlink_target(self, tmp_path: Path) -> None:
-        target = tmp_path / "target"
-        target.mkdir()
-        (tmp_path / "link").symlink_to(target, target_is_directory=True)
-        root = resolve_project_root(tmp_path).unwrap()
-        resolved = resolve_root_anchored_path("@/link/file.txt", root).unwrap()
-
-        assert project_path_id_from_resolved(resolved, root) == "@/target/file.txt"
 
     def test_uses_root_independently_of_cwd(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         root = resolve_project_root(tmp_path / "project").unwrap()
@@ -526,7 +528,54 @@ class TestResolveProjectRoot:
             resolve_project_root(tmp_path)
 
 
+class TestValidateNoSymlinks:
+    @pytest.mark.parametrize("target_kind", ["file", "directory", "missing", "loop", "outside"])
+    @pytest.mark.parametrize("suffix", ["", "/child", "/../other"])
+    def test_rejects_links_before_following_them(self, tmp_path: Path, target_kind: str, suffix: str) -> None:
+        target = tmp_path / "target"
+        link = tmp_path / "link"
+        if target_kind == "file":
+            target.touch()
+        elif target_kind == "directory":
+            target.mkdir()
+        elif target_kind == "loop":
+            target = link
+        elif target_kind == "outside":
+            target = tmp_path.parent
+        link.symlink_to(target)
+        candidate = Path(str(link) + suffix)
+
+        assert _validate_no_symlinks(candidate, ProjectRootPath(tmp_path)).unwrap_err() == [
+            InvalidProjectPath(path=str(candidate))
+        ]
+
+    def test_root_alias_does_not_hide_descendant_link(self, tmp_path: Path) -> None:
+        root = tmp_path / "project"
+        root.mkdir()
+        alias = tmp_path / "alias"
+        alias.symlink_to(root)
+        (root / "link").symlink_to(root / "missing")
+
+        assert _validate_no_symlinks(alias / "ordinary", ProjectRootPath(root)).is_ok()
+        assert _validate_no_symlinks(alias / "link/file", ProjectRootPath(root)).unwrap_err() == [
+            InvalidProjectPath(path=str(alias / "link/file"))
+        ]
+
+    def test_missing_paths_and_parent_segments_remain_valid(self, tmp_path: Path) -> None:
+        assert _validate_no_symlinks(tmp_path / "missing/../file", ProjectRootPath(tmp_path)).is_ok()
+
+
 class TestResolveInsideProject:
+    def test_symlink_inspection_failure_preserves_cause(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        cause = PermissionError("cannot inspect path")
+        mocker.patch.object(Path, "lstat", side_effect=cause)
+
+        failure = resolve_inside_project(tmp_path / "file", ProjectRootPath(tmp_path)).unwrap_err()[0]
+
+        assert isinstance(failure, PathResolutionFailed)
+        assert failure.path == str(tmp_path / "file")
+        assert failure.cause == cause
+
     def test_resolves_file_and_parent_segments(self, tmp_path: Path) -> None:
         target = tmp_path / "file"
         target.touch()
@@ -571,13 +620,15 @@ class TestResolveInsideProject:
         assert error.code == "invalid_project_path"
         assert error.path == str(root / relative)
 
-    def test_follows_symlink_inside_root(self, tmp_path: Path) -> None:
+    def test_rejects_symlink_inside_root(self, tmp_path: Path) -> None:
         target = tmp_path / "target"
         target.mkdir()
         link = tmp_path / "link"
         link.symlink_to(target, target_is_directory=True)
 
-        assert resolve_inside_project(link / "file", ProjectRootPath(tmp_path)).unwrap() == (target / "file")
+        assert resolve_inside_project(link / "file", ProjectRootPath(tmp_path)).unwrap_err() == [
+            InvalidProjectPath(path=str(link / "file"))
+        ]
 
     @pytest.mark.parametrize("target", [".", ".."])
     def test_rejects_symlink_to_root_or_outside(self, tmp_path: Path, target: str) -> None:
@@ -588,15 +639,13 @@ class TestResolveInsideProject:
             InvalidProjectPath(path=str(link))
         ]
 
-    def test_symlink_loop_returns_resolution_failure(self, tmp_path: Path) -> None:
+    def test_rejects_symlink_loop(self, tmp_path: Path) -> None:
         link = tmp_path / "loop"
         link.symlink_to(link)
 
         failure = resolve_inside_project(link, ProjectRootPath(tmp_path)).unwrap_err()[0]
 
-        assert isinstance(failure, PathResolutionFailed)
-        assert failure.path == str(link)
-        assert isinstance(failure.cause, (OSError, RuntimeError))
+        assert failure == InvalidProjectPath(path=str(link))
 
     @pytest.mark.parametrize("cause", [PermissionError(" permission denied "), RuntimeError(" symlink loop ")])
     def test_resolution_failure_preserves_diagnostic_and_private_cause(
@@ -670,12 +719,14 @@ class TestResolveRootAnchoredPath:
         assert failure.code == "invalid_project_path"
         assert failure.path == value
 
-    def test_follows_symlink_inside_root(self, tmp_path: Path) -> None:
+    def test_rejects_symlink_inside_root(self, tmp_path: Path) -> None:
         target = tmp_path / "target"
         target.mkdir()
         (tmp_path / "link").symlink_to(target, target_is_directory=True)
 
-        assert resolve_root_anchored_path("@/link/file", ProjectRootPath(tmp_path)).unwrap() == target / "file"
+        assert resolve_root_anchored_path("@/link/file", ProjectRootPath(tmp_path)).unwrap_err() == [
+            InvalidProjectPath(path=str(tmp_path / "link/file"))
+        ]
 
     @pytest.mark.parametrize("target", [".", ".."])
     def test_rejects_symlink_to_root_or_outside(self, tmp_path: Path, target: str) -> None:
@@ -690,7 +741,7 @@ class TestResolveRootAnchoredPath:
         assert failure.code == "invalid_project_path"
         assert failure.path == str(link)
 
-    def test_symlink_loop_preserves_resolution_failure(self, tmp_path: Path) -> None:
+    def test_rejects_symlink_loop(self, tmp_path: Path) -> None:
         link = tmp_path / "loop"
         link.symlink_to(link)
 
@@ -698,10 +749,7 @@ class TestResolveRootAnchoredPath:
 
         assert len(failures) == 1
         failure = failures[0]
-        assert isinstance(failure, PathResolutionFailed)
-        assert failure.code == "path_resolution_failed"
-        assert failure.path == str(link / "file")
-        assert isinstance(failure.cause, (OSError, RuntimeError))
+        assert failure == InvalidProjectPath(path=str(link / "file"))
 
     def test_permission_failure_preserves_diagnostic_and_private_cause(
         self, tmp_path: Path, mocker: MockerFixture
