@@ -31,6 +31,11 @@ Shared capabilities MUST have explicit contracts that distinguish library respon
 Consumer-specific defaults and policies SHOULD remain with the consumer unless they are part of an intentionally adopted common contract.
 Consumer-specific domain entities MUST remain with the consumer.
 
+Consumer domain and runtime modules MUST own assembly of command-facing domain results as logic cells or ordered collections of their subclasses.
+The CLI MUST consume those cells through shared rendering without converting internal domain results into output payloads.
+Consumer protocol modules MUST own domain-cell projections, while the shared protocol module owns the common cell interface and rendering infrastructure.
+Constructing a logic cell from typed domain data MUST NOT be treated as protocol-specific rendering or require a dependency on consumer CLI code.
+
 ## Module responsibilities
 
 Module names SHOULD describe the responsibility owned by the module so callers can identify where a concept belongs.

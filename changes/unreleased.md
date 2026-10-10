@@ -32,6 +32,8 @@
 
 ### Changes
 
+- Establish logic cells and their ordered collections as the primary interface for consumer domain results returned to CLI layers, keeping domain result assembly with consumers and protocol rendering shared.
+
 - Add shared deterministic file enumeration with glob matching, hidden-file discovery, symlink exclusion, and structured filesystem errors. Mixed path normalization now checks root-anchored inputs for prohibited links.
 
 - Provide `protocol.logic_cells.uniform.UniformCell` for one-cell projections with the same payload across protocols; reuse it in content and environment-error cells while preserving rendering and generated identifiers.
