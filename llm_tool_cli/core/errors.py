@@ -31,6 +31,14 @@ class InternalError(Exception):
         return super().__str__()
 
 
+class ContextValueNotSet(InternalError):
+    message_template = "Context value {name!r} is not set."
+
+
+class ContextValueAlreadySet(InternalError):
+    message_template = "Context value {name!r} is already set."
+
+
 class ToolLabelNotInitialized(InternalError):
     message_template = "Initialize the tool label before rendering cells."
 

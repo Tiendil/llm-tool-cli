@@ -62,6 +62,18 @@ The shared callback exception bridge MUST be publicly available as `llm_tool_cli
 The shared base entity MUST be publicly available as `llm_tool_cli.core.entities.BaseEntity`.
 Capability errors MUST remain with their owning capabilities, and consumer presentation metadata MUST remain with the consumer.
 
+The public `llm_tool_cli.core.context` submodule MUST provide `ContextValue[T](name: str)` for independently managed typed bindings.
+Its public operations MUST be:
+
+- `get() -> T` for access to the current value.
+- `is_set() -> bool` for checking whether a value is bound.
+- `initialize(value: T) -> None` for initialization without reassignment.
+- `scope(value: T)` returning a synchronous context manager that yields `None` and restores the preceding binding on exit.
+
+The core error module MUST own `ContextValueNotSet` and `ContextValueAlreadySet`, both deriving from `InternalError` and identifying the binding through `details["name"]`.
+The binding mechanism MUST remain independent of CLI frameworks and application-owned services.
+Applications MUST own their binding instances, supplied objects, and setup boundaries; obtaining values through bindings MUST NOT prohibit explicit function arguments.
+
 The CLI module MUST own shared parsed global options and command-specific protocol defaults.
 Its public `llm_tool_cli.cli.entities` submodule MUST provide `GlobalOptions`, inheriting the shared entity base and containing `protocol: Protocol | None` and `config_path: ProjectConfigPath | None`, both defaulting to `None`.
 Its `protocol_for(command_name: str) -> Protocol` method MUST apply explicit protocol precedence and the shared command-default rule without storing derived state.

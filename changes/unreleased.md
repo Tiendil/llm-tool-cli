@@ -32,6 +32,8 @@
 
 ### Changes
 
+- Add `core.context.ContextValue` for independent typed bindings with initialization, explicit absent-value errors, and temporary scopes that restore prior bindings even after exceptions.
+
 - Establish logic cells and their ordered collections as the primary interface for consumer domain results returned to CLI layers, keeping domain result assembly with consumers and protocol rendering shared.
 
 - Add shared deterministic file enumeration with glob matching, hidden-file discovery, symlink exclusion, and structured filesystem errors. Mixed path normalization now checks root-anchored inputs for prohibited links.
