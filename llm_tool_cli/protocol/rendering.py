@@ -8,7 +8,7 @@ from llm_tool_cli.protocol.streams import write_output
 
 
 def render_cells(cells: Iterable[LogicCell], *, protocol: Protocol) -> bytes:
-    tool_label = settings.tool_label.get()
+    tool_label = settings.static_config.get().tool_label
     sequence = [output for cell in cells for output in cell.render(protocol)]
     return b"".join(
         cell.render(RenderContext(index=index, total=len(sequence), tool_label=tool_label))

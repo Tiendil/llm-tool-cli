@@ -2,11 +2,11 @@
 
 ## Goal of the document
 
-This document describes shared configuration-file selection, loading, creation, and failure diagnostics.
+This document describes shared configuration-file selection, loading, creation, project scopes, and failure diagnostics.
 
 ## Scope
 
-This specification covers reusable configuration-file mechanics.
+This specification covers reusable configuration-file mechanics and project preparation and scope management.
 Application schema semantics, template contents, workspace construction, and CLI presentation and exit policies are out of scope.
 
 ## General behavior
@@ -83,6 +83,24 @@ The caller MUST supply the default filename, working directory, resource package
 Initialization MUST return the resolved configuration path only after successful creation.
 A failed stage MUST stop initialization and propagate its diagnostics unchanged without attempting subsequent stages.
 Initialization MUST NOT load or validate the created configuration or construct or install an application workspace.
+
+## Project scopes
+
+Project loading MUST combine existing configuration selection and schema-based loading, using the default filename declared in static application settings.
+Project initialization MUST combine configuration-file initialization and schema-based loading of the created file, using the same static filename.
+Both operations MUST accept the caller's schema, working directory, and optional explicit path; initialization MUST also accept the template resource location.
+Preparation MUST occur when entering the scope.
+Only successful validation MUST establish immutable project settings containing the selected absolute path and its derived parent directory.
+The scope MUST yield the loaded application configuration through a successful result and retain the project binding until exit.
+Selection MUST preserve its existing symlink policy; loading MUST NOT resolve a discovered path again.
+The preceding project binding, including its absence, MUST be restored on normal exit and after exceptions or early exits from the scope body.
+Runtime settings MUST remain unchanged, and project preparation MUST NOT require them.
+Expected preparation failures MUST yield their original error result without replacing the preceding project binding or attempting subsequent stages.
+A created file MUST remain on disk if its subsequent loading or validation fails.
+Unexpected preparation failures and exceptions from the scope body MUST propagate unchanged.
+Attempting project setup without a static configuration filename MUST raise an internal exception before filesystem operations.
+Application-specific configuration binding, workspace construction, and output MUST remain with the caller.
+Commands without project requirements MUST NOT enter a project scope.
 
 ## Failure diagnostics
 

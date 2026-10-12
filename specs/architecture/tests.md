@@ -38,7 +38,7 @@ Tests that require specific state MUST prepare it explicitly at the start of the
 Tests MUST prepare and mutate application-owned state through the production code that owns the corresponding state transition and invariants.
 Tests MUST NOT bypass production logic by writing directly to application-owned state unless the developer explicitly approves the exception.
 An approved exception MUST be documented next to the bypass and MUST explain why the required state cannot be produced through production code.
-The shared application-settings isolation fixture MAY replace the label binding with a fresh context value as an approved test-only exception, because production initialization deliberately cannot clear or replace an installed label.
+The shared application-settings isolation fixture MAY replace the static configuration binding with a fresh context value as an approved test-only exception, because production initialization deliberately cannot clear or replace an installed label.
 It MUST use `pytest-mock` to restore the previous binding after the test, including when the test fails.
 Tests using this fixture MUST exercise real settings initialization and access.
 Tests MAY inspect application-owned state directly to assert observable effects; this permission does not allow direct mutation.

@@ -13,6 +13,14 @@ from llm_tool_cli.core import errors as core_errors
 from llm_tool_cli.core.entities import ExitCode
 
 
+class InternalError(core_errors.InternalError):
+    """Misuse of configuration setup interfaces."""
+
+
+class ConfigFilenameNotSet(InternalError):
+    message_template = "Project setup requires a configuration filename in static settings."
+
+
 class EnvironmentError(core_errors.EnvironmentError):
     """Classification and filesystem context for configuration failures."""
 

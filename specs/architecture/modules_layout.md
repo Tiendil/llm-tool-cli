@@ -74,24 +74,43 @@ The core error module MUST own `ContextValueNotSet` and `ContextValueAlreadySet`
 The binding mechanism MUST remain independent of CLI frameworks and application-owned services.
 Applications MUST own their binding instances, supplied objects, and setup boundaries; obtaining values through bindings MUST NOT prohibit explicit function arguments.
 
-The public `llm_tool_cli.core.settings` submodule MUST expose `tool_label` as a `ContextValue[ToolLabel]`; callers MUST read the label through `settings.tool_label.get()`.
-Its `initialize(*, label)` boundary MUST retain same-label initialization and the `ToolLabelAlreadyInitialized` diagnostic for conflicting labels.
-Access to an unset label MUST use the shared `ContextValueNotSet` diagnostic.
+The public `llm_tool_cli.core.settings` submodule MUST expose frozen `StaticConfig` with `tool_label: ToolLabel`, `config_filename: ConfigFilename | None = None`, and `static_config: ContextValue[StaticConfig]`.
+`ConfigFilename` MUST be a semantic string type owned by this submodule; applications using project setup MUST declare their default filename here instead of maintaining a competing constant.
+Callers MUST read application identity through `settings.static_config.get().tool_label`.
+Static configuration MUST preserve the label exactly, including whitespace and an empty string, and remain available before command-line parsing.
+Its `initialize(*, label, config_filename=None)` boundary MUST accept repeated identical settings and retain the `ToolLabelAlreadyInitialized` diagnostic for conflicting labels.
+Changing the filename of an initialized application MUST raise `ContextValueAlreadySet` for `static_config` and preserve the existing settings.
+Access to unset static configuration MUST use the shared `ContextValueNotSet` diagnostic.
 
-The CLI module MUST own shared parsed global options and command-specific protocol defaults.
-Its public `llm_tool_cli.cli.entities` submodule MUST provide `GlobalOptions`, inheriting the shared entity base and containing `protocol: Protocol | None` and `config_path: ProjectConfigPath | None`, both defaulting to `None`.
-Its `protocol_for(command_name: str) -> Protocol` method MUST apply explicit protocol precedence and the shared command-default rule without storing derived state.
-The parsed options entity MUST remain independent of CLI frameworks and application execution contexts.
-The public `llm_tool_cli.cli.context` submodule MUST expose `global_options` as a `ContextValue[GlobalOptions]`; callers MUST access the active options through `global_options.get()` and temporary bindings through `global_options.scope(options)`.
-The public `llm_tool_cli.cli.context.CommandContext(context: typer.Context)` class MUST own retrieval of invocation options and selection of the invoked command's protocol, exposing `global_options` and `protocol`.
-It MUST read the shared binding, falling back to unspecified options without installing them when no binding is active.
+The configuration module MUST expose `llm_tool_cli.config.runtime.RuntimeConfig` and `runtime_config: ContextValue[RuntimeConfig]` independently of CLI frameworks.
+`RuntimeConfig` MUST be frozen and contain the effective `protocol: Protocol`, without project fields or duplicated application identity.
+The configuration module MUST expose `llm_tool_cli.config.project.ProjectConfig` and `project_config: ContextValue[ProjectConfig]` independently of CLI frameworks.
+`ProjectConfig` MUST be frozen and require an absolute active `config_path: ProjectConfigPath`.
+Its read-only `project_dir: ProjectRootPath` property MUST derive the root from that path's parent.
+The configuration module MUST expose `load_project(config_class, *, cwd, path=None)` and `initialize_project(config_class, *, package, template, cwd, path=None)`, implemented in `config.project` and re-exported by `config`.
+Both MUST return synchronous context managers yielding `Result[T]` for the caller-supplied Pydantic schema, performing preparation on entry and using the filename from static settings.
+Loading MUST select an existing configuration; initialization MUST create a starter without upward discovery. Both MUST load and validate the selected file, construct complete project settings, bind them for the scope, and restore the preceding binding on exit.
+Expected preparation failures MUST yield their unchanged error result without binding a project. Exceptions from the caller's scope body MUST propagate without being converted into preparation results.
+Project setup without a configured static filename MUST raise `config.errors.ConfigFilenameNotSet`, deriving from a module-specific `InternalError` root.
+Callers MUST retain the shared context around project-dependent execution and output; CLI callers MUST register it with the framework context's resource lifecycle.
+Commands without a project MUST NOT establish a project binding.
+Each configuration MUST be the single source of truth for its fields; consumer globals, workspace entities, and command contexts MUST NOT keep competing copies.
+Application-specific configuration and compiled workspaces MUST remain consumer-owned and separate from shared settings.
+The shared test-only `llm_tool_cli.config.tests.fixtures.runtime_settings` fixture MUST bind fresh runtime settings through a real scope and restore the preceding binding on exit.
+The same module's `project_settings` fixture MUST independently scope a project rooted at the test's temporary directory, without loading configuration files.
+Its `project_static_settings` fixture MUST scope application metadata for project-preparation tests.
+
+The CLI module MUST own global-option parsing and command-specific protocol defaults.
+The public `llm_tool_cli.cli.context.CommandContext(context: typer.Context)` class MUST create a runtime configuration with the effective protocol and bind it through the framework context's resource lifecycle.
+It MUST read parsed root parameters from the framework, treating an unspecified protocol as LLM for the invoked command named `skill` and human otherwise.
+Its `config_input` property MUST expose the unresolved optional CLI configuration path for the operation that selects or creates a configuration file.
+Its `protocol` property MUST read the active runtime configuration without retaining a copy.
 Its `write_cells(cells: Iterable[LogicCell], *, stderr: bool = False) -> None` method MUST use shared cell writing with that protocol and the requested stream.
-Consumer command contexts MAY inherit this implementation while retaining their own workspace loading, emitters, runtime setup, journaling, and cleanup.
+Consumer command contexts MAY inherit this implementation while retaining their own application settings, workspace construction, emitters, runtime setup, journaling, and cleanup.
 Shared skill and version commands MUST use this context for protocol selection and cell writing.
 The library MUST own the Typer runtime dependency and its supported version constraint for shared CLI context integration.
-The public `llm_tool_cli.cli.application.create_app(*, help: str) -> typer.Typer` factory MUST own shared application construction, the root callback, help aliases, and completion-option availability.
-The root callback MUST declare `ProtocolOption` and `ConfigOption`, retaining unspecified values as `None`, and bind their parsed values as `GlobalOptions` through `global_options.scope`.
-The callback MUST attach that scope to the framework context's resource lifecycle so the preceding binding is restored when the invocation closes, including after errors.
+The public `llm_tool_cli.cli.application.create_app(*, help: str) -> typer.Typer` factory MUST own shared application construction, root option registration, help aliases, and completion-option availability.
+The root callback MUST declare `ProtocolOption` and `ConfigOption`, retaining unspecified inputs as `None` in the framework parameters without a parallel global options binding.
 The factory MUST return an ordinary Typer application; consumers MUST register application-specific commands themselves.
 The public `llm_tool_cli.cli.commands.skills.register_skill_command(app, *, package: str, documents: type[StrEnum]) -> None` boundary MUST register the complete shared skill command using the supplied document enum and resource package.
 The CLI module MUST compose shared skill loading, protocol selection, cell writing, and read-failure handling without depending on consumer command contexts.
@@ -104,7 +123,7 @@ The same submodule MUST provide the Typer `ProtocolOption` annotation for `Proto
 It MUST own protocol option aliases, help, value parsing, and invalid-value LLM error-cell emission with the initialized application label before command execution.
 The public `llm_tool_cli.cli.errors` submodule MUST own `InvalidArguments`, carrying `reason` under a module-specific `EnvironmentError` root derived from the shared environment-error base.
 Shared protocol parsing and consumer-owned validation reporting `invalid_arguments` MUST use this same diagnostic type directly, without local wrappers or duplicate error models.
-The shared application factory MUST register these option definitions; consumers MUST own their remaining option parsing and use the shared command context to retrieve options and select the effective protocol.
+The shared application factory MUST register these option definitions; consumers MUST own their remaining option parsing and use the shared command context to establish effective runtime settings and access unresolved configuration input.
 
 The paths module MUST own lexical project-path operations, filesystem resolution and containment without symlink traversal below the resolved root, deterministic file enumeration, and conversion of resolved filesystem paths to canonical identifiers, together with their semantic types and environment errors.
 Lexical operations MUST include canonical identifier checking, normalization, and component extraction.
@@ -143,7 +162,7 @@ The public `config.errors` submodule MUST own configuration environment errors, 
 The configuration module MUST expose `llm_tool_cli.config.resolve_init_config_path(filename: str, *, path: ProjectConfigPath | None = None, cwd: PathInput) -> Result[ProjectConfigPath]`, implemented in `config.files`.
 Consumers MUST supply the default filename and invocation working directory.
 The configuration module MUST expose `llm_tool_cli.config.initialize_config(filename: str, *, package: str, template: str, cwd: PathInput, path: ProjectConfigPath | None = None) -> Result[ProjectConfigPath]`, implemented in `config.files` by composing shared initialization target selection and template-based creation.
-Template contents, application schemas, and workspace construction and installation MUST remain consumer-owned.
+Template contents, application schemas, and application-specific workspace construction and installation MUST remain consumer-owned; shared project settings and their scopes MUST be managed by the shared project contexts.
 
 The protocol module MUST own shared output protocols, cell construction, cell formatting and environment-error cell construction, JSON Lines serialization, and direct text writing.
 Its public package interface MUST export `Protocol`, `to_jsonl`, and `write_output` from `llm_tool_cli.protocol`.
@@ -172,7 +191,7 @@ Output cells, logic cells, and rendering contexts MUST inherit the shared `BaseE
 The public `llm_tool_cli.protocol.output_cells` package MUST expose `HumanOutputCell`, `LLMOutputCell`, and `AutomationOutputCell` subclasses, whose `render` methods own complete protocol-specific cell formatting.
 Its `human`, `llm`, and `automation` submodules MUST own the respective implementations.
 Logic-cell projections MUST construct the corresponding concrete output-cell subtype before final rendering.
-The public `llm_tool_cli.protocol.rendering.render_cells` function MUST accept an iterable of logic cells and an explicit keyword-only `protocol` argument, read `settings.tool_label.get()` once per batch, project the logic cells for that protocol, calculate rendering contexts for the complete output-cell sequence, and concatenate rendered bytes.
+The public `llm_tool_cli.protocol.rendering.render_cells` function MUST accept an iterable of logic cells and an explicit keyword-only `protocol` argument, read `settings.static_config.get().tool_label` once per batch, project the logic cells for that protocol, calculate rendering contexts for the complete output-cell sequence, and concatenate rendered bytes.
 The same public submodule MUST provide `write_cells(cells, *, protocol, stderr=False) -> None`, composing sequence rendering, UTF-8 decoding, and shared text writing with caller-selected stream routing.
 The rendering function MUST remain free of output side effects; the writing function MUST own emission without classifying cells or selecting exit statuses.
 Output-cell type selection MUST belong to logic-cell projections rather than a separate selector exposed to application code.

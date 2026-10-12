@@ -13,7 +13,7 @@ Consumer-specific command execution, configuration loading, and output-cell layo
 
 The library MUST construct independently configurable applications using the consumer's help description.
 Each application MUST be a command group with shared global options registered at its root, even when it has only one command.
-The library MUST store the parsed global options before the selected command executes, without loading configuration or selecting a command's default protocol at the root.
+The library MUST retain parsed global options as framework inputs before the selected command executes, without loading configuration or selecting a command's default protocol at the root.
 Consumers MUST retain ownership of application-specific command registration and startup.
 `-h` and `--help` MUST display generated help and exit successfully at the root and subcommand levels.
 Help MUST describe registered commands, arguments, and options using the framework's normal text output.
@@ -27,12 +27,14 @@ Completion MUST include registered command names, options, and declared document
 
 ## Application identity
 
-The application MUST initialize its tool label in the execution context used for command-line parsing or shared sequence rendering, before either operation.
+The application MUST initialize immutable static configuration containing its tool label in the execution context used for command-line parsing or shared sequence rendering, before either operation.
 The label MUST preserve its exact string value, including whitespace and an empty string.
 The label MUST remain separate from parsed invocation options and MUST NOT be obtained from workspace configuration.
-Reading an uninitialized label MUST raise an internal exception.
-Repeated initialization with the same label MUST succeed without changing it.
+Reading uninitialized static configuration MUST raise an internal exception.
+Static configuration MAY also declare the application's default configuration filename; project setup MUST require it, while parsing and rendering MUST remain independent of it.
+Repeated initialization with identical static settings MUST succeed without changing them.
 Initialization with a different label MUST raise an internal exception and preserve the installed label.
+Initialization with a different configuration filename MUST likewise fail and preserve the installed settings.
 
 **Example:** An unsupported protocol can produce an error cell with the application's label before its root command callback runs.
 
@@ -77,31 +79,36 @@ Framework parsing failures MUST retain their existing framework diagnostics unle
 
 ## Invocation context
 
-The library MUST bind parsed global options for the invocation and make them available from its root command and nested subcommands without requiring a framework context for access.
-Each invocation MUST use its own parsed options without changing unrelated framework context data.
-The preceding binding, including an absent binding, MUST be restored when the invocation finishes, including after command errors and early exits.
-Retrieval of bound options MUST return them without changing them or resolving their configuration path.
-Independent invocations MUST NOT share retained options.
+Command setup MUST establish immutable context-scoped runtime settings owning the effective output protocol, independently of the CLI framework and project availability.
+Project settings MUST have their own independent binding and MUST require an absolute active configuration path.
+The project directory MUST be derived from that path, never initialized independently.
+All configuration entities MUST be complete when constructed and immutable thereafter.
+Unresolved CLI configuration input MUST remain separate from project settings.
+Shared project contexts MUST construct and bind project settings after successful configuration loading and validation, including after creation, and retain them around project-dependent execution and output.
+Commands that do not use configuration MUST NOT establish project settings, even when `--config` is supplied.
+A failed loading or creation operation MUST NOT replace an existing project binding with the failed candidate.
+Application-specific loaded configuration MUST remain separate from these shared settings.
 
-Constructing a shared command context MUST retrieve the invocation's global options and select its protocol using the invoked command name, treating an absent name as an empty name.
-When no global options are bound, command-context construction MUST use options with both protocol and configuration path unspecified, without binding the fallback.
-Construction MUST NOT resolve configuration paths, load a workspace, or emit output.
-The context MUST write supplied cell iterables with its selected protocol through shared cell writing, using stdout by default and stderr when explicitly requested.
+Each command context MUST establish fresh runtime settings without changing unrelated framework context data.
+The preceding runtime binding, including an absent binding, MUST be restored when the framework command context closes, including after command errors and early exits.
+Consumer setup MUST register shared project contexts with the framework command context so project bindings are restored when it closes.
+Runtime readers, including output writing, MUST consult the active settings rather than retained copies.
+Constructing a command context MUST NOT resolve configuration paths, load a workspace, or emit output.
+The context MUST write supplied cell iterables with the active protocol through shared cell writing, using stdout by default and stderr when explicitly requested.
 Cell writing MUST preserve complete batches and their order; environment-error reporting MUST remain the responsibility of the shared command error handler.
 The shared skill and version commands MUST use this context; consumers MAY extend it with application-specific responsibilities.
-
-**Example:** A protocol and configuration path supplied to the root command remain available inside a nested command group.
-A later invocation without those options receives unspecified values instead of inheriting the earlier choices.
+Explicit function arguments remain permitted for operations that receive values directly.
 
 ## Protocol selection
 
 An explicit protocol MUST take precedence over command defaults.
-When no protocol is specified, the command named `skill` MUST select `llm` and all other command names MUST select `human`.
+When no protocol is specified, the invoked command named `skill` MUST select `llm` and all other command names MUST select `human`.
 The library MUST own both defaults and the selection rule.
-Selection MUST leave the stored options unchanged and MUST NOT retain a previous command's default.
+Selection MUST publish the effective protocol in runtime settings before command execution.
 
 **Example:** With no explicit protocol, printing a skill document selects LLM output, while the next version command selects human output.
 An explicit `human` protocol selects human output for the skill command as well.
+Invalid-protocol diagnostics MUST use static application identity and the explicit LLM fallback without requiring runtime or project settings.
 
 ## Skill command
 
@@ -151,7 +158,7 @@ Early validation MUST supply its chosen fallback protocol; the reporter MUST use
 An empty error list MUST emit no diagnostics and terminate with the shared aggregation result.
 
 Shared commands MUST use this error-handling scope.
-Consumers MUST retain workspace loading, application runtime setup, error journaling, and cleanup.
+Consumers MUST retain application-specific workspace construction, runtime setup, error journaling, and cleanup.
 Consumer journaling MAY observe failures before propagating them to the shared handler and MUST NOT cause duplicate error-cell emission.
 
 ## Exit statuses

@@ -1,16 +1,14 @@
-from pathlib import Path
-
 import pytest
 import typer
 from pytest_mock import MockerFixture
 from typer.testing import CliRunner
 
 from llm_tool_cli.cli.application import create_app
-from llm_tool_cli.cli.context import CommandContext, global_options
-from llm_tool_cli.cli.entities import GlobalOptions
+from llm_tool_cli.cli.context import CommandContext
+from llm_tool_cli.config.project import project_config
+from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
 from llm_tool_cli.core.settings import ToolLabel, initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
-from llm_tool_cli.paths import ProjectConfigPath
 from llm_tool_cli.protocol import Protocol
 
 __all__ = ["isolated_settings"]
@@ -34,11 +32,13 @@ class TestCreateApp:
         application = create_app(help="Inspect nested resources.")
         group = typer.Typer()
         application.add_typer(group, name="nested")
-        received: list[GlobalOptions] = []
+        received: list[RuntimeConfig] = []
 
         @group.command()
         def show(context: typer.Context) -> None:
-            received.append(global_options.get())
+            command = CommandContext(context)
+            received.append(runtime_config.get())
+            assert command.config_input == context.find_root().params["config_path"]
             assert context.obj == {"other": "state"}
             assert context.find_root().meta == {}
 
@@ -48,52 +48,52 @@ class TestCreateApp:
             [option, protocol.value, "--config", "~/custom.toml", "nested", "show"],
             obj={"other": "state"},
         )
-        assert not global_options.is_set()
+        assert not runtime_config.is_set()
         unspecified = runner.invoke(application, ["nested", "show"], obj={"other": "state"})
-        assert not global_options.is_set()
+        assert not runtime_config.is_set()
 
         assert explicit.exit_code == unspecified.exit_code == 0
         assert explicit.stdout == explicit.stderr == unspecified.stdout == unspecified.stderr == ""
         assert received == [
-            GlobalOptions(protocol=protocol, config_path=ProjectConfigPath(Path("~/custom.toml"))),
-            GlobalOptions(),
+            RuntimeConfig(protocol=protocol),
+            RuntimeConfig(protocol=Protocol.human),
         ]
 
     @pytest.mark.parametrize(
         ("failure", "exit_code"),
         [(None, 0), (typer.Exit(7), 7), (RuntimeError("command failed"), 1)],
     )
-    def test_restores_outer_options_after_command(self, failure: Exception | None, exit_code: int) -> None:
+    def test_restores_outer_runtime_after_command(self, failure: Exception | None, exit_code: int) -> None:
         application = create_app(help="Inspect scoped options.")
-        received: list[GlobalOptions] = []
+        received: list[RuntimeConfig] = []
 
         @application.command()
         def show(context: typer.Context) -> None:
             command = CommandContext(context)
-            received.append(command.global_options)
+            received.append(runtime_config.get())
             assert command.protocol == Protocol.human
             if failure is not None:
                 raise failure
 
-        outer = GlobalOptions(protocol=Protocol.automation, config_path=ProjectConfigPath(Path("outer.toml")))
-        with global_options.scope(outer):
+        outer = RuntimeConfig(protocol=Protocol.automation)
+        with runtime_config.scope(outer):
             result = CliRunner().invoke(application, ["show"])
 
             assert result.exit_code == exit_code
-            assert received == [GlobalOptions()]
-            assert global_options.get() == outer
+            assert received == [RuntimeConfig(protocol=Protocol.human)]
+            assert runtime_config.get() == outer
 
-        assert not global_options.is_set()
+        assert not runtime_config.is_set()
         if failure is not None and not isinstance(failure, typer.Exit):
             assert isinstance(result.exception, type(failure))
             assert result.exception.args == failure.args
 
-    def test_subcommand_parse_error_clears_options(self, app: typer.Typer) -> None:
+    def test_subcommand_parse_error_leaves_runtime_unbound(self, app: typer.Typer) -> None:
         result = CliRunner().invoke(app, ["-p", "automation", "show", "--unknown"])
 
         assert result.exit_code == 2
         assert "No such option" in result.stderr
-        assert not global_options.is_set()
+        assert not runtime_config.is_set()
 
     def test_invalid_protocol_stops_execution(self, app: typer.Typer, isolated_settings: None) -> None:
         initialize(label=ToolLabel("TEST"))
@@ -105,6 +105,8 @@ class TestCreateApp:
         assert result.stderr.startswith("--TEST-CELL ")
         assert result.stderr.count(" BEGIN--\n") == 1
         assert "code=invalid_arguments\n" in result.stderr
+        assert not runtime_config.is_set()
+        assert not project_config.is_set()
 
     @pytest.mark.parametrize("option", ["-p", "--protocol", "--config"])
     def test_missing_option_value(self, app: typer.Typer, option: str) -> None:
@@ -121,7 +123,7 @@ class TestCreateApp:
 
         assert result.exit_code == 0
         assert not result.stderr
-        assert not global_options.is_set()
+        assert not runtime_config.is_set()
         assert ("Show a test resource." if command else "Inspect test resources.") in result.stdout
         assert "--help" in result.stdout
         assert "-h" in result.stdout

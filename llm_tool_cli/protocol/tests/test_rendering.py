@@ -97,7 +97,7 @@ class TestRenderCells:
         with pytest.raises(ContextValueNotSet) as caught:
             render_cells([ContentCell(kind="message")], protocol=protocol)
 
-        assert caught.value.details == {"name": "tool_label"}
+        assert caught.value.details == {"name": "static_config"}
 
 
 class TestWriteCells:
@@ -181,6 +181,6 @@ class TestWriteCells:
         with pytest.raises(ContextValueNotSet) as caught:
             write_cells([ContentCell(kind="message")], protocol=Protocol.llm, stderr=True)
 
-        assert caught.value.details == {"name": "tool_label"}
+        assert caught.value.details == {"name": "static_config"}
         captured = capsys.readouterr()
         assert captured.out == captured.err == ""
