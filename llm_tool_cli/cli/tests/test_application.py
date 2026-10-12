@@ -52,7 +52,7 @@ class TestCreateApp:
         ]
 
     def test_invalid_protocol_stops_execution(self, app: typer.Typer, isolated_settings: None) -> None:
-        initialize(tool_label=ToolLabel("TEST"))
+        initialize(label=ToolLabel("TEST"))
 
         result = CliRunner().invoke(app, ["--protocol", "invalid", "show"])
 

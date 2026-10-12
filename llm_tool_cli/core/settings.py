@@ -1,25 +1,20 @@
-"""Process-wide application settings, initialized before command-line parsing."""
+"""Application settings bound before command-line parsing in the active context."""
 
 from typing import NewType
 
-from llm_tool_cli.core.errors import ToolLabelAlreadyInitialized, ToolLabelNotInitialized
+from llm_tool_cli.core.context import ContextValue
+from llm_tool_cli.core.errors import ToolLabelAlreadyInitialized
 
 ToolLabel = NewType("ToolLabel", str)
 
-_tool_label: ToolLabel | None = None
+tool_label = ContextValue[ToolLabel]("tool_label")
 
 
-def initialize(*, tool_label: ToolLabel) -> None:
-    global _tool_label
+def initialize(*, label: ToolLabel) -> None:
+    if tool_label.is_set():
+        current = tool_label.get()
+        if current != label:
+            raise ToolLabelAlreadyInitialized(details={"current": current, "requested": label})
+        return
 
-    if _tool_label is not None and _tool_label != tool_label:
-        raise ToolLabelAlreadyInitialized(details={"current": _tool_label, "requested": tool_label})
-
-    _tool_label = tool_label
-
-
-def get_tool_label() -> ToolLabel:
-    if _tool_label is None:
-        raise ToolLabelNotInitialized()
-
-    return _tool_label
+    tool_label.initialize(label)

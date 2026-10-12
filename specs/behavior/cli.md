@@ -27,7 +27,7 @@ Completion MUST include registered command names, options, and declared document
 
 ## Application identity
 
-The application MUST initialize its process-wide tool label before command-line parsing or shared sequence rendering.
+The application MUST initialize its tool label in the execution context used for command-line parsing or shared sequence rendering, before either operation.
 The label MUST preserve its exact string value, including whitespace and an empty string.
 The label MUST remain separate from parsed invocation options and MUST NOT be obtained from workspace configuration.
 Reading an uninitialized label MUST raise an internal exception.

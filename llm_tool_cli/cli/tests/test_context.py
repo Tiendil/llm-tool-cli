@@ -104,7 +104,7 @@ class TestCommandContext:
     def test_write_cells__uses_selected_protocol_and_stream(
         self, capsys: pytest.CaptureFixture[str], protocol: Protocol, stderr: bool
     ) -> None:
-        initialize(tool_label=ToolLabel("TEST"))
+        initialize(label=ToolLabel("TEST"))
         context = typer.Context(TyperCommand("show"), info_name="show")
         set_global_options(context, GlobalOptions(protocol=protocol))
         command = CommandContext(context)

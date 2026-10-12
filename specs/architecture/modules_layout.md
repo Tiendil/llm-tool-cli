@@ -74,6 +74,10 @@ The core error module MUST own `ContextValueNotSet` and `ContextValueAlreadySet`
 The binding mechanism MUST remain independent of CLI frameworks and application-owned services.
 Applications MUST own their binding instances, supplied objects, and setup boundaries; obtaining values through bindings MUST NOT prohibit explicit function arguments.
 
+The public `llm_tool_cli.core.settings` submodule MUST expose `tool_label` as a `ContextValue[ToolLabel]`; callers MUST read the label through `settings.tool_label.get()`.
+Its `initialize(*, label)` boundary MUST retain same-label initialization and the `ToolLabelAlreadyInitialized` diagnostic for conflicting labels.
+Access to an unset label MUST use the shared `ContextValueNotSet` diagnostic.
+
 The CLI module MUST own shared parsed global options and command-specific protocol defaults.
 Its public `llm_tool_cli.cli.entities` submodule MUST provide `GlobalOptions`, inheriting the shared entity base and containing `protocol: Protocol | None` and `config_path: ProjectConfigPath | None`, both defaulting to `None`.
 Its `protocol_for(command_name: str) -> Protocol` method MUST apply explicit protocol precedence and the shared command-default rule without storing derived state.
@@ -165,8 +169,8 @@ Output cells, logic cells, and rendering contexts MUST inherit the shared `BaseE
 The public `llm_tool_cli.protocol.output_cells` package MUST expose `HumanOutputCell`, `LLMOutputCell`, and `AutomationOutputCell` subclasses, whose `render` methods own complete protocol-specific cell formatting.
 Its `human`, `llm`, and `automation` submodules MUST own the respective implementations.
 Logic-cell projections MUST construct the corresponding concrete output-cell subtype before final rendering.
-The public `llm_tool_cli.protocol.rendering.render_cells` function MUST accept an iterable of logic cells and explicit keyword-only `protocol` and `tool_label` arguments, project the logic cells for that protocol, calculate rendering contexts for the complete output-cell sequence, and concatenate rendered bytes.
-The same public submodule MUST provide `write_cells(cells, *, protocol, tool_label, stderr=False) -> None`, composing sequence rendering, UTF-8 decoding, and shared text writing with caller-selected stream routing.
+The public `llm_tool_cli.protocol.rendering.render_cells` function MUST accept an iterable of logic cells and an explicit keyword-only `protocol` argument, read `settings.tool_label.get()` once per batch, project the logic cells for that protocol, calculate rendering contexts for the complete output-cell sequence, and concatenate rendered bytes.
+The same public submodule MUST provide `write_cells(cells, *, protocol, stderr=False) -> None`, composing sequence rendering, UTF-8 decoding, and shared text writing with caller-selected stream routing.
 The rendering function MUST remain free of output side effects; the writing function MUST own emission without classifying cells or selecting exit statuses.
 Output-cell type selection MUST belong to logic-cell projections rather than a separate selector exposed to application code.
 The `llm_tool_cli.protocol.cell_shortcuts.environment_error(error)` helper MUST construct a shared `EnvironmentErrorCell`; it MUST NOT serialize the error, select a protocol, or render content.

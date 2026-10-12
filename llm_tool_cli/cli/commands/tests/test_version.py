@@ -18,7 +18,7 @@ __all__ = ["isolated_settings"]
 
 @pytest.fixture
 def version_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, isolated_settings: None) -> typer.Typer:
-    initialize(tool_label=ToolLabel("TEST"))
+    initialize(label=ToolLabel("TEST"))
     distribution = tmp_path / "sample_distribution-9.8.7.dist-info"
     distribution.mkdir()
     (distribution / "METADATA").write_text(

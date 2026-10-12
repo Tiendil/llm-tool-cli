@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 
-from llm_tool_cli.core.settings import get_tool_label
+from llm_tool_cli.core import settings
 from llm_tool_cli.protocol.entities import Protocol
 from llm_tool_cli.protocol.logic_cells.base import LogicCell
 from llm_tool_cli.protocol.output_cells.base import RenderContext
@@ -8,7 +8,7 @@ from llm_tool_cli.protocol.streams import write_output
 
 
 def render_cells(cells: Iterable[LogicCell], *, protocol: Protocol) -> bytes:
-    tool_label = get_tool_label()
+    tool_label = settings.tool_label.get()
     sequence = [output for cell in cells for output in cell.render(protocol)]
     return b"".join(
         cell.render(RenderContext(index=index, total=len(sequence), tool_label=tool_label))

@@ -5,7 +5,7 @@ import sys
 import pytest
 from pytest_mock import MockerFixture
 
-from llm_tool_cli.core.errors import ToolLabelNotInitialized
+from llm_tool_cli.core.errors import ContextValueNotSet
 from llm_tool_cli.core.settings import ToolLabel, initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
 from llm_tool_cli.protocol import Protocol
@@ -39,7 +39,7 @@ class PositionedLogicCell(LogicCell):
 
 class TestRenderCells:
     def test_preserves_sequence_order_and_supplies_context_after_projection(self) -> None:
-        initialize(tool_label=ToolLabel("  TOOL  "))
+        initialize(label=ToolLabel("  TOOL  "))
         cells = (PositionedLogicCell(items=items) for items in [("café", "second"), (), ("third",)])
 
         rendered = render_cells(cells, protocol=Protocol.human)
@@ -47,24 +47,24 @@ class TestRenderCells:
         assert rendered == "  TOOL   0/3: café\n  TOOL   1/3: second\n  TOOL   2/3: third\n".encode()
 
     def test_single_output_cell_receives_its_own_sequence_context(self) -> None:
-        initialize(tool_label=ToolLabel("TOOL"))
+        initialize(label=ToolLabel("TOOL"))
         cell = PositionedLogicCell(items=("only",))
 
         assert render_cells([cell], protocol=Protocol.human) == b"TOOL 0/1: only\n"
 
     def test_empty_sequence(self) -> None:
-        initialize(tool_label=ToolLabel("TOOL"))
+        initialize(label=ToolLabel("TOOL"))
         assert render_cells([], protocol=Protocol.human) == b""
 
     def test_empty_projection(self) -> None:
-        initialize(tool_label=ToolLabel("TOOL"))
+        initialize(label=ToolLabel("TOOL"))
         cell = PositionedLogicCell(items=("only",))
 
         assert render_cells([cell], protocol=Protocol.llm) == b""
 
     @pytest.mark.parametrize("protocol", list(Protocol))
     def test_rendering_preserves_logic_cells(self, protocol: Protocol) -> None:
-        initialize(tool_label=ToolLabel("TOOL"))
+        initialize(label=ToolLabel("TOOL"))
         cell = ContentCell(kind="message", media_type="text/markdown", content="café", meta={"labels": ["one", "two"]})
         original = cell.model_dump()
 
@@ -74,7 +74,7 @@ class TestRenderCells:
 
     @pytest.mark.parametrize("protocol", [Protocol.human, Protocol.llm])
     def test_text_cells_use_context_label_unchanged(self, protocol: Protocol) -> None:
-        initialize(tool_label=ToolLabel("  LABEL  "))
+        initialize(label=ToolLabel("  LABEL  "))
         cell = ContentCell(kind="message")
 
         output = render_cells([cell], protocol=protocol)
@@ -83,7 +83,7 @@ class TestRenderCells:
 
     @pytest.mark.parametrize("label", ["FIRST", "SECOND"])
     def test_automation_ignores_context_label(self, label: str) -> None:
-        initialize(tool_label=ToolLabel(label))
+        initialize(label=ToolLabel(label))
         cell = ContentCell(kind="message")
 
         first = json.loads(render_cells([cell], protocol=Protocol.automation))
@@ -94,8 +94,10 @@ class TestRenderCells:
 
     @pytest.mark.parametrize("protocol", list(Protocol))
     def test_requires_initialization(self, protocol: Protocol) -> None:
-        with pytest.raises(ToolLabelNotInitialized):
+        with pytest.raises(ContextValueNotSet) as caught:
             render_cells([ContentCell(kind="message")], protocol=protocol)
+
+        assert caught.value.details == {"name": "tool_label"}
 
 
 class TestWriteCells:
@@ -104,7 +106,7 @@ class TestWriteCells:
     def test_unicode_and_stream_selection(
         self, capsys: pytest.CaptureFixture[str], protocol: Protocol, stderr: bool
     ) -> None:
-        initialize(tool_label=ToolLabel("TOOL"))
+        initialize(label=ToolLabel("TOOL"))
         cell = ContentCell(kind="message", media_type="text/markdown", content="café 日本語", meta={"type": "message"})
 
         write_cells([cell], protocol=protocol, stderr=stderr)
@@ -128,7 +130,7 @@ class TestWriteCells:
                 assert output.endswith(" END--\n")
 
     def test_generator_batch_uses_stdout_by_default(self, capsys: pytest.CaptureFixture[str]) -> None:
-        initialize(tool_label=ToolLabel("  TOOL  "))
+        initialize(label=ToolLabel("  TOOL  "))
         cells = (PositionedLogicCell(items=items) for items in [("café", "second"), (), ("third",)])
 
         write_cells(cells, protocol=Protocol.human)
@@ -139,7 +141,7 @@ class TestWriteCells:
 
     @pytest.mark.parametrize("cells", [[], [PositionedLogicCell(items=())]])
     def test_empty_output(self, capsys: pytest.CaptureFixture[str], cells: list[LogicCell]) -> None:
-        initialize(tool_label=ToolLabel("TOOL"))
+        initialize(label=ToolLabel("TOOL"))
         write_cells(cells, protocol=Protocol.human)
 
         captured = capsys.readouterr()
@@ -156,7 +158,7 @@ class TestWriteCells:
         last_output: bytes | Exception,
         exception_type: type[Exception],
     ) -> None:
-        initialize(tool_label=ToolLabel("TOOL"))
+        initialize(label=ToolLabel("TOOL"))
         mocker.patch.object(PositionedOutputCell, "render", side_effect=[b"first\n", last_output])
         cell = PositionedLogicCell(items=("first", "second"))
 
@@ -167,7 +169,7 @@ class TestWriteCells:
         assert captured.out == captured.err == ""
 
     def test_stream_failure_propagates(self, mocker: MockerFixture) -> None:
-        initialize(tool_label=ToolLabel("TOOL"))
+        initialize(label=ToolLabel("TOOL"))
         stream = io.StringIO()
         mocker.patch.object(stream, "write", side_effect=OSError("write failed"))
         mocker.patch.object(sys, "stdout", stream)
@@ -176,8 +178,9 @@ class TestWriteCells:
             write_cells([ContentCell(kind="message")], protocol=Protocol.human)
 
     def test_missing_initialization_writes_nothing(self, capsys: pytest.CaptureFixture[str]) -> None:
-        with pytest.raises(ToolLabelNotInitialized):
+        with pytest.raises(ContextValueNotSet) as caught:
             write_cells([ContentCell(kind="message")], protocol=Protocol.llm, stderr=True)
 
+        assert caught.value.details == {"name": "tool_label"}
         captured = capsys.readouterr()
         assert captured.out == captured.err == ""

@@ -24,7 +24,7 @@ class TestReportErrorsAndExit:
     def test_ordered_cells_stream_and_highest_exit_code(  # noqa: CCR001
         self, capsys: pytest.CaptureFixture[str], protocol: Protocol, reverse: bool
     ) -> None:
-        initialize(tool_label=ToolLabel("TEST"))
+        initialize(label=ToolLabel("TEST"))
         errors: EnvironmentErrors = [
             InvalidArguments(reason="Invalid café 日本語"),
             EnvironmentError(code="unavailable", message="Service unavailable"),
@@ -62,7 +62,7 @@ class TestReportErrorsAndExit:
     def test_empty_errors_exit_successfully_without_output(
         self, capsys: pytest.CaptureFixture[str], protocol: Protocol
     ) -> None:
-        initialize(tool_label=ToolLabel("TEST"))
+        initialize(label=ToolLabel("TEST"))
 
         with pytest.raises(typer.Exit) as caught:
             report_errors_and_exit([], protocol=protocol)
@@ -83,7 +83,7 @@ class TestHandleCommandErrors:
 
     @pytest.mark.parametrize("protocol", list(Protocol))
     def test_failed_command_stops_and_reports_errors(self, protocol: Protocol) -> None:
-        initialize(tool_label=ToolLabel("TEST"))
+        initialize(label=ToolLabel("TEST"))
         app = typer.Typer()
 
         @app.command()

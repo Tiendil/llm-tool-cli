@@ -110,7 +110,7 @@ class TestEnvironmentErrorCell:
         assert first.meta == {"type": "error", "code": "empty"}
 
     def test_render__preserves_order_and_guidance_in_automation_sequences(self, isolated_settings: None) -> None:
-        initialize(tool_label=ToolLabel("TOOL"))
+        initialize(label=ToolLabel("TOOL"))
         cells = [
             EnvironmentErrorCell(error=EnvironmentError(code="first", message="First", ways_to_fix=["Retry."])),
             EnvironmentErrorCell(error=EnvironmentError(code="second", message="Second")),

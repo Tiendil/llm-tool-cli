@@ -24,7 +24,7 @@ class Document(StrEnum):
 
 @pytest.fixture
 def skill_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, isolated_settings: None) -> typer.Typer:
-    initialize(tool_label=ToolLabel("TEST"))
+    initialize(label=ToolLabel("TEST"))
     initializer = tmp_path / "__init__.py"
     initializer.write_text("", encoding="utf-8")
     package = "cli_skill_test_package"

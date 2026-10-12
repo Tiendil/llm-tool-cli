@@ -15,7 +15,7 @@ __all__ = ["isolated_settings"]
 
 @pytest.fixture
 def protocol_app(isolated_settings: None) -> typer.Typer:
-    settings.initialize(tool_label=settings.ToolLabel("TEST"))
+    settings.initialize(label=settings.ToolLabel("TEST"))
     app = typer.Typer()
 
     @app.callback()

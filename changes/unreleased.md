@@ -1,5 +1,7 @@
 ### Migration
 
+- Replace `core.settings.get_tool_label()` with `core.settings.tool_label.get()`, and pass `label=` instead of `tool_label=` to `core.settings.initialize`. Unset label access now raises `core.errors.ContextValueNotSet` with `details["name"] = "tool_label"`; `ToolLabelNotInitialized` is removed.
+
 - Pass `paths.FileGlobPattern` for explicit patterns supplied to `paths.enumerate_files`. Constructing the type preserves the string; enumeration still performs path validation and filesystem checks.
 
 - Project file paths no longer follow symbolic links below the resolved project root, including links to internal targets. Use ordinary project paths and directories instead; discovery skips links and explicit inputs reject them.
@@ -31,6 +33,8 @@
 - Result exceptions expose payloads through `details` instead of `arguments` and use the shared `InternalError` message and string representation. Unwrap exceptions inherit directly from `InternalError`; the intermediate `ResultError` base is removed.
 
 ### Changes
+
+- Expose the shared application label as `core.settings.tool_label`, a `ContextValue[ToolLabel]`, and remove its getter wrapper. Preserve same-label initialization, conflicting-label diagnostics, and test isolation through the shared fixture.
 
 - Add `core.context.ContextValue` for independent typed bindings with initialization, explicit absent-value errors, and temporary scopes that restore prior bindings even after exceptions.
 
@@ -64,7 +68,7 @@
 - Add `cli.application.create_app` with shared `-h`/`--help` aliases and shell completion options. Add `cli.commands.skills.register_skill_command` for consumer-owned document enums and resource packages, preserving protocol defaults, cell output, and read-failure behavior.
 - Add `cli.entities.ExitCode`, an `IntEnum` for success, explicit invalid arguments, and unreadable skill documents; framework parsing and consumer-specific failure statuses remain unchanged.
 
-- Add typed process-wide application label initialization, idempotent same-label setup, explicit uninitialized/conflicting-label errors, and a shared pytest fixture for settings isolation. Sequence rendering reads the label once per batch; protocol parsing uses the same shared setting.
+- Add typed application label initialization, idempotent same-label setup, explicit uninitialized/conflicting-label errors, and a shared pytest fixture for settings isolation. Sequence rendering reads the label once per batch; protocol parsing uses the same shared setting.
 
 - Add `cli.options.ProtocolOption` for common protocol aliases, help, and parsing. Unsupported values emit an LLM `invalid_arguments` error cell on stderr and exit with status `1`.
 
