@@ -5,7 +5,7 @@ import pytest
 import typer
 from typer.core import TyperCommand
 
-from llm_tool_cli.cli.context import CommandContext, get_global_options, set_global_options
+from llm_tool_cli.cli.context import CommandContext, global_options
 from llm_tool_cli.cli.entities import GlobalOptions
 from llm_tool_cli.core.settings import ToolLabel, initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
@@ -14,48 +14,6 @@ from llm_tool_cli.protocol import Protocol
 from llm_tool_cli.protocol.cell_shortcuts import info
 
 __all__ = ["isolated_settings"]
-
-
-class TestSetGlobalOptions:
-    def test_replaces_options_for_the_invocation(self) -> None:
-        root = typer.Context(TyperCommand("root"), obj={"other": "state"})
-        child = typer.Context(TyperCommand("child"), parent=root)
-        options = GlobalOptions(protocol=Protocol.automation, config_path=ProjectConfigPath(Path("~/custom.toml")))
-
-        set_global_options(root, options)
-
-        assert get_global_options(child) == options
-        assert root.obj == {"other": "state"}
-
-        set_global_options(child, GlobalOptions())
-
-        assert get_global_options(root) == GlobalOptions()
-        assert root.obj == {"other": "state"}
-
-
-class TestGetGlobalOptions:
-    @pytest.mark.parametrize("depth", [0, 2])
-    def test_missing_options(self, depth: int) -> None:
-        context = typer.Context(TyperCommand("root"))
-        for _ in range(depth):
-            context = typer.Context(TyperCommand("child"), parent=context)
-
-        assert get_global_options(context) == GlobalOptions()
-        assert context.find_root().meta == {}
-
-    def test_independent_roots(self) -> None:
-        first = typer.Context(TyperCommand("first"))
-        second = typer.Context(TyperCommand("second"))
-        first_options = GlobalOptions(protocol=Protocol.automation)
-        second_options = GlobalOptions(config_path=ProjectConfigPath(Path("other.toml")))
-        set_global_options(first, first_options)
-
-        assert get_global_options(second) == GlobalOptions()
-
-        set_global_options(second, second_options)
-
-        assert get_global_options(first) == first_options
-        assert get_global_options(second) == second_options
 
 
 @pytest.mark.usefixtures("isolated_settings")
@@ -71,26 +29,26 @@ class TestCommandContext:
 
         assert command.protocol == expected
         assert command.global_options == GlobalOptions()
+        assert not global_options.is_set()
         assert context.meta == {}
 
     @pytest.mark.parametrize("protocol", list(Protocol))
-    def test_init__uses_root_options_for_nested_command(self, protocol: Protocol) -> None:
+    def test_init__uses_active_options_for_nested_command(self, protocol: Protocol) -> None:
         root = typer.Context(TyperCommand("root"))
         group = typer.Context(TyperCommand("group"), parent=root)
         child = typer.Context(TyperCommand("skill"), parent=group, info_name="skill")
         options = GlobalOptions(protocol=protocol, config_path=ProjectConfigPath(Path("~/missing.toml")))
-        set_global_options(root, options)
-
-        command = CommandContext(child)
+        with global_options.scope(options):
+            command = CommandContext(child)
 
         assert command.protocol == protocol
         assert command.global_options == options
-        assert get_global_options(root) == options
+        assert options == GlobalOptions(protocol=protocol, config_path=ProjectConfigPath(Path("~/missing.toml")))
 
-    def test_init__keeps_invocations_independent(self) -> None:
+    def test_init__keeps_scopes_independent(self) -> None:
         first = typer.Context(TyperCommand("skill"), info_name="skill")
-        set_global_options(first, GlobalOptions(protocol=Protocol.automation))
-        first_command = CommandContext(first)
+        with global_options.scope(GlobalOptions(protocol=Protocol.automation)):
+            first_command = CommandContext(first)
         second = typer.Context(TyperCommand("skill"), info_name="skill")
 
         second_command = CommandContext(second)
@@ -106,11 +64,11 @@ class TestCommandContext:
     ) -> None:
         initialize(label=ToolLabel("TEST"))
         context = typer.Context(TyperCommand("show"), info_name="show")
-        set_global_options(context, GlobalOptions(protocol=protocol))
-        command = CommandContext(context)
         messages = ["Café", "日本語"]
 
-        command.write_cells((info(message) for message in messages), stderr=stderr)
+        with global_options.scope(GlobalOptions(protocol=protocol)):
+            command = CommandContext(context)
+            command.write_cells((info(message) for message in messages), stderr=stderr)
 
         captured = capsys.readouterr()
         output, other = (captured.err, captured.out) if stderr else (captured.out, captured.err)

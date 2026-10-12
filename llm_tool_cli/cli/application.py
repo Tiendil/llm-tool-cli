@@ -1,6 +1,6 @@
 import typer
 
-from llm_tool_cli.cli.context import set_global_options
+from llm_tool_cli.cli.context import global_options
 from llm_tool_cli.cli.entities import GlobalOptions
 from llm_tool_cli.cli.options import ConfigOption, ProtocolOption
 
@@ -18,6 +18,6 @@ def create_app(*, help: str) -> typer.Typer:
         protocol: ProtocolOption = None,
         config_path: ConfigOption = None,
     ) -> None:
-        set_global_options(context, GlobalOptions(protocol=protocol, config_path=config_path))
+        context.with_resource(global_options.scope(GlobalOptions(protocol=protocol, config_path=config_path)))
 
     return app

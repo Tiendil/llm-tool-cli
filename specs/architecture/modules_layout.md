@@ -82,13 +82,16 @@ The CLI module MUST own shared parsed global options and command-specific protoc
 Its public `llm_tool_cli.cli.entities` submodule MUST provide `GlobalOptions`, inheriting the shared entity base and containing `protocol: Protocol | None` and `config_path: ProjectConfigPath | None`, both defaulting to `None`.
 Its `protocol_for(command_name: str) -> Protocol` method MUST apply explicit protocol precedence and the shared command-default rule without storing derived state.
 The parsed options entity MUST remain independent of CLI frameworks and application execution contexts.
+The public `llm_tool_cli.cli.context` submodule MUST expose `global_options` as a `ContextValue[GlobalOptions]`; callers MUST access the active options through `global_options.get()` and temporary bindings through `global_options.scope(options)`.
 The public `llm_tool_cli.cli.context.CommandContext(context: typer.Context)` class MUST own retrieval of invocation options and selection of the invoked command's protocol, exposing `global_options` and `protocol`.
+It MUST read the shared binding, falling back to unspecified options without installing them when no binding is active.
 Its `write_cells(cells: Iterable[LogicCell], *, stderr: bool = False) -> None` method MUST use shared cell writing with that protocol and the requested stream.
 Consumer command contexts MAY inherit this implementation while retaining their own workspace loading, emitters, runtime setup, journaling, and cleanup.
 Shared skill and version commands MUST use this context for protocol selection and cell writing.
 The library MUST own the Typer runtime dependency and its supported version constraint for shared CLI context integration.
 The public `llm_tool_cli.cli.application.create_app(*, help: str) -> typer.Typer` factory MUST own shared application construction, the root callback, help aliases, and completion-option availability.
-The root callback MUST declare `ProtocolOption` and `ConfigOption`, retaining unspecified values as `None`, and store their parsed values as `GlobalOptions` through the shared context boundary.
+The root callback MUST declare `ProtocolOption` and `ConfigOption`, retaining unspecified values as `None`, and bind their parsed values as `GlobalOptions` through `global_options.scope`.
+The callback MUST attach that scope to the framework context's resource lifecycle so the preceding binding is restored when the invocation closes, including after errors.
 The factory MUST return an ordinary Typer application; consumers MUST register application-specific commands themselves.
 The public `llm_tool_cli.cli.commands.skills.register_skill_command(app, *, package: str, documents: type[StrEnum]) -> None` boundary MUST register the complete shared skill command using the supplied document enum and resource package.
 The CLI module MUST compose shared skill loading, protocol selection, cell writing, and read-failure handling without depending on consumer command contexts.

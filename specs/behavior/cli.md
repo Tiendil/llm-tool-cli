@@ -77,13 +77,14 @@ Framework parsing failures MUST retain their existing framework diagnostics unle
 
 ## Invocation context
 
-The library MUST retain parsed global options for the invocation and make them available from its root command and nested subcommands.
-Storing options MUST replace the invocation's previous global options without changing unrelated context data.
-Retrieval MUST return the stored options without changing them or resolving their configuration path.
-When the context contains no recognized global options, retrieval MUST return options with both protocol and configuration path unspecified, without storing the fallback.
+The library MUST bind parsed global options for the invocation and make them available from its root command and nested subcommands without requiring a framework context for access.
+Each invocation MUST use its own parsed options without changing unrelated framework context data.
+The preceding binding, including an absent binding, MUST be restored when the invocation finishes, including after command errors and early exits.
+Retrieval of bound options MUST return them without changing them or resolving their configuration path.
 Independent invocations MUST NOT share retained options.
 
 Constructing a shared command context MUST retrieve the invocation's global options and select its protocol using the invoked command name, treating an absent name as an empty name.
+When no global options are bound, command-context construction MUST use options with both protocol and configuration path unspecified, without binding the fallback.
 Construction MUST NOT resolve configuration paths, load a workspace, or emit output.
 The context MUST write supplied cell iterables with its selected protocol through shared cell writing, using stdout by default and stderr when explicitly requested.
 Cell writing MUST preserve complete batches and their order; environment-error reporting MUST remain the responsibility of the shared command error handler.
