@@ -136,15 +136,16 @@ Parsed identifiers and paths with library-specific meaning MUST use semantic pri
 ## Command results
 
 Logic cells MUST be the primary interface for successful domain results passed to a consumer's CLI layer.
-A command-facing domain or runtime operation MUST return a `LogicCell` subclass or an ordered collection of logic cells, wrapped in `Result` when the operation can fail.
+Command-facing domain and runtime operations MAY submit logic cells directly to the shared scoped output emitter and return `Result[None]` when they have no other useful result.
+Operations that compute reusable values MAY retain typed return values, including cells and their ordered collections.
 Concrete cell subclasses MAY retain typed domain entities needed for projection; they MUST NOT require the CLI to inspect those entities or assemble domain output payloads.
 Internal domain operations and low-level library capabilities MAY continue to return their own typed values.
 This boundary keeps result assembly reusable independently of CLI argument parsing and output protocol selection.
 
 Cells MUST carry the information needed for their projections without reading runtime state or writing output.
-The CLI MUST select the protocol and stream and pass complete cell batches to shared rendering.
+CLI initialization MUST establish output delivery and the effective protocol; the shared emitter MUST own buffering and delivery of submitted cells.
 Expected failures MUST remain structured errors in failed results until the CLI error-handling boundary.
-Generic CLI acknowledgements and explicitly specified raw-text output MAY retain their own construction paths.
+Generic CLI acknowledgements and already prepared documents MAY use shared content logic cells.
 
 ## Data structure conventions
 

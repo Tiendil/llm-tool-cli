@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import assert_never
 
+import pydantic
+
 from llm_tool_cli.core.entities import BaseEntity
 from llm_tool_cli.protocol.entities import Protocol
 from llm_tool_cli.protocol.output_cells.base import OutputCell
@@ -8,6 +10,9 @@ from llm_tool_cli.protocol.output_cells.base import OutputCell
 
 class LogicCell(BaseEntity, ABC):
     """Application data projected into prepared output cells for a protocol."""
+
+    is_journal: bool = pydantic.Field(default=False, exclude=True)
+    is_warning: bool = pydantic.Field(default=False, exclude=True)
 
     def render(self, protocol: Protocol) -> list[OutputCell]:
         match protocol:

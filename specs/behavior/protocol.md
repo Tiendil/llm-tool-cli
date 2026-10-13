@@ -2,12 +2,12 @@
 
 ## Goal of the document
 
-This document defines shared output protocol names, output cells, logic-cell rendering, cell formatting and environment-error cells, JSON Lines serialization, and direct text writing.
+This document defines shared output protocol names, output cells, logic-cell rendering, cell formatting and environment-error cells, JSON Lines serialization, and emitter-owned batch rendering and scoped delivery of results, warnings, and journal events.
 
 ## Scope
 
 This specification covers reusable protocol mechanics for callers that construct and render output.
-Consumer-specific records and journal layouts, command parsing, defaults, error classification, exit status selection, and command execution are out of scope.
+Consumer-specific records and journal layouts, command parsing, exit status selection, and application command execution are out of scope.
 
 ## Output protocols
 
@@ -88,8 +88,6 @@ Rendering MUST NOT write output, choose streams, classify errors, or select exit
 Formatting MUST NOT mutate the cell.
 Rendering context MUST provide the cell's zero-based position, the total number of output cells in the supplied sequence, and a tool label.
 The position MUST be nonnegative and smaller than the positive total.
-Sequence rendering MUST read the initialized application label once per batch, accept logic cells and a selected protocol, flatten their projections in input order, calculate positions and totals for the complete output-cell sequence, and concatenate the rendered bytes without additional separators.
-An empty sequence MUST produce empty bytes; a single cell MUST receive position zero and total one.
 The standard output-cell types MUST preserve their boundaries for both single-cell and multiple-cell sequences.
 Text cell boundaries MUST use the rendering context's tool label without changing it.
 The label MUST NOT affect automation records.
@@ -147,21 +145,48 @@ It MUST sort object keys, preserve Unicode characters, escape embedded newlines,
 Nested JSON values and empty records MUST be supported.
 Values unsupported by the JSON encoder MUST propagate the encoder's exception.
 
-## Text writing
+## Output delivery
 
-Text writing MUST use the current standard output stream unless the caller selects the standard error stream.
-The stream MUST be selected on each call so replaced streams work without a binary buffer interface.
-Writing MUST preserve supplied text, including empty text, surrounding whitespace, and existing newlines.
-It MUST NOT add a newline, flush explicitly, or change the stream's encoding.
-Callers MUST supply any required line or record terminators.
-Stream failures MUST propagate to the caller.
+Output delivery MUST have an independent scoped binding, usable without a project and replaceable by programmatic callers.
+Ordinary cells MUST be buffered until an explicit flush or successful command completion.
+Warnings MUST be buffered separately and follow ordinary results in warning insertion order, without deduplication.
+Explicit cell construction MUST be able to override journal and warning defaults independently.
+Disabling a delivery flag MUST change routing rather than suppress the cell.
+Delivery flags MUST NOT appear in serialized journal records or cell payloads.
 
-## Cell writing
+Journal processing MUST occur synchronously when a journal-marked cell is submitted, before its console delivery or buffering.
+Successful journal processing MUST be followed immediately by console delivery unless the cell is also marked as a warning.
+Cells marked as both journal and warning MUST be processed immediately and delivered to the console with the final warnings.
+The default processor MUST succeed without external effects and MUST NOT suppress console journal output.
+A failed processor MUST prevent delivery of the affected cell and stop processing subsequent cells in that submission.
+Flushing MUST NOT repeat journal processing.
 
-Cell writing MUST accept an iterable of logic cells and an explicit protocol, obtaining its label through shared sequence rendering.
-It MUST render the complete sequence, decode the rendered UTF-8 bytes, and write the resulting text through the shared text-writing behavior.
-It MUST preserve cell ordering, batch positions and totals, framing, Unicode content, and record terminators.
-It MUST use standard output by default and standard error only when requested by the caller, independently of cell kind and protocol.
-Empty sequences and empty projections MUST produce no output text.
+Ordering MUST be preserved within immediate journal output, buffered ordinary output, and buffered warnings.
+Immediate journal output MAY precede ordinary output submitted earlier.
+A flush MUST render the final batch before writing any part of it, clear consumed buffers, and flush the written stream.
+The emitter MUST own batch rendering, using the active runtime protocol and reading the initialized application label once per batch.
+It MUST flatten logical-cell projections in input order, calculate positions and totals for the complete output-cell sequence, and concatenate rendered bytes without additional separators.
+A single output cell MUST receive position zero and total one; empty batches and empty projections MUST produce no output text.
+The emitter MUST decode the complete batch as UTF-8 before writing, preserving framing, Unicode content, and record terminators.
 Rendering and decoding failures MUST propagate before any text is written; stream failures MUST also propagate.
-Error classification, stream-routing policy, and exit status selection MUST belong to the calling CLI boundary.
+A failed stream write MUST propagate without automatic replay.
+An emitter MUST deliver all cell kinds to one text stream selected during construction, using current stdout by default in every protocol.
+The default stream MUST be resolved at each delivery so replaced streams work without a binary buffer interface.
+Stream writing MUST preserve the rendered text without adding newlines or changing the stream's encoding.
+Individual submissions MUST NOT select a stream. Immediate journal delivery MUST flush the same stream.
+The emitter MUST leave stream closure to its caller.
+
+**Example:** Submitting a result, a journal event, a second result, and a warning produces the journal event immediately, followed at flush by both results and the warning.
+
+Logical-cell string fields MUST use the shared entity normalization, stripping surrounding whitespace while retaining internal whitespace and line breaks.
+Compact journal text MUST escape backslashes, carriage returns, and line feeds to retain a single physical output line without truncating messages.
+Automation journal records MUST retain the normalized logical-cell values and use ordinary JSON escaping.
+A cell's journal flag MUST NOT replace its own presentation with compact journal formatting.
+
+The external command processor MUST execute an argument list directly without a shell and capture subprocess output.
+Whole arguments enclosed in braces MUST resolve to named logical-cell fields; embedded placeholder-like text MUST remain literal.
+Absent optional field values MUST become empty arguments, date and time values MUST use ISO formatting, and other values MUST use their string representation.
+Multiline string arguments MUST retain the normalized logical-cell values; destination-specific processors MAY apply their own formatting without mutating cells.
+Empty commands and unknown fields MUST return `journal_command_config_invalid`.
+An operating-system execution failure or nonzero exit MUST return `journal_command_failed` with command, return code when available, and diagnostic details.
+Successful external processing MUST NOT copy subprocess stdout into console output.

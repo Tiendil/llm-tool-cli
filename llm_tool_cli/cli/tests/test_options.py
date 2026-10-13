@@ -91,17 +91,17 @@ class TestParseProtocol:
         result = CliRunner().invoke(protocol_app, [*prefix, "--protocol", value, "show"])
 
         assert result.exit_code == 1
-        assert not result.stdout
-        assert result.stderr.startswith("--TEST-CELL ")
-        assert result.stderr.count(" BEGIN--\n") == 1
-        assert result.stderr.count(" END--\n") == 1
-        assert "kind=error\n" in result.stderr
-        assert "code=invalid_arguments\n" in result.stderr
-        assert "type=error\n" in result.stderr
-        assert "\nreason=" in result.stderr
-        assert f"`{value}`" in result.stderr
+        assert not result.stderr
+        assert result.stdout.startswith("--TEST-CELL ")
+        assert result.stdout.count(" BEGIN--\n") == 1
+        assert result.stdout.count(" END--\n") == 1
+        assert "kind=error\n" in result.stdout
+        assert "code=invalid_arguments\n" in result.stdout
+        assert "type=error\n" in result.stdout
+        assert "\nreason=" in result.stdout
+        assert f"`{value}`" in result.stdout
         for protocol in Protocol:
-            assert protocol.value in result.stderr
+            assert protocol.value in result.stdout
 
     @pytest.mark.parametrize("option", ["-p", "--protocol"])
     def test_missing_value_remains_a_framework_error(self, protocol_app: typer.Typer, option: str) -> None:

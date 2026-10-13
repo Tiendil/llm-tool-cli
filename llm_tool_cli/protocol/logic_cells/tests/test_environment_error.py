@@ -1,19 +1,13 @@
-import json
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
 
 from llm_tool_cli.core.errors import EnvironmentError
-from llm_tool_cli.core.settings import ToolLabel, initialize
-from llm_tool_cli.core.tests.fixtures import isolated_settings
 from llm_tool_cli.protocol import Protocol
 from llm_tool_cli.protocol.logic_cells import EnvironmentErrorCell
 from llm_tool_cli.protocol.output_cells import AutomationOutputCell, HumanOutputCell, LLMOutputCell
 from llm_tool_cli.protocol.output_cells.base import OutputCell
-from llm_tool_cli.protocol.rendering import render_cells
-
-__all__ = ["isolated_settings"]
 
 
 class ContextFailure(EnvironmentError):
@@ -108,19 +102,3 @@ class TestEnvironmentErrorCell:
         assert first.model_dump(exclude={"id"}) == second.model_dump(exclude={"id"})
         assert first.content == ""
         assert first.meta == {"type": "error", "code": "empty"}
-
-    def test_render__preserves_order_and_guidance_in_automation_sequences(self, isolated_settings: None) -> None:
-        initialize(label=ToolLabel("TOOL"))
-        cells = [
-            EnvironmentErrorCell(error=EnvironmentError(code="first", message="First", ways_to_fix=["Retry."])),
-            EnvironmentErrorCell(error=EnvironmentError(code="second", message="Second")),
-        ]
-
-        output = render_cells(cells, protocol=Protocol.automation)
-        records = [json.loads(line) for line in output.splitlines()]
-
-        assert records[0].pop("id") != records[1].pop("id")
-        assert records == [
-            {"type": "error", "code": "first", "content": "First\nWay to fix: Retry."},
-            {"type": "error", "code": "second", "content": "Second"},
-        ]

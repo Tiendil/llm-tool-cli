@@ -107,10 +107,10 @@ class TestRegisterSkillCommand:
             assert record["reason"]
             assert record["content"]
         else:
-            assert not result.stdout
+            assert not result.stderr
             separator = " = " if protocol == "human" else "="
-            assert f"code{separator}skill_unreadable\n" in result.stderr
-            assert f"document{separator}usage\n" in result.stderr
+            assert f"code{separator}skill_unreadable\n" in result.stdout
+            assert f"document{separator}usage\n" in result.stdout
 
     def test_empty_document(self, skill_app: typer.Typer, tmp_path: Path) -> None:
         (tmp_path / "fixtures" / "usage.md").write_text("", encoding="utf-8")

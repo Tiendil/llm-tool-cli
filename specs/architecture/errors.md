@@ -185,7 +185,7 @@ A boundary MAY report an unexpected stored-state integrity failure as a generic 
 The shared core MUST aggregate an environment-error list by returning the highest declared exit code, or `ExitCode.success` for an empty list.
 Aggregation MUST preserve error values and their order and MUST NOT render output or terminate the process.
 CLI boundaries MUST use the shared aggregation contract rather than maintaining mappings from error types to exit codes.
-The shared CLI handling boundary MUST own validated unwrap-error recovery, ordered diagnostic emission, error stream selection, and process termination.
+The shared CLI handling boundary MUST own validated unwrap-error recovery, ordered diagnostic emission through the configured emitter, and process termination. Error cells MUST use stdout by default in every protocol.
 Consumers MAY observe and re-raise failures for local journaling while retaining their runtime cleanup responsibilities.
 Warnings alone MUST NOT cause a non-zero CLI exit code.
 
@@ -198,8 +198,9 @@ Warnings MUST NOT be used for invalid command line arguments, invalid configurat
 Warnings MUST NOT disguise an unusable result as successful.
 Code that produces warnings SHOULD include enough context for the consumer to explain the problem.
 
-The library currently has no shared warning storage or warning delivery architecture.
-Until such architecture is specified and implemented, modules MUST NOT invent ad hoc warning channels.
+Warnings MUST be represented by logic cells submitted to the independently scoped shared output emitter.
+The emitter MUST collect warnings in insertion order without deduplication and deliver them after ordinary results, or after reported environment errors when execution fails.
+Warnings MUST NOT require a separate global storage or snapshot in a result cell.
 
 ## Other exception types
 

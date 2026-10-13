@@ -1,3 +1,4 @@
+import io
 import json
 
 import click
@@ -7,11 +8,15 @@ from typer.testing import CliRunner
 
 from llm_tool_cli.cli.errors import InvalidArguments
 from llm_tool_cli.cli.handling import handle_command_errors, report_errors_and_exit
+from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
 from llm_tool_cli.core.errors import EnvironmentError, EnvironmentErrors, InternalError
 from llm_tool_cli.core.result import Err, Ok, UnwrapError
 from llm_tool_cli.core.settings import ToolLabel, initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
+from llm_tool_cli.output import StreamOutputEmitter, output
 from llm_tool_cli.protocol import Protocol
+from llm_tool_cli.protocol.logic_cells import ContentCell
+from llm_tool_cli.protocol.logic_cells.warning import WarningCell
 
 __all__ = ["isolated_settings"]
 
@@ -49,14 +54,14 @@ class TestReportErrorsAndExit:
                 del record["message"]
             assert records == expected
         else:
-            assert not captured.out
+            assert not captured.err
             separator = " = " if protocol == Protocol.human else "="
             codes = [f"code{separator}{error.code}\n" for error in errors]
-            assert all(code in captured.err for code in codes)
-            positions = [captured.err.index(code) for code in codes]
+            assert all(code in captured.out for code in codes)
+            positions = [captured.out.index(code) for code in codes]
             assert positions == sorted(positions)
-            assert "café 日本語" in captured.err
-            assert "cli_exit_code" not in captured.err
+            assert "café 日本語" in captured.out
+            assert "cli_exit_code" not in captured.out
 
     @pytest.mark.parametrize("protocol", list(Protocol))
     def test_empty_errors_exit_successfully_without_output(
@@ -101,8 +106,8 @@ class TestHandleCommandErrors:
             assert not result.stderr
             assert json.loads(result.stdout)["code"] == "invalid_arguments"
         else:
-            assert not result.stdout
-            assert "invalid_arguments" in result.stderr
+            assert not result.stderr
+            assert "invalid_arguments" in result.stdout
 
     @pytest.mark.parametrize(
         "failure",
@@ -133,3 +138,36 @@ class TestHandleCommandErrors:
         assert caught.value == failure
         captured = capsys.readouterr()
         assert captured.out == captured.err == ""
+
+    @pytest.mark.parametrize("protocol", list(Protocol))
+    @pytest.mark.parametrize("custom_stream", [False, True])
+    def test_discard__failure_outputs_error_then_warnings_without_results(
+        self, capsys: pytest.CaptureFixture[str], protocol: Protocol, custom_stream: bool
+    ) -> None:
+        initialize(label=ToolLabel("TEST"))
+        stream = io.StringIO()
+        emitter = StreamOutputEmitter(stream=stream if custom_stream else None)
+        with runtime_config.scope(RuntimeConfig(protocol=protocol)), output.scope(emitter):
+            with pytest.raises(typer.Exit) as caught:
+                with handle_command_errors(protocol=protocol):
+                    emitter.emit([ContentCell(kind="success"), WarningCell(message="keep warning")]).unwrap()
+                    Err([EnvironmentError(code="failed", message="command failed")]).unwrap()
+        assert caught.value.exit_code == 3
+        captured = capsys.readouterr()
+        delivered = stream.getvalue() if custom_stream else captured.out
+        assert not (captured.out if custom_stream else stream.getvalue())
+        assert not captured.err
+        assert "success" not in delivered
+        assert delivered.index("command failed") < delivered.index("keep warning")
+        assert not stream.closed
+        if protocol == Protocol.automation:
+            assert [json.loads(line)["type"] for line in delivered.splitlines()] == ["error", "warning"]
+
+    def test_discard__unexpected_failure_does_not_flush_results(self, capsys: pytest.CaptureFixture[str]) -> None:
+        emitter = StreamOutputEmitter()
+        with output.scope(emitter), pytest.raises(RuntimeError, match="defect"):
+            with handle_command_errors(protocol=Protocol.human):
+                emitter.emit([ContentCell(kind="success")]).unwrap()
+                raise RuntimeError("defect")
+        emitter.flush()
+        assert not capsys.readouterr().out

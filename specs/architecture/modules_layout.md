@@ -32,7 +32,8 @@ Consumer-specific defaults and policies SHOULD remain with the consumer unless t
 Consumer-specific domain entities MUST remain with the consumer.
 
 Consumer domain and runtime modules MUST own assembly of command-facing domain results as logic cells or ordered collections of their subclasses.
-The CLI MUST consume those cells through shared rendering without converting internal domain results into output payloads.
+Domain and runtime operations MAY submit those cells directly to the shared output binding.
+The CLI MUST configure delivery without converting internal domain results into output payloads.
 Consumer protocol modules MUST own domain-cell projections, while the shared protocol module owns the common cell interface and rendering infrastructure.
 Constructing a logic cell from typed domain data MUST NOT be treated as protocol-specific rendering or require a dependency on consumer CLI code.
 
@@ -105,8 +106,9 @@ The public `llm_tool_cli.cli.context.CommandContext(context: typer.Context)` cla
 It MUST read parsed root parameters from the framework, treating an unspecified protocol as LLM for the invoked command named `skill` and human otherwise.
 Its `config_input` property MUST expose the unresolved optional CLI configuration path for the operation that selects or creates a configuration file.
 Its `protocol` property MUST read the active runtime configuration without retaining a copy.
-Its `write_cells(cells: Iterable[LogicCell], *, stderr: bool = False) -> None` method MUST use shared cell writing with that protocol and the requested stream.
-Consumer command contexts MAY inherit this implementation while retaining their own application settings, workspace construction, emitters, runtime setup, journaling, and cleanup.
+It MUST establish a fresh shared output scope through the framework context lifecycle.
+Its `write_cells(cells: Iterable[LogicCell]) -> None` method MUST submit a materialized cell batch to the active emitter.
+Consumer command contexts MAY inherit this implementation while retaining their own application settings, workspace construction, runtime setup, journal-cell construction, and cleanup.
 Shared skill and version commands MUST use this context for protocol selection and cell writing.
 The library MUST own the Typer runtime dependency and its supported version constraint for shared CLI context integration.
 The public `llm_tool_cli.cli.application.create_app(*, help: str) -> typer.Typer` factory MUST own shared application construction, root option registration, help aliases, and completion-option availability.
@@ -164,10 +166,10 @@ Consumers MUST supply the default filename and invocation working directory.
 The configuration module MUST expose `llm_tool_cli.config.initialize_config(filename: str, *, package: str, template: str, cwd: PathInput, path: ProjectConfigPath | None = None) -> Result[ProjectConfigPath]`, implemented in `config.files` by composing shared initialization target selection and template-based creation.
 Template contents, application schemas, and application-specific workspace construction and installation MUST remain consumer-owned; shared project settings and their scopes MUST be managed by the shared project contexts.
 
-The protocol module MUST own shared output protocols, cell construction, cell formatting and environment-error cell construction, JSON Lines serialization, and direct text writing.
-Its public package interface MUST export `Protocol`, `to_jsonl`, and `write_output` from `llm_tool_cli.protocol`.
-The protocol enum MUST live in `protocol.entities`, record serialization in `protocol.serialization`, and text writing in `protocol.streams`.
-The protocol enum, record serialization, and text writing MUST depend only on the standard library.
+The protocol module MUST own shared output protocols, cell construction, cell formatting and environment-error cell construction, and JSON Lines serialization.
+Its public package interface MUST export `Protocol` and `to_jsonl` from `llm_tool_cli.protocol`.
+The protocol enum MUST live in `protocol.entities` and record serialization in `protocol.serialization`.
+The protocol enum and record serialization MUST depend only on the standard library.
 The public `llm_tool_cli.protocol.output_cells.base` submodule MUST own the abstract `OutputCell` entity, its construction helpers and compact identifier, `MetaValue`, and `to_meta_value`.
 It MUST also own `RenderContext`, containing the zero-based cell `index`, sequence `total`, and `tool_label` supplied to `OutputCell.render(context) -> bytes`.
 The public `llm_tool_cli.protocol.logic_cells.base` submodule MUST provide the abstract `LogicCell` entity with `render(protocol) -> list[OutputCell]`, dispatching to the subclass's `render_human`, `render_llm`, or `render_automation` method.
@@ -191,13 +193,13 @@ Output cells, logic cells, and rendering contexts MUST inherit the shared `BaseE
 The public `llm_tool_cli.protocol.output_cells` package MUST expose `HumanOutputCell`, `LLMOutputCell`, and `AutomationOutputCell` subclasses, whose `render` methods own complete protocol-specific cell formatting.
 Its `human`, `llm`, and `automation` submodules MUST own the respective implementations.
 Logic-cell projections MUST construct the corresponding concrete output-cell subtype before final rendering.
-The public `llm_tool_cli.protocol.rendering.render_cells` function MUST accept an iterable of logic cells and an explicit keyword-only `protocol` argument, read `settings.static_config.get().tool_label` once per batch, project the logic cells for that protocol, calculate rendering contexts for the complete output-cell sequence, and concatenate rendered bytes.
-The same public submodule MUST provide `write_cells(cells, *, protocol, stderr=False) -> None`, composing sequence rendering, UTF-8 decoding, and shared text writing with caller-selected stream routing.
-The rendering function MUST remain free of output side effects; the writing function MUST own emission without classifying cells or selecting exit statuses.
+The protocol module MUST leave batch-rendering orchestration and stream writing to the shared output emitter.
+Individual logic-cell projections and output-cell formatting MUST remain free of output side effects.
 Output-cell type selection MUST belong to logic-cell projections rather than a separate selector exposed to application code.
 The `llm_tool_cli.protocol.cell_shortcuts.environment_error(error)` helper MUST construct a shared `EnvironmentErrorCell`; it MUST NOT serialize the error, select a protocol, or render content.
 The public `llm_tool_cli.protocol.errors` submodule MUST own the internal `ContentWithoutMediaType` and `UnsupportedFormatterMode` exceptions under a protocol-specific `InternalError` root derived from the shared internal-error base.
-Consumer-specific cell kinds and content, domain record construction and rendering, journal models and formatting, consumer-specific CLI parsing, output routing, error classification, and exit selection MUST remain consumer-owned except for commands explicitly delegated to the shared CLI module.
+Consumer-specific cell kinds, content, domain context, and projections MUST remain consumer-owned.
+Shared output delivery and command error handling MUST remain independent of consumer implementations.
 
 The skills module MUST own packaged skill-document loading independently of protocol cells.
 Its public interface MUST provide `llm_tool_cli.skills.load_skill_text(package: str, document: str) -> Result[str]`, with implementation in `skills.fixtures`.
@@ -224,3 +226,30 @@ The error-cell assertion MUST reuse this helper.
 
 Configured module boundaries MUST reflect implemented ownership and dependency direction.
 New modules MUST update the architecture configuration when their addition changes a configured boundary.
+
+## Output delivery
+
+The public `llm_tool_cli.output` package MUST expose `OutputEmitter`, `StreamOutputEmitter`, and `output: ContextValue[OutputEmitter]`.
+The interface MUST accept `emit(cells: list[LogicCell]) -> Result[None]`, `flush() -> None`, and `discard() -> None`.
+`StreamOutputEmitter` MUST accept an optional keyword-only `stream: TextIO | None = None` during construction and deliver every cell to that stream, resolving `None` to current stdout at delivery time.
+Stream selection MUST belong to emitter construction rather than individual submissions; the emitter MUST NOT close the supplied stream.
+Discarding MUST remove pending ordinary results while retaining warnings for failure reporting.
+Stream delivery MUST read the active runtime protocol when rendering and MUST NOT retain a competing protocol value.
+The emitter MUST read `settings.static_config.get().tool_label` once per batch, project the logical cells for the active protocol, flatten their outputs in order, construct rendering contexts for the complete output-cell sequence, and concatenate rendered bytes.
+It MUST decode the complete batch as UTF-8 before writing directly to its selected text stream and flushing it.
+Its protected `_render(cells: list[LogicCell]) -> str` method MUST prepare complete batch text without writing output, allowing subclasses to override preparation while retaining `_write` stream selection, writing, and flushing.
+The output module MAY depend on core, configuration, and protocol; those modules MUST NOT depend on output.
+
+The public `output.journal` submodule MUST expose `JournalProcessor.process(cell: LogicCell) -> Result[None]`, `NoopJournalProcessor`, and `CommandJournalProcessor`.
+The emitter MUST accept a processor during construction and default to the no-op processor.
+The command processor MUST use the cell's explicitly serialized model fields, excluding delivery flags, for whole-argument substitution.
+The output error module MUST own journal command configuration and execution failures.
+
+The logic-cell base MUST own overridable `is_journal` and `is_warning` fields, defaulting to false and excluded from serialization.
+The public `protocol.logic_cells.journal.JournalCell` MUST supply timestamp, actor, message, compact text projections, and structured automation output with a journal default.
+Consumers MAY subclass it to add domain fields and customize text projections.
+The public `protocol.logic_cells.warning.WarningCell` MUST provide warning metadata projections with a warning default.
+Their output-cell implementations MUST belong to `protocol.output_cells`.
+Cells and their projections MUST remain free of delivery side effects.
+
+The public test-only `output.tests.helpers` boundary MAY provide a collecting emitter and warning-message inspection for consumer integration tests.

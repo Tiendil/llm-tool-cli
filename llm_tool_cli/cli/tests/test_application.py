@@ -101,10 +101,10 @@ class TestCreateApp:
         result = CliRunner().invoke(app, ["--protocol", "invalid", "show"])
 
         assert result.exit_code == 1
-        assert not result.stdout
-        assert result.stderr.startswith("--TEST-CELL ")
-        assert result.stderr.count(" BEGIN--\n") == 1
-        assert "code=invalid_arguments\n" in result.stderr
+        assert not result.stderr
+        assert result.stdout.startswith("--TEST-CELL ")
+        assert result.stdout.count(" BEGIN--\n") == 1
+        assert "code=invalid_arguments\n" in result.stdout
         assert not runtime_config.is_set()
         assert not project_config.is_set()
 

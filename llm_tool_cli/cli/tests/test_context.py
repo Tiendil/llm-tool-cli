@@ -1,3 +1,4 @@
+import io
 import json
 from pathlib import Path
 
@@ -10,6 +11,8 @@ from llm_tool_cli.config.project import project_config
 from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
 from llm_tool_cli.core.settings import ToolLabel, initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
+from llm_tool_cli.output import StreamOutputEmitter
+from llm_tool_cli.output import output as active_output
 from llm_tool_cli.paths import ProjectConfigPath
 from llm_tool_cli.protocol import Protocol
 from llm_tool_cli.protocol.cell_shortcuts import info
@@ -61,21 +64,28 @@ class TestCommandContext:
             assert observed == [Protocol.automation, Protocol.llm, Protocol.automation]
 
     @pytest.mark.parametrize("protocol", list(Protocol))
-    @pytest.mark.parametrize("stderr", [False, True])
+    @pytest.mark.parametrize("custom_stream", [False, True])
     def test_write_cells__uses_selected_protocol_and_stream(
-        self, capsys: pytest.CaptureFixture[str], protocol: Protocol, stderr: bool
+        self, capsys: pytest.CaptureFixture[str], protocol: Protocol, custom_stream: bool
     ) -> None:
         initialize(label=ToolLabel("TEST"))
         messages = ["Café", "日本語"]
+        stream = io.StringIO()
 
         with typer.Context(TyperCommand("show"), info_name="show") as context:
             context.params["protocol"] = protocol
             command = CommandContext(context)
-            command.write_cells((info(message) for message in messages), stderr=stderr)
+            if custom_stream:
+                context.with_resource(active_output.scope(StreamOutputEmitter(stream=stream)))
+            command.write_cells(info(message) for message in messages)
+            assert capsys.readouterr() == ("", "")
+            assert not stream.getvalue()
+            active_output.get().flush()
 
         captured = capsys.readouterr()
-        output, other = (captured.err, captured.out) if stderr else (captured.out, captured.err)
-        assert not other
+        output = stream.getvalue() if custom_stream else captured.out
+        assert not (captured.out if custom_stream else stream.getvalue())
+        assert not captured.err
         if protocol == Protocol.automation:
             records = [json.loads(line) for line in output.splitlines()]
             assert [record["content"] for record in records] == messages

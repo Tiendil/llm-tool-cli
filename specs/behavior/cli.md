@@ -64,7 +64,7 @@ Accepted values MUST be the exact, case-sensitive names of the shared output pro
 Omission MUST leave the protocol unspecified for command-default selection.
 Help MUST identify the option value as `PROTOCOL` and describe the accepted values and shared command defaults.
 
-An unsupported value MUST stop execution before the command runs, write one LLM error cell to stderr, and exit with status `1`.
+An unsupported value MUST stop execution before the command runs, write one LLM error cell to stdout, and exit with status `1`.
 The cell MUST use the initialized application tool label and the shared invalid-argument diagnostic, with a `reason` identifying the rejected value and the accepted values.
 The fallback MUST always use LLM output because the requested protocol is invalid.
 Supplying the option without a value MUST remain a framework command-line parsing error.
@@ -94,8 +94,9 @@ The preceding runtime binding, including an absent binding, MUST be restored whe
 Consumer setup MUST register shared project contexts with the framework command context so project bindings are restored when it closes.
 Runtime readers, including output writing, MUST consult the active settings rather than retained copies.
 Constructing a command context MUST NOT resolve configuration paths, load a workspace, or emit output.
-The context MUST write supplied cell iterables with the active protocol through shared cell writing, using stdout by default and stderr when explicitly requested.
-Cell writing MUST preserve complete batches and their order; environment-error reporting MUST remain the responsibility of the shared command error handler.
+The context MUST bind fresh shared output delivery independently of project settings and submit supplied cell iterables to the active emitter, using stdout by default.
+The preceding output binding MUST be restored when the framework context closes.
+Successful command completion MUST flush buffered results followed by warnings before runtime and project bindings close.
 The shared skill and version commands MUST use this context; consumers MAY extend it with application-specific responsibilities.
 Explicit function arguments remain permitted for operations that receive values directly.
 
@@ -148,13 +149,16 @@ Metadata lookup failures, including missing distribution metadata, MUST propagat
 The library MUST provide a shared error-handling scope for command execution using an already selected protocol.
 It MUST recover only failed result unwrapping, using the validated environment-error accessor from the shared result contract.
 It MUST report every recovered error in order as one batch of shared error cells and terminate with the aggregated exit status.
-Human and LLM error cells MUST use stderr; automation error cells MUST use stdout, independently of the error's package ownership.
+Error cells MUST use the emitter's configured stream, defaulting to stdout in every protocol, independently of the error's package ownership.
 Malformed unwrapping payloads MUST propagate unchanged without partial diagnostic output.
 Unrelated exceptions and framework control-flow exceptions MUST propagate unchanged.
-Successful execution MUST leave the scope normally without emitting output or forcing process termination.
+Successful execution MUST flush the active emitter and leave the scope without forcing process termination.
+Expected failures MUST discard buffered ordinary results, report diagnostics, and flush retained warnings after them.
+Unexpected exceptions and framework exits MUST NOT flush pending ordinary results.
 
 The same reporting and termination operation MUST be available for explicit error lists, including argument validation before command execution.
-Early validation MUST supply its chosen fallback protocol; the reporter MUST use the same stream and exit rules as command failures.
+Early validation MUST supply its chosen fallback protocol; the reporter MUST use the same stream and exit rules as command failures without consuming an unrelated outer emitter.
+Command failure reporting MUST use the command's emitter so its retained warnings follow diagnostics.
 An empty error list MUST emit no diagnostics and terminate with the shared aggregation result.
 
 Shared commands MUST use this error-handling scope.
@@ -171,4 +175,4 @@ A CLI handling multiple environment errors MUST render all errors in their origi
 An empty list or a list whose errors all declare status `0` MUST produce status `0`.
 Exit-status aggregation MUST be provided by the shared core error contract.
 Framework parsing failures MUST retain status `2`; they MUST NOT be changed to status `1` merely to use shared exit statuses.
-Consumers MAY declare application-specific error-class overrides; output stream routing and process termination MUST remain at the handling CLI boundary.
+Consumers MAY declare application-specific error-class overrides; emitter configuration and process termination MUST remain at the handling CLI boundary.
