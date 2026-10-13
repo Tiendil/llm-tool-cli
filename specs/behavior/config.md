@@ -2,16 +2,31 @@
 
 ## Goal of the document
 
-This document describes shared configuration-file selection, loading, creation, project scopes, and failure diagnostics.
+This document describes shared configuration fields, configuration-file selection, loading, creation, project scopes, and failure diagnostics.
 
 ## Scope
 
-This specification covers reusable configuration-file mechanics and project preparation and scope management.
-Application schema semantics, template contents, workspace construction, and CLI presentation and exit policies are out of scope.
+This specification covers reusable configuration fields, configuration-file mechanics, and project preparation and scope management.
+Application-specific schema semantics, template contents, workspace construction, and CLI presentation and exit policies are out of scope.
 
 ## General behavior
 
 Configuration selection and loading MUST be deterministic for the same inputs, working directory, and filesystem state.
+
+## Shared root fields
+
+Applications MUST be able to reuse configuration-version and session-directory field definitions independently in their own schemas.
+Application schemas MUST own their supported versions and defaults, independently of other applications and the shared library.
+The shared version field MUST apply the application's supplied version constraint without prescribing a supported version or default.
+Version validation MUST inspect the original input and reject non-integer values, including booleans, floating-point numbers, and strings, without coercion.
+Wrong-type diagnostics MUST explain that an integer is required and identify the received value.
+Unsupported-version diagnostics for application-supplied literal constraints MUST identify both the received version and the supported values.
+Other schema-validation failures MUST retain their original details.
+The shared session-directory field MUST accept project-relative filesystem paths and reject absolute paths and any `..` path component.
+Applications MUST supply session-directory defaults and own storage behavior.
+Session-directory validation MUST remain lexical: it MUST NOT resolve paths, expand home markers, inspect the filesystem, or create directories.
+Validated session-directory values MUST retain the shared relative-project-path representation and serialize as path strings in JSON.
+Shared field validation failures MUST use the existing schema-validation diagnostic when loaded from configuration files.
 
 ## Path resolution
 
@@ -56,7 +71,7 @@ An empty document MUST produce an empty mapping.
 Reading MUST use the supplied path without additional discovery or resolution.
 
 Schema-based loading MUST validate the parsed document using the caller-supplied schema and its defaults.
-The caller MUST own field meanings and validation rules.
+The caller MUST own schema composition and application-specific field meanings and validation rules; reused shared fields MUST retain their shared validation.
 Read failures MUST propagate unchanged.
 Expected schema-validation failures MUST produce configuration validation diagnostics.
 Unexpected schema failures MUST propagate as exceptions.

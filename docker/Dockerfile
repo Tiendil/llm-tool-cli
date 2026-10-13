@@ -2,10 +2,6 @@ FROM python:3.12
 
 COPY --from=ghcr.io/astral-sh/uv:0.11.14 /uv /uvx /bin/
 
-RUN apt-get update \
-    && apt-get install --yes --no-install-recommends ripgrep \
-    && rm -rf /var/lib/apt/lists/*
-
 ARG UID=1000
 ARG GID=1000
 ARG PROJECT_USER=llm-tool-cli

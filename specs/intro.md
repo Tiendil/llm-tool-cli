@@ -19,6 +19,8 @@ Detailed requirements for individual specifications are out of scope except for 
 
 ## Specification documents
 
+Reusable root configuration fields for schema version and session directory are specified in `specs/architecture/modules_layout.md` and `specs/behavior/config.md`, including application-owned supported versions and defaults, strict version validation, and descriptive type and compatibility diagnostics.
+
 Journal-record entities, explicit semantic cell summaries, prohibited content-cell journaling, emitter-owned journal construction, configurable factories, and processor ownership are specified in `specs/architecture/modules_layout.md` and `specs/architecture/entities.md`, with delivery and conversion behavior in `specs/behavior/protocol.md`.
 Record conversion, empty arguments for missing journal fields, and emitter-local journal failure tracking are specified in `specs/behavior/protocol.md`; terminal-error journaling and delivery-failure recovery without error-type classification are specified in `specs/behavior/cli.md` and `specs/architecture/errors.md`.
 

@@ -1,6 +1,6 @@
-"""Configuration file mechanics independent of application schemas and defaults.
+"""Configuration file mechanics and reusable schema fields.
 
-The exported operations and ``config.errors`` are public interfaces.
+The exported operations, ``config.fields``, and ``config.errors`` are public interfaces.
 Applications declare their default filename in static settings and own template
 resources, schemas, workspace construction, and presentation of failures.
 """

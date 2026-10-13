@@ -38,7 +38,8 @@ Preserve the wording and structure of existing specifications where they remain 
 
 All development-related operations MUST be performed in Docker Compose containers through the repository helpers.
 Agents MUST NOT perform development-related operations directly on the host machine.
-Searching, reading, and editing files may be done on the host.
+Code and file searches MUST run on the host using host-installed tools, including `ast-grep` and `rg`, without Docker or development-helper wrappers.
+Reading and editing files MAY also be done on the host.
 Do not replace the Compose-managed environment with direct `docker run` or `docker build` commands.
 
 Supported helpers:
@@ -156,15 +157,15 @@ You MUST NOT use it for:
 
 - Implementing huge features or behaviors that require adding massive blocks of code (like adding a new class, module, writing a huge function, etc.).
 
-It is installed in the development environment:
+Run the host-installed executable directly:
 
 ```bash
-./bin/dev.sh uv run -- ast-grep --help
+ast-grep --help
 ```
 
 ### `rg`
 
-Use `rg` for text and file searches unless a structural code query is needed.
+Use host-installed `rg` directly for text and file searches unless a structural code query is needed.
 
 `ast-grep` has a higher priority than `rg` whenever a structural code query is needed.
 

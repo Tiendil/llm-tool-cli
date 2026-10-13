@@ -35,7 +35,6 @@ Changelog = "https://github.com/Tiendil/llm-tool-cli/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
-    "ast-grep-cli==0.44.*",
     "autoflake==2.3.*",
     "black==25.12.*",
     "changy==0.4.*",

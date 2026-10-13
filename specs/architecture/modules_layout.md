@@ -162,6 +162,12 @@ The glob-pattern constructor MUST preserve the supplied string without validatio
 
 The configuration module MUST own reusable configuration selection, loading, and creation, with behavior specified in `specs/behavior/config.md`.
 Its public package interface MUST expose the operations implemented in `config.files`.
+The public `llm_tool_cli.config.fields` submodule MUST provide independently reusable root-field definitions without requiring a common application configuration base class.
+It MUST expose generic `ConfigVersion[Version]` for strict integer validation and diagnostic formatting around an application-supplied version constraint.
+Applications MUST declare their supported versions and defaults in their own schemas; the library MUST NOT prescribe a schema version or default.
+It MUST expose `SessionDir` as a Pydantic-validated annotation over `RelativeProjectPath`, rejecting absolute paths and parent-directory references.
+Its public `validate_relative_project_path` Pydantic validator MUST provide the same lexical checks for other configuration paths that adopt this policy.
+Applications MUST own their root schemas, select the fields they use, and supply their session-directory defaults; field definitions MUST NOT depend on active contexts or perform filesystem operations.
 The configuration module MUST use the shared `ProjectConfigPath` for successful path values returned by `find_config`, `resolve_config_path`, `resolve_init_config_path`, `initialize_config`, and `locate_config`.
 The target path parameter of `create_config` and `create_config_from_template` MUST also use `ProjectConfigPath`, without requiring resolution or existence.
 The configuration module MUST also expose `llm_tool_cli.config.create_config_from_template(path, *, package, template) -> Result[None]`, implemented in `config.files`.
