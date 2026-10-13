@@ -94,7 +94,8 @@ The preceding runtime binding, including an absent binding, MUST be restored whe
 Consumer setup MUST register shared project contexts with the framework command context so project bindings are restored when it closes.
 Runtime readers, including output writing, MUST consult the active settings rather than retained copies.
 Constructing a command context MUST NOT resolve configuration paths, load a workspace, or emit output.
-The context MUST bind fresh shared output delivery independently of project settings and submit supplied cell iterables to the active emitter, using stdout by default.
+The context MUST bind fresh shared output delivery independently of project settings, using stdout by default.
+Commands MUST submit cell batches directly to the active emitter.
 The preceding output binding MUST be restored when the framework context closes.
 Successful command completion MUST flush buffered results followed by warnings before runtime and project bindings close.
 The shared skill and version commands MUST use this context; consumers MAY extend it with application-specific responsibilities.

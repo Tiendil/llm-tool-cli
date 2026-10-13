@@ -107,9 +107,9 @@ It MUST read parsed root parameters from the framework, treating an unspecified 
 Its `config_input` property MUST expose the unresolved optional CLI configuration path for the operation that selects or creates a configuration file.
 Its `protocol` property MUST read the active runtime configuration without retaining a copy.
 It MUST establish a fresh shared output scope through the framework context lifecycle.
-Its `write_cells(cells: Iterable[LogicCell]) -> None` method MUST submit a materialized cell batch to the active emitter.
+Commands MUST submit cell batches directly through `llm_tool_cli.output.output`.
 Consumer command contexts MAY inherit this implementation while retaining their own application settings, workspace construction, runtime setup, journal-cell construction, and cleanup.
-Shared skill and version commands MUST use this context for protocol selection and cell writing.
+Shared skill and version commands MUST use this context for protocol selection and output scope setup, then submit cells directly to the active emitter.
 The library MUST own the Typer runtime dependency and its supported version constraint for shared CLI context integration.
 The public `llm_tool_cli.cli.application.create_app(*, help: str) -> typer.Typer` factory MUST own shared application construction, root option registration, help aliases, and completion-option availability.
 The root callback MUST declare `ProtocolOption` and `ConfigOption`, retaining unspecified inputs as `None` in the framework parameters without a parallel global options binding.

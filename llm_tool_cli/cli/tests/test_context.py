@@ -65,7 +65,7 @@ class TestCommandContext:
 
     @pytest.mark.parametrize("protocol", list(Protocol))
     @pytest.mark.parametrize("custom_stream", [False, True])
-    def test_write_cells__uses_selected_protocol_and_stream(
+    def test_init__binds_output_with_selected_protocol_and_supports_stream_override(
         self, capsys: pytest.CaptureFixture[str], protocol: Protocol, custom_stream: bool
     ) -> None:
         initialize(label=ToolLabel("TEST"))
@@ -74,10 +74,10 @@ class TestCommandContext:
 
         with typer.Context(TyperCommand("show"), info_name="show") as context:
             context.params["protocol"] = protocol
-            command = CommandContext(context)
+            CommandContext(context)
             if custom_stream:
                 context.with_resource(active_output.scope(StreamOutputEmitter(stream=stream)))
-            command.write_cells(info(message) for message in messages)
+            active_output.get().emit([info(message) for message in messages]).unwrap()
             assert capsys.readouterr() == ("", "")
             assert not stream.getvalue()
             active_output.get().flush()

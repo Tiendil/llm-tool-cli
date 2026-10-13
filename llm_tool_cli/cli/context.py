@@ -1,12 +1,9 @@
-from collections.abc import Iterable
-
 import typer
 
 from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
 from llm_tool_cli.output import StreamOutputEmitter, output
 from llm_tool_cli.paths import ProjectConfigPath
 from llm_tool_cli.protocol import Protocol
-from llm_tool_cli.protocol.logic_cells.base import LogicCell
 
 
 class CommandContext:
@@ -28,6 +25,3 @@ class CommandContext:
     @property
     def protocol(self) -> Protocol:
         return runtime_config.get().protocol
-
-    def write_cells(self, cells: Iterable[LogicCell]) -> None:
-        output.get().emit(list(cells)).unwrap()
