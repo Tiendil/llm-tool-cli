@@ -1,5 +1,9 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
+
 import typer
 
+from llm_tool_cli.cli.handling import handle_command_errors
 from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
 from llm_tool_cli.output import StreamOutputEmitter, output
 from llm_tool_cli.paths import ProjectConfigPath
@@ -25,3 +29,11 @@ class CommandContext:
     @property
     def protocol(self) -> Protocol:
         return runtime_config.get().protocol
+
+
+@contextmanager
+def command_context(context: typer.Context) -> Iterator[CommandContext]:
+    """Set up command execution and finalize output before framework cleanup."""
+    command = CommandContext(context)
+    with handle_command_errors(protocol=command.protocol):
+        yield command

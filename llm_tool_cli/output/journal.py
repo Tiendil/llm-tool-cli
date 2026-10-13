@@ -1,51 +1,45 @@
-import datetime
 import subprocess  # noqa: S404
 from typing import Protocol
 
+import pydantic
+
+from llm_tool_cli.core.entities import BaseEntity
 from llm_tool_cli.core.result import Err, Ok, Result
 from llm_tool_cli.output.errors import JournalCommandConfigInvalid, JournalCommandFailed
-from llm_tool_cli.protocol.logic_cells.base import LogicCell
+from llm_tool_cli.protocol.journal import JournalRecord
 
 
 class JournalProcessor(Protocol):
     __slots__ = ()
 
-    def process(self, cell: LogicCell) -> Result[None]: ...  # noqa: E704
+    def process(self, record: JournalRecord) -> Result[None]: ...  # noqa: E704
 
 
 class NoopJournalProcessor:
     __slots__ = ()
 
-    def process(self, cell: LogicCell) -> Result[None]:
+    def process(self, record: JournalRecord) -> Result[None]:
         return Ok(None)
 
 
 class CommandJournalProcessor:
-    """Forward logical fields as whole arguments, without a shell or text flattening."""
+    """Forward record fields as whole arguments, without a shell or text flattening."""
 
     __slots__ = ("command",)
 
     def __init__(self, command: list[str]) -> None:
         self.command = tuple(command)
 
-    def process(self, cell: LogicCell) -> Result[None]:  # noqa: CCR001
+    def process(self, record: JournalRecord) -> Result[None]:  # noqa: CCR001
         if not self.command:
             return Err([JournalCommandConfigInvalid(argument="", details="Configured command is empty.")])
 
-        fields = cell.model_dump(mode="python")
+        fields = record.as_dict()
         args = []
         for argument in self.command:
             if len(argument) >= 2 and argument.startswith("{") and argument.endswith("}"):
-                name = argument[1:-1]
-                if name not in fields:
-                    return Err(
-                        [JournalCommandConfigInvalid(argument=argument, details=f"Unknown cell field `{name}`.")]
-                    )
-                value = fields[name]
-                if isinstance(value, (datetime.datetime, datetime.date, datetime.time)):
-                    argument = value.isoformat()
-                else:
-                    argument = "" if value is None else str(value)
+                value = fields.get(argument[1:-1])
+                argument = "" if value is None else str(value)
             args.append(argument)
 
         try:
@@ -59,3 +53,14 @@ class CommandJournalProcessor:
                 details += f"; stderr: {result.stderr.strip()}"
             return Err([JournalCommandFailed(command=args, returncode=result.returncode, details=details)])
         return Ok(None)
+
+
+class JournalConfig(BaseEntity):
+    """Optional external command forwarding."""
+
+    cmd: list[str] | None = pydantic.Field(default=None, min_length=1)
+
+    def processor(self) -> JournalProcessor:
+        if self.cmd is None:
+            return NoopJournalProcessor()
+        return CommandJournalProcessor(self.cmd)

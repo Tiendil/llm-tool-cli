@@ -15,3 +15,7 @@ class ContentWithoutMediaType(InternalError):
 
 class UnsupportedFormatterMode(InternalError):
     message_template: ClassVar[str] = "Formatter for mode '{mode}' is not implemented."
+
+
+class JournalConversionUnsupported(InternalError):
+    message_template: ClassVar[str] = "Cell '{cell_type}' does not support journal conversion."

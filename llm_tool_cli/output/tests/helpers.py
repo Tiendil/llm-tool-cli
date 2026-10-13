@@ -1,13 +1,15 @@
 from llm_tool_cli.core.result import Ok, Result
-from llm_tool_cli.output import output
+from llm_tool_cli.output import JournalCellFactory, StreamOutputEmitter, output
 from llm_tool_cli.protocol.logic_cells.base import LogicCell
+from llm_tool_cli.protocol.logic_cells.journal import JournalCell
 from llm_tool_cli.protocol.logic_cells.warning import WarningCell
 
 
-class CollectingEmitter:
+class CollectingEmitter(StreamOutputEmitter):
     """Capture submitted logical cells without rendering or external side effects."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, journal_factory: JournalCellFactory = JournalCell) -> None:
+        super().__init__(journal_factory=journal_factory)
         self.cells: list[LogicCell] = []
 
     def emit(self, cells: list[LogicCell]) -> Result[None]:

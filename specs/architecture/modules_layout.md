@@ -108,8 +108,10 @@ Its `config_input` property MUST expose the unresolved optional CLI configuratio
 Its `protocol` property MUST read the active runtime configuration without retaining a copy.
 It MUST establish a fresh shared output scope through the framework context lifecycle.
 Commands MUST submit cell batches directly through `llm_tool_cli.output.output`.
-Consumer command contexts MAY inherit this implementation while retaining their own application settings, workspace construction, runtime setup, journal-cell construction, and cleanup.
-Shared skill and version commands MUST use this context for protocol selection and output scope setup, then submit cells directly to the active emitter.
+The public `llm_tool_cli.cli.context.command_context(context: typer.Context)` context manager MUST yield the shared `CommandContext`, composing its setup with shared command error handling and output finalization.
+Consumer command contexts MUST compose this scope while retaining their own application settings, workspace construction, runtime setup, journal-cell construction, and cleanup.
+Shared error journaling MUST use self-contained error cells without invoking consumer journal factories or extending consumer runtime scopes; framework-managed output and project bindings MUST remain active through finalization.
+Shared skill, version, and initialization commands MUST use this scope for protocol selection, output scope setup, and finalization, submitting cells directly to the active emitter during execution.
 The library MUST own the Typer runtime dependency and its supported version constraint for shared CLI context integration.
 The public `llm_tool_cli.cli.application.create_app(*, help: str) -> typer.Typer` factory MUST own shared application construction, root option registration, help aliases, and completion-option availability.
 The root callback MUST declare `ProtocolOption` and `ConfigOption`, retaining unspecified inputs as `None` in the framework parameters without a parallel global options binding.
@@ -118,6 +120,10 @@ The public `llm_tool_cli.cli.commands.skills.register_skill_command(app, *, pack
 The CLI module MUST compose shared skill loading, protocol selection, cell writing, and read-failure handling without depending on consumer command contexts.
 The public `llm_tool_cli.cli.commands.version.register_version_command(app, *, distribution: str) -> None` boundary MUST register the complete shared version command using the supplied distribution name.
 The CLI module MUST own installed package-version lookup, protocol selection, and version-cell emission without depending on consumer command contexts.
+The public `llm_tool_cli.cli.commands.initialization.register_init_command(app, *, config_class, package, template, help=None) -> None` boundary MUST register the complete shared `init` command using the supplied Pydantic schema, resource package, starter template, and optional help text.
+The command MUST compose the shared command context with `initialize_project`, supplying the invocation working directory and unresolved CLI configuration input, and retain the project scope through the framework resource lifecycle.
+After successful initialization, it MUST submit `configuration_created(project_config.get().config_path)` to the active emitter.
+Schema and starter contents MUST remain consumer-owned; registration MUST NOT prepare a project or require a consumer command context.
 The public `llm_tool_cli.cli.entities` submodule MUST provide `ExitCode`, an `enum.IntEnum` with `success = 0`, `invalid_arguments = 1`, and `skill_unreadable = 3` for their respective shared CLI outcomes.
 The enum MUST preserve the integer exit-status contract without replacing consumer-specific failure categories.
 The public `llm_tool_cli.cli.options` submodule MUST provide the Typer `ConfigOption` annotation, parsing `--config` values into `ProjectConfigPath | None` without filesystem validation or resolution.
@@ -197,7 +203,7 @@ The protocol module MUST leave batch-rendering orchestration and stream writing 
 Individual logic-cell projections and output-cell formatting MUST remain free of output side effects.
 Output-cell type selection MUST belong to logic-cell projections rather than a separate selector exposed to application code.
 The `llm_tool_cli.protocol.cell_shortcuts.environment_error(error)` helper MUST construct a shared `EnvironmentErrorCell`; it MUST NOT serialize the error, select a protocol, or render content.
-The public `llm_tool_cli.protocol.errors` submodule MUST own the internal `ContentWithoutMediaType` and `UnsupportedFormatterMode` exceptions under a protocol-specific `InternalError` root derived from the shared internal-error base.
+The public `llm_tool_cli.protocol.errors` submodule MUST own the internal `ContentWithoutMediaType`, `UnsupportedFormatterMode`, and `JournalConversionUnsupported` exceptions under a protocol-specific `InternalError` root derived from the shared internal-error base.
 Consumer-specific cell kinds, content, domain context, and projections MUST remain consumer-owned.
 Shared output delivery and command error handling MUST remain independent of consumer implementations.
 
@@ -230,7 +236,10 @@ New modules MUST update the architecture configuration when their addition chang
 ## Output delivery
 
 The public `llm_tool_cli.output` package MUST expose `OutputEmitter`, `StreamOutputEmitter`, and `output: ContextValue[OutputEmitter]`.
-The interface MUST accept `emit(cells: list[LogicCell]) -> Result[None]`, `flush() -> None`, and `discard() -> None`.
+The interface MUST accept `emit(cells: list[LogicCell]) -> Result[None]`, `journal(message: str, *, actor_id=...) -> Result[None]`, `flush() -> None`, and `discard() -> None`.
+The output module MUST expose `JournalCellFactory`, accepting keyword-only message and actor values and returning a shared journal-cell subclass.
+The emitter MUST accept a `journal_factory` during construction, defaulting to the shared journal cell, and use it only for explicit `journal` calls.
+The emitter MUST resolve omitted actors from runtime protocol and preserve explicit values, including `None`.
 `StreamOutputEmitter` MUST accept an optional keyword-only `stream: TextIO | None = None` during construction and deliver every cell to that stream, resolving `None` to current stdout at delivery time.
 Stream selection MUST belong to emitter construction rather than individual submissions; the emitter MUST NOT close the supplied stream.
 Discarding MUST remove pending ordinary results while retaining warnings for failure reporting.
@@ -240,9 +249,19 @@ It MUST decode the complete batch as UTF-8 before writing directly to its select
 Its protected `_render(cells: list[LogicCell]) -> str` method MUST prepare complete batch text without writing output, allowing subclasses to override preparation while retaining `_write` stream selection, writing, and flushing.
 The output module MAY depend on core, configuration, and protocol; those modules MUST NOT depend on output.
 
-The public `output.journal` submodule MUST expose `JournalProcessor.process(cell: LogicCell) -> Result[None]`, `NoopJournalProcessor`, and `CommandJournalProcessor`.
+The public `protocol.journal` submodule MUST own `JournalRecord`, containing message, creation timestamp, optional actor, and JSON-compatible attributes.
+Its `as_dict()` method MUST flatten attributes and common fields into a fresh dictionary, with common fields taking precedence and timestamps using ISO formatting.
+The logic-cell base MUST provide pure `to_journal_record() -> JournalRecord` conversion, raising `JournalConversionUnsupported` with the concrete cell type when a subclass has no implementation.
+Journal-capable cells MUST explicitly construct a new semantic event summary and useful structured attributes from their existing data, independently of output-cell projections.
+Uniform projection MUST NOT provide a fallback journal conversion.
+Cells that prohibit journaling MUST narrow `is_journal` to `Literal[False]`; shared `ContentCell` MUST use this restriction.
+The public `output.journal` submodule MUST expose `JournalProcessor.process(record: JournalRecord) -> Result[None]`, `NoopJournalProcessor`, and `CommandJournalProcessor`.
 The emitter MUST accept a processor during construction and default to the no-op processor.
-The command processor MUST use the cell's explicitly serialized model fields, excluding delivery flags, for whole-argument substitution.
+The emitter MUST own its journal-processing failure state, set it when `process` returns a failed result, and bypass further conversion and processing without changing console routing.
+That state MUST remain private to the emitter and survive `flush` and `discard`; CLI handling MUST NOT infer processor state from error classes.
+The command processor MUST use the record's dictionary representation for whole-argument substitution.
+The same submodule MUST own `JournalConfig`, accepting an optional nonempty list of string command arguments and constructing the processor.
+Placeholder lookup MUST use the record's dictionary without a separate field registry.
 The output error module MUST own journal command configuration and execution failures.
 
 The logic-cell base MUST own overridable `is_journal` and `is_warning` fields, defaulting to false and excluded from serialization.

@@ -1,4 +1,4 @@
-from typing import Self
+from typing import Literal, Self
 
 import pydantic
 
@@ -10,6 +10,7 @@ from llm_tool_cli.protocol.output_cells.base import MetaValue, OutputCell
 class ContentCell(UniformCell):
     """Prepared content and metadata shared by all output protocols."""
 
+    is_journal: Literal[False] = pydantic.Field(default=False, exclude=True)
     kind: str
     media_type: str | None = None
     content: str | None = None

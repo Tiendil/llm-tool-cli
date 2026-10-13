@@ -2,6 +2,7 @@ import datetime
 
 import pydantic
 
+from llm_tool_cli.protocol.journal import JournalRecord
 from llm_tool_cli.protocol.logic_cells.base import LogicCell
 from llm_tool_cli.protocol.output_cells.base import OutputCell, to_meta_value
 from llm_tool_cli.protocol.output_cells.journal import JournalAutomationOutputCell, JournalTextOutputCell
@@ -14,6 +15,14 @@ class JournalCell(LogicCell):
     timestamp: datetime.datetime = pydantic.Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
     actor_id: str | None = None
     message: str
+
+    def to_journal_record(self) -> JournalRecord:
+        return JournalRecord(
+            message=self.message,
+            timestamp=self.timestamp,
+            actor_id=self.actor_id,
+            attributes=self.model_dump(mode="json", exclude={"message", "timestamp", "actor_id"}),
+        )
 
     def human_line(self) -> str:
         return f"{self.timestamp.time().isoformat('seconds')} <{self.actor_id or '-'}> {self.message}"

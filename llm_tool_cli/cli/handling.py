@@ -18,11 +18,19 @@ def report_errors_and_exit(
     """Deliver ordered diagnostics through the emitter and exit."""
     # Parsing can fail before command setup has established runtime/output scopes.
     emitter = emitter if emitter is not None else StreamOutputEmitter()
+    delivery_errors: EnvironmentErrors = []
     with runtime_config.scope(RuntimeConfig(protocol=protocol)):
         emitter.discard()
-        emitter.emit([environment_error(error) for error in errors]).unwrap()
+        for error in errors:
+            cell = environment_error(error).replace(is_journal=True)
+            delivered = emitter.emit([cell])
+            if delivered.is_err():
+                delivery_errors.extend(delivered.unwrap_err())
+                # Journal forwarding is disabled; preserve this diagnostic in its original position.
+                emitter.emit([cell]).unwrap()
+        emitter.emit([environment_error(error) for error in delivery_errors]).unwrap()
         emitter.flush()
-    raise typer.Exit(exit_code_for_errors(errors))
+    raise typer.Exit(exit_code_for_errors([*errors, *delivery_errors]))
 
 
 @contextmanager

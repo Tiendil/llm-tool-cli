@@ -1,6 +1,7 @@
 import pytest
 
 from llm_tool_cli.protocol import Protocol
+from llm_tool_cli.protocol.errors import JournalConversionUnsupported
 from llm_tool_cli.protocol.logic_cells.base import LogicCell
 from llm_tool_cli.protocol.output_cells import AutomationOutputCell, HumanOutputCell
 from llm_tool_cli.protocol.output_cells.base import OutputCell
@@ -20,6 +21,14 @@ class ExampleLogicCell(LogicCell):
 
 
 class TestLogicCell:
+    def test_to_journal_record__unsupported_conversion_is_explicit(self) -> None:
+        cell = ExampleLogicCell(items=("first", "second"))
+
+        with pytest.raises(JournalConversionUnsupported) as caught:
+            cell.to_journal_record()
+
+        assert caught.value.details == {"cell_type": "ExampleLogicCell"}
+
     @pytest.mark.parametrize(
         ("protocol", "expected"),
         (

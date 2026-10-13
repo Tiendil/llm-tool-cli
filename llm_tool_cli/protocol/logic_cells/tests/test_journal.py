@@ -9,6 +9,19 @@ from llm_tool_cli.protocol.output_cells.base import RenderContext
 
 
 class TestJournalCell:
+    def test_to_journal_record__preserves_timestamp_and_subclass_fields(self) -> None:
+        class EventCell(JournalCell):
+            task_id: str | None = None
+
+        cell = EventCell(message="event", actor_id="actor", task_id="T-1", is_warning=True)
+        original = cell.model_dump()
+        record = cell.to_journal_record()
+        assert record.timestamp == cell.timestamp
+        assert record.message == cell.message
+        assert record.actor_id == "actor"
+        assert record.attributes == {"task_id": "T-1"}
+        assert cell.model_dump() == original
+
     @pytest.mark.parametrize("protocol", list(Protocol))
     def test_render__uses_normalized_multiline_data_and_emits_one_line(self, protocol: Protocol) -> None:
         message = "  first\nsecond\rthird\\n  "

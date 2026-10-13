@@ -2,12 +2,12 @@
 
 ## Goal of the document
 
-This document describes shared application setup, invocation options, output protocol selection, command error handling, and built-in documentation and version commands.
+This document describes shared application setup, invocation options, output protocol selection, command error handling, and built-in documentation, version, and initialization commands.
 
 ## Scope
 
 This specification covers reusable application setup and shared command-line behavior.
-Consumer-specific command execution, configuration loading, and output-cell layouts are out of scope.
+Consumer-specific command execution, configuration schemas and loading mechanics, and output-cell layouts are out of scope.
 
 ## Application setup
 
@@ -98,7 +98,9 @@ The context MUST bind fresh shared output delivery independently of project sett
 Commands MUST submit cell batches directly to the active emitter.
 The preceding output binding MUST be restored when the framework context closes.
 Successful command completion MUST flush buffered results followed by warnings before runtime and project bindings close.
-The shared skill and version commands MUST use this context; consumers MAY extend it with application-specific responsibilities.
+Command execution MUST have a shared scope composing context setup, error handling, and output finalization.
+The shared skill, version, and initialization commands MUST use this scope; consumers MAY compose it with application-specific responsibilities.
+Shared terminal-error journaling MUST remain independent of consumer runtime resources and MUST NOT invoke consumer journal-cell factories.
 Explicit function arguments remain permitted for operations that receive values directly.
 
 ## Protocol selection
@@ -145,11 +147,30 @@ Help MUST describe printing the installed package version without consumer-speci
 
 Metadata lookup failures, including missing distribution metadata, MUST propagate without being converted to environment-error cells or successful fallback output.
 
+## Initialization command
+
+The shared `init` command MUST use the consumer's configuration schema, packaged starter template, and optional help text.
+Registration and help MUST NOT perform project preparation or require an existing configuration.
+The command MUST NOT accept positional arguments or command-specific options.
+It MUST use shared project initialization with the invocation working directory and optional unresolved configuration input; the default filename MUST come from static configuration.
+Initialization MUST create and validate the starter before binding project settings or reporting success.
+The created file MUST remain on disk when subsequent validation fails, and the failed candidate MUST NOT establish a project binding.
+After success, the command MUST emit one shared configuration-creation success cell with the active configuration path, honoring the selected protocol and retaining the project scope through output delivery.
+Expected failures MUST use shared command error handling without success output; unexpected exceptions MUST propagate unchanged.
+The command MUST NOT require consumer-specific runtime setup.
+
 ## Command error handling
 
 The library MUST provide a shared error-handling scope for command execution using an already selected protocol.
 It MUST recover only failed result unwrapping, using the validated environment-error accessor from the shared result contract.
-It MUST report every recovered error in order as one batch of shared error cells and terminate with the aggregated exit status.
+It MUST report every recovered error in order through shared error cells and terminate with the aggregated exit status.
+Terminal error cells MUST be journal-enabled and converted into shared journal records without constructing separate journal cells or duplicating console diagnostics.
+Journal records MUST preserve the formatted error message, code, and structured diagnostic fields without loading consumer execution context.
+After the active emitter's journal processor fails, reporting MUST NOT invoke that processor again.
+The CLI MUST NOT infer processor failure from the types of errors being reported; a healthy emitter MUST journal error cells regardless of their error types.
+If journal delivery fails while reporting another error, the original diagnostic MUST still be emitted, followed by the delivery failures without recursive journaling.
+All original diagnostics MUST retain their order, and collected delivery failures MUST follow them before retained warnings.
+Exit-status aggregation MUST include journal-delivery failures without mutating the original error list.
 Error cells MUST use the emitter's configured stream, defaulting to stdout in every protocol, independently of the error's package ownership.
 Malformed unwrapping payloads MUST propagate unchanged without partial diagnostic output.
 Unrelated exceptions and framework control-flow exceptions MUST propagate unchanged.
@@ -163,8 +184,8 @@ Command failure reporting MUST use the command's emitter so its retained warning
 An empty error list MUST emit no diagnostics and terminate with the shared aggregation result.
 
 Shared commands MUST use this error-handling scope.
-Consumers MUST retain application-specific workspace construction, runtime setup, error journaling, and cleanup.
-Consumer journaling MAY observe failures before propagating them to the shared handler and MUST NOT cause duplicate error-cell emission.
+Consumers MUST retain application-specific workspace construction, runtime setup, and cleanup.
+Shared error journaling MUST NOT require extending the lifetime of consumer runtime resources.
 
 ## Exit statuses
 

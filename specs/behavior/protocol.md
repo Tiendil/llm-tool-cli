@@ -150,15 +150,33 @@ Values unsupported by the JSON encoder MUST propagate the encoder's exception.
 Output delivery MUST have an independent scoped binding, usable without a project and replaceable by programmatic callers.
 Ordinary cells MUST be buffered until an explicit flush or successful command completion.
 Warnings MUST be buffered separately and follow ordinary results in warning insertion order, without deduplication.
-Explicit cell construction MUST be able to override journal and warning defaults independently.
+Explicit cell construction MUST be able to override journal and warning defaults independently when the cell supports those values.
+Cells without a journal representation MUST be able to prohibit journal delivery; generic content cells MUST prohibit it.
+Construction MUST reject attempts to enable prohibited journal delivery.
+Requesting unsupported journal conversion MUST raise an internal error rather than derive a message from rendered content.
 Disabling a delivery flag MUST change routing rather than suppress the cell.
 Delivery flags MUST NOT appear in serialized journal records or cell payloads.
 
-Journal processing MUST occur synchronously when a journal-marked cell is submitted, before its console delivery or buffering.
+While the emitter's journal processor has not failed, journal processing MUST occur synchronously when a journal-marked cell is submitted, before its console delivery or buffering.
+Each processor call MUST receive a new shared journal record converted from the submitted logical cell.
+Conversion MUST use only the cell's data, without accessing application contexts or performing I/O.
+Journal messages MUST concisely describe the event or result represented by the cell, including useful identifiers or counts, independently of its stdout content.
+Conversion MUST NOT render an output cell or copy document bodies, action instructions, or result listings into the journal record.
+Structured attributes MUST provide useful event context rather than duplicate the full stdout payload.
+Explicit journal messages and diagnostic messages MAY remain the journal message when they already describe the event or problem.
+The record MUST contain a message, a timestamp, an optional actor, and optional structured attributes.
+Its dictionary representation MUST flatten attributes alongside the common fields, preserving the common fields on name collisions and excluding delivery flags.
+Existing journal-cell timestamps MUST be preserved; other records MUST receive their creation timestamp during submission rather than flushing.
+Explicit message journaling MUST use an emitter-configured cell factory, defaulting to the shared journal cell.
+The emitter MUST infer an omitted actor as `agent` for LLM output and the protocol name otherwise; an explicit actor, including null, MUST take precedence.
+Direct submission of constructed cells MUST NOT invoke the factory.
 Successful journal processing MUST be followed immediately by console delivery unless the cell is also marked as a warning.
 Cells marked as both journal and warning MUST be processed immediately and delivered to the console with the final warnings.
 The default processor MUST succeed without external effects and MUST NOT suppress console journal output.
 A failed processor MUST prevent delivery of the affected cell and stop processing subsequent cells in that submission.
+The emitter MUST detect failure from the processor's failed result, regardless of the contained error types or whether the error list is empty, and propagate that result unchanged.
+After that failure, the emitter MUST skip journal conversion and processing for all subsequent submissions during its lifetime while preserving immediate journal console delivery and deferred warning delivery.
+Flushing or discarding buffered cells MUST NOT re-enable journal processing; another emitter MUST have independent failure state.
 Flushing MUST NOT repeat journal processing.
 
 Ordering MUST be preserved within immediate journal output, buffered ordinary output, and buffered warnings.
@@ -184,9 +202,10 @@ Automation journal records MUST retain the normalized logical-cell values and us
 A cell's journal flag MUST NOT replace its own presentation with compact journal formatting.
 
 The external command processor MUST execute an argument list directly without a shell and capture subprocess output.
-Whole arguments enclosed in braces MUST resolve to named logical-cell fields; embedded placeholder-like text MUST remain literal.
-Absent optional field values MUST become empty arguments, date and time values MUST use ISO formatting, and other values MUST use their string representation.
-Multiline string arguments MUST retain the normalized logical-cell values; destination-specific processors MAY apply their own formatting without mutating cells.
-Empty commands and unknown fields MUST return `journal_command_config_invalid`.
+Whole arguments enclosed in braces MUST resolve to fields in the journal record's dictionary representation; embedded placeholder-like text MUST remain literal.
+Missing or null field values MUST become empty arguments, preserving their positions in the argument list without requiring field declarations.
+Date and time values MUST use ISO formatting, and other values MUST use their string representation.
+Multiline string arguments MUST retain the normalized journal-record values; destination-specific processors MAY apply their own formatting without mutating records.
+Empty commands MUST return `journal_command_config_invalid`.
 An operating-system execution failure or nonzero exit MUST return `journal_command_failed` with command, return code when available, and diagnostic details.
 Successful external processing MUST NOT copy subprocess stdout into console output.

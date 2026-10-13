@@ -1,4 +1,5 @@
 from llm_tool_cli.core.errors import EnvironmentError
+from llm_tool_cli.protocol.journal import JournalRecord
 from llm_tool_cli.protocol.logic_cells.uniform import UniformCell
 from llm_tool_cli.protocol.output_cells.base import OutputCell, to_meta_value
 
@@ -7,6 +8,12 @@ class EnvironmentErrorCell(UniformCell):
     """An operational failure retained as typed data until projection."""
 
     error: EnvironmentError
+
+    def to_journal_record(self) -> JournalRecord:
+        fields = self.error.as_record()
+        message = str(fields.pop("message"))
+        # Native error records already contain JSON-compatible serialized context.
+        return JournalRecord(message=message, attributes=fields)  # type: ignore[arg-type]
 
     def _render(self, cell_type: type[OutputCell]) -> OutputCell:
         record = self.error.as_record()

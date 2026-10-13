@@ -3,8 +3,7 @@ from typing import Annotated
 
 import typer
 
-from llm_tool_cli.cli.context import CommandContext
-from llm_tool_cli.cli.handling import handle_command_errors
+from llm_tool_cli.cli.context import command_context
 from llm_tool_cli.output import output
 from llm_tool_cli.protocol import cell_shortcuts
 from llm_tool_cli.skills import load_skill_text
@@ -17,8 +16,7 @@ def register_skill_command(app: typer.Typer, *, package: str, documents: type[St
         context: typer.Context,
         document: StrEnum = documents("usage"),
     ) -> None:
-        command = CommandContext(context)
-        with handle_command_errors(protocol=command.protocol):
+        with command_context(context):
             content = load_skill_text(package=package, document=document.value).unwrap()
             output.get().emit([cell_shortcuts.skill(document=document.value, content=content)]).unwrap()
 

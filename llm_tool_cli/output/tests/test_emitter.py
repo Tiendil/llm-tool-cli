@@ -13,6 +13,7 @@ from llm_tool_cli.core.settings import StaticConfig, ToolLabel, static_config
 from llm_tool_cli.core.tests.fixtures import isolated_settings
 from llm_tool_cli.output import StreamOutputEmitter
 from llm_tool_cli.protocol import Protocol
+from llm_tool_cli.protocol.journal import JournalRecord
 from llm_tool_cli.protocol.logic_cells import ContentCell, EnvironmentErrorCell
 from llm_tool_cli.protocol.logic_cells.base import LogicCell
 from llm_tool_cli.protocol.logic_cells.journal import JournalCell
@@ -26,11 +27,11 @@ pytestmark = pytest.mark.usefixtures("project_static_settings", "runtime_setting
 
 class RecordingProcessor:
     def __init__(self, result: Result[None] = Ok(None)) -> None:
-        self.cells: list[LogicCell] = []
+        self.records: list[JournalRecord] = []
         self.result = result
 
-    def process(self, cell: LogicCell) -> Result[None]:
-        self.cells.append(cell)
+    def process(self, record: JournalRecord) -> Result[None]:
+        self.records.append(record)
         return self.result
 
 
@@ -41,6 +42,9 @@ class PositionedOutputCell(OutputCell):
 
 class PositionedLogicCell(LogicCell):
     items: tuple[str, ...]
+
+    def to_journal_record(self) -> JournalRecord:
+        return JournalRecord(message="\n".join(self.items))
 
     def render_human(self) -> list[OutputCell]:
         return [PositionedOutputCell.build_markdown(kind="item", content=text) for text in self.items]
@@ -53,6 +57,93 @@ class PositionedLogicCell(LogicCell):
 
 
 class TestStreamOutputEmitter:
+    @pytest.mark.parametrize(
+        "protocol, actor", [(Protocol.human, "human"), (Protocol.llm, "agent"), (Protocol.automation, "automation")]
+    )
+    def test_journal__uses_default_factory_and_protocol_actor(self, protocol: Protocol, actor: str) -> None:
+        stream = io.StringIO()
+        processor = RecordingProcessor()
+        emitter = StreamOutputEmitter(stream=stream, journal_processor=processor)
+        with runtime_config.scope(RuntimeConfig(protocol=protocol)):
+            emitter.journal("starting").unwrap()
+        assert len(processor.records) == 1
+        assert processor.records[0].message == "starting"
+        assert processor.records[0].actor_id == actor
+        assert "starting" in stream.getvalue()
+
+    @pytest.mark.parametrize("actor", [None, "worker"])
+    def test_journal__custom_factory_receives_explicit_actor_at_each_call(self, actor: str | None) -> None:
+        calls: list[tuple[str, str | None]] = []
+
+        def factory(*, message: str, actor_id: str | None) -> JournalCell:
+            calls.append((message, actor_id))
+            return JournalCell(message=f"{len(calls)}: {message}", actor_id=actor_id)
+
+        processor = RecordingProcessor()
+        emitter = StreamOutputEmitter(stream=io.StringIO(), journal_factory=factory, journal_processor=processor)
+        emitter.journal("first", actor_id=actor).unwrap()
+        emitter.journal("second", actor_id=actor).unwrap()
+        assert calls == [("first", actor), ("second", actor)]
+        assert [record.message for record in processor.records] == ["1: first", "2: second"]
+
+    def test_emit__direct_cells_do_not_invoke_journal_factory(self) -> None:
+        def factory(*, message: str, actor_id: str | None) -> JournalCell:
+            raise AssertionError("factory must not run")
+
+        emitter = StreamOutputEmitter(stream=io.StringIO(), journal_factory=factory)
+        emitter.emit(
+            [EnvironmentErrorCell(error=EnvironmentError(code="failed", message="failure"), is_journal=True)]
+        ).unwrap()
+
+    def test_journal__processor_failure_propagates(self) -> None:
+        failure = EnvironmentError(code="forward_failed", message="delivery failed")
+        stream = io.StringIO()
+        emitter = StreamOutputEmitter(stream=stream, journal_processor=RecordingProcessor(Err([failure])))
+        assert emitter.journal("event").unwrap_err() == [failure]
+        assert not stream.getvalue()
+
+    @pytest.mark.parametrize("errors", [[], [EnvironmentError(code="custom_failure", message="unavailable")]])
+    def test_emit__processor_failure_disables_forwarding_but_preserves_console_routing(
+        self, errors: list[EnvironmentError]
+    ) -> None:
+        processor = RecordingProcessor(Err(errors))
+        stream = io.StringIO()
+        emitter = StreamOutputEmitter(stream=stream, journal_processor=processor)
+        with runtime_config.scope(RuntimeConfig(protocol=Protocol.automation)):
+            assert emitter.journal("failed event").unwrap_err() == errors
+            emitter.discard()
+            emitter.flush()
+            assert not stream.getvalue()
+
+            emitter.journal("later event").unwrap()
+            emitter.emit(
+                [
+                    ContentCell(kind="result", media_type="text/plain", content="result"),
+                    WarningCell(message="warning", is_journal=True),
+                    JournalCell(message="last event"),
+                ]
+            ).unwrap()
+            assert [json.loads(line)["message"] for line in stream.getvalue().splitlines()] == [
+                "later event",
+                "last event",
+            ]
+            emitter.flush()
+
+        records = [json.loads(line) for line in stream.getvalue().splitlines()]
+        assert len(records) == 4
+        assert records[2]["content"] == "result"
+        assert records[3]["message"] == "warning"
+        assert [record.message for record in processor.records] == ["failed event"]
+
+    def test_emit__processor_failure_is_local_to_emitter(self) -> None:
+        error = EnvironmentError(code="custom_failure", message="unavailable")
+        processor = RecordingProcessor(Err([error]))
+        first = StreamOutputEmitter(stream=io.StringIO(), journal_processor=processor)
+        second = StreamOutputEmitter(stream=io.StringIO(), journal_processor=processor)
+        assert first.journal("first").unwrap_err() == [error]
+        assert second.journal("second").unwrap_err() == [error]
+        assert [record.message for record in processor.records] == ["first", "second"]
+
     @pytest.mark.parametrize("journal", [False, True])
     def test_render__override_retains_buffering_and_stream_delivery(
         self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], journal: bool
@@ -64,7 +155,7 @@ class TestStreamOutputEmitter:
         stream = io.StringIO()
         flush = mocker.spy(stream, "flush")
         emitter = CustomOutputEmitter(stream=stream)
-        emitter.emit([ContentCell(kind="result", is_journal=journal)]).unwrap()
+        emitter.emit([JournalCell(message="result", is_journal=journal)]).unwrap()
         assert stream.getvalue() == ("Batch of 1\n" if journal else "")
         emitter.flush()
         emitter.flush()
@@ -93,7 +184,7 @@ class TestStreamOutputEmitter:
             assert "progress" in stream.getvalue()
             assert "completed" not in stream.getvalue()
             assert "warning" not in stream.getvalue()
-            assert processor.cells == [event]
+            assert processor.records == [event.to_journal_record()]
             flush.assert_called_once()
 
             emitter.flush()
@@ -144,14 +235,14 @@ class TestStreamOutputEmitter:
             ).unwrap()
             immediate = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
             assert [record["message"] for record in immediate] == ["progress"]
-            assert processor.cells == [event]
+            assert processor.records == [event.to_journal_record()]
             emitter.flush()
             records = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
             assert [record["content"] for record in records[:2]] == ["first", "last"]
             assert [record["message"] for record in records[2:]] == ["warning one", "warning two"]
             emitter.flush()
             assert not capsys.readouterr().out
-            assert processor.cells == [event]
+            assert processor.records == [event.to_journal_record()]
 
     @pytest.mark.parametrize("journal", [False, True])
     @pytest.mark.parametrize("warning", [False, True])
@@ -162,18 +253,24 @@ class TestStreamOutputEmitter:
         emitter = StreamOutputEmitter(journal_processor=processor)
         cell = JournalCell(message="event", is_journal=journal, is_warning=warning)
         emitter.emit([cell]).unwrap()
-        assert processor.cells == ([cell] if journal else [])
+        assert processor.records == ([cell.to_journal_record()] if journal else [])
         assert bool(capsys.readouterr().out) == (journal and not warning)
         emitter.flush()
         assert bool(capsys.readouterr().out) == (not journal or warning)
 
-    def test_emit__ordinary_cells_can_be_journaled(self, capsys: pytest.CaptureFixture[str]) -> None:
-        cell = ContentCell(kind="document", media_type="text/markdown", content="first\nsecond", is_journal=True)
+    def test_emit__journals_semantic_record_and_preserves_console_projection(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        cell = EnvironmentErrorCell(
+            error=EnvironmentError(code="failed", message="failure", ways_to_fix=["Retry."]), is_journal=True
+        )
         processor = RecordingProcessor()
         emitter = StreamOutputEmitter(journal_processor=processor)
         emitter.emit([cell]).unwrap()
-        assert processor.cells == [cell]
-        assert "first\nsecond" in capsys.readouterr().out
+        assert len(processor.records) == 1
+        assert processor.records[0].message == "failure"
+        assert processor.records[0].attributes == {"type": "error", "code": "failed"}
+        assert "failure\nWay to fix: Retry." in capsys.readouterr().out
 
     def test_emit__failure_stops_delivery_and_never_replays_processor(
         self, capsys: pytest.CaptureFixture[str]
@@ -185,7 +282,7 @@ class TestStreamOutputEmitter:
         assert emitter.emit([cell, WarningCell(message="unreached")]).unwrap_err() == [error]
         emitter.flush()
         assert not capsys.readouterr().out
-        assert processor.cells == [cell]
+        assert processor.records == [cell.to_journal_record()]
 
     @pytest.mark.parametrize(
         ("items", "expected"),

@@ -1,4 +1,5 @@
 import sys
+from types import EllipsisType
 from typing import Protocol, TextIO
 
 from llm_tool_cli.config.runtime import runtime_config
@@ -6,14 +7,24 @@ from llm_tool_cli.core import settings
 from llm_tool_cli.core.context import ContextValue
 from llm_tool_cli.core.result import Ok, Result, unwrap_to_error
 from llm_tool_cli.output.journal import JournalProcessor, NoopJournalProcessor
+from llm_tool_cli.protocol import Protocol as OutputProtocol
 from llm_tool_cli.protocol.logic_cells.base import LogicCell
+from llm_tool_cli.protocol.logic_cells.journal import JournalCell
 from llm_tool_cli.protocol.output_cells.base import RenderContext
+
+
+class JournalCellFactory(Protocol):
+    __slots__ = ()
+
+    def __call__(self, *, message: str, actor_id: str | None) -> JournalCell: ...  # noqa: E704
 
 
 class OutputEmitter(Protocol):
     __slots__ = ()
 
     def emit(self, cells: list[LogicCell]) -> Result[None]: ...  # noqa: E704
+
+    def journal(self, message: str, *, actor_id: str | None | EllipsisType = ...) -> Result[None]: ...  # noqa: E704
 
     def flush(self) -> None: ...  # noqa: E704
 
@@ -28,19 +39,37 @@ output = ContextValue[OutputEmitter]("output")
 class StreamOutputEmitter:
     """Deliver journals now, then buffered results and warnings at finalization."""
 
-    __slots__ = ("_cells", "_warnings", "_stream", "journal_processor")
+    __slots__ = ("_cells", "_warnings", "_stream", "_journal_failed", "journal_processor", "journal_factory")
 
-    def __init__(self, *, stream: TextIO | None = None, journal_processor: JournalProcessor | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        stream: TextIO | None = None,
+        journal_processor: JournalProcessor | None = None,
+        journal_factory: JournalCellFactory = JournalCell,
+    ) -> None:
         self._stream = stream
         self.journal_processor = journal_processor if journal_processor is not None else NoopJournalProcessor()
+        self.journal_factory = journal_factory
+        # A processor failure disables forwarding for this emitter's lifetime.
+        self._journal_failed = False
         self._cells: list[LogicCell] = []
         self._warnings: list[LogicCell] = []
 
+    def journal(self, message: str, *, actor_id: str | None | EllipsisType = ...) -> Result[None]:
+        if actor_id is ...:
+            protocol = runtime_config.get().protocol
+            actor_id = "agent" if protocol == OutputProtocol.llm else protocol.value
+        return self.emit([self.journal_factory(message=message, actor_id=actor_id)])
+
     @unwrap_to_error
-    def emit(self, cells: list[LogicCell]) -> Result[None]:
+    def emit(self, cells: list[LogicCell]) -> Result[None]:  # noqa: CCR001
         for cell in cells:
-            if cell.is_journal:
-                self.journal_processor.process(cell).unwrap()
+            if cell.is_journal and not self._journal_failed:
+                processed = self.journal_processor.process(cell.to_journal_record())
+                if processed.is_err():
+                    self._journal_failed = True
+                    return processed
             if cell.is_warning:
                 self._warnings.append(cell)
             elif cell.is_journal:

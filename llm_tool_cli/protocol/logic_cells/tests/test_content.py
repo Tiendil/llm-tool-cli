@@ -1,3 +1,4 @@
+import pydantic
 import pytest
 
 from llm_tool_cli.protocol import Protocol
@@ -8,6 +9,10 @@ from llm_tool_cli.protocol.output_cells.base import OutputCell
 
 
 class TestContentCell:
+    def test_validation__prohibits_journaling_generic_content(self) -> None:
+        with pytest.raises(pydantic.ValidationError):
+            ContentCell.model_validate({"kind": "document", "is_journal": True})
+
     @pytest.mark.parametrize(
         ("protocol", "cell_type"),
         [

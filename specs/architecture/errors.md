@@ -186,7 +186,11 @@ The shared core MUST aggregate an environment-error list by returning the highes
 Aggregation MUST preserve error values and their order and MUST NOT render output or terminate the process.
 CLI boundaries MUST use the shared aggregation contract rather than maintaining mappings from error types to exit codes.
 The shared CLI handling boundary MUST own validated unwrap-error recovery, ordered diagnostic emission through the configured emitter, and process termination. Error cells MUST use stdout by default in every protocol.
-Consumers MAY observe and re-raise failures for local journaling while retaining their runtime cleanup responsibilities.
+The shared CLI boundary MUST journal terminal error cells through their pure journal-record conversion, without constructing separate journal cells or invoking consumer factories.
+The emitter MUST retain journal-processing failure state based on the processor's failed result, independently of the returned error types, and skip further journal processing for its lifetime.
+The CLI MUST NOT classify reported error types to infer that state.
+If journal processing fails during reporting, remaining original diagnostics and the delivery failures MUST be emitted without journal processing, followed by retained warnings.
+Consumers MUST retain their runtime cleanup responsibilities without keeping resources alive solely for shared error journaling.
 Warnings alone MUST NOT cause a non-zero CLI exit code.
 
 ## Non-fatal problems

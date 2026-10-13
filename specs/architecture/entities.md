@@ -143,6 +143,9 @@ Internal domain operations and low-level library capabilities MAY continue to re
 This boundary keeps result assembly reusable independently of CLI argument parsing and output protocol selection.
 
 Cells MUST carry the information needed for their projections without reading runtime state or writing output.
+Journal records MUST be shared boundary entities constructed from logical-cell data independently of delivery and application runtime contexts.
+Journal-capable cells MUST own explicit semantic summaries; generic content cells MUST prohibit journaling.
+Consumer-specific execution identifiers MUST remain consumer-owned and cross the journal boundary as structured attributes.
 CLI initialization MUST establish output delivery and the effective protocol; the shared emitter MUST own buffering and delivery of submitted cells.
 Expected failures MUST remain structured errors in failed results until the CLI error-handling boundary.
 Generic CLI acknowledgements and already prepared documents MAY use shared content logic cells.

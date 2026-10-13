@@ -20,6 +20,32 @@ class ContextFailure(EnvironmentError):
 
 
 class TestEnvironmentErrorCell:
+    def test_to_journal_record__keeps_structured_error_without_private_cause(self) -> None:
+        error = ContextFailure(
+            code="unavailable",
+            message="{error.path}: failed",
+            path=Path("/project"),
+            labels=["first"],
+            retryable=False,
+            attempts=0,
+            detail=None,
+            amount=Decimal("1.5"),
+        ).with_cause(OSError("private"))
+        original = error.model_dump()
+        record = EnvironmentErrorCell(error=error).to_journal_record()
+        assert record.message == "/project: failed"
+        assert record.attributes == {
+            "type": "error",
+            "code": "unavailable",
+            "path": "/project",
+            "labels": ["first"],
+            "retryable": False,
+            "attempts": 0,
+            "detail": None,
+            "amount": "1.5",
+        }
+        assert error.model_dump() == original
+
     @pytest.mark.parametrize(
         ("protocol", "output_type"),
         [

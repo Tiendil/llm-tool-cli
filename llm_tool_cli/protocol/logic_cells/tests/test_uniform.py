@@ -1,6 +1,8 @@
 import pytest
+from pytest_mock import MockerFixture
 
 from llm_tool_cli.protocol import Protocol
+from llm_tool_cli.protocol.errors import JournalConversionUnsupported
 from llm_tool_cli.protocol.logic_cells.uniform import UniformCell
 from llm_tool_cli.protocol.output_cells import AutomationOutputCell, HumanOutputCell, LLMOutputCell
 from llm_tool_cli.protocol.output_cells.base import OutputCell
@@ -14,6 +16,15 @@ class ExampleUniformCell(UniformCell):
 
 
 class TestUniformCell:
+    def test_to_journal_record__does_not_fall_back_to_rendering(self, mocker: MockerFixture) -> None:
+        cell = ExampleUniformCell(items=("first", "second"))
+        render = mocker.spy(ExampleUniformCell, "_render")
+
+        with pytest.raises(JournalConversionUnsupported):
+            cell.to_journal_record()
+
+        render.assert_not_called()
+
     @pytest.mark.parametrize(
         ("protocol", "cell_type"),
         [
