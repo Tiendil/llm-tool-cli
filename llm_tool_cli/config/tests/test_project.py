@@ -20,6 +20,7 @@ from llm_tool_cli.core.errors import EnvironmentErrors
 from llm_tool_cli.core.result import Err, Ok, UnwrapError
 from llm_tool_cli.core.settings import ConfigFilename, StaticConfig, ToolLabel, static_config
 from llm_tool_cli.paths import PathInput, ProjectConfigPath
+from llm_tool_cli.paths.errors import InvalidProjectPath
 from llm_tool_cli.protocol import Protocol
 
 __all__ = ["project_static_settings"]
@@ -70,7 +71,7 @@ class TestLoadProject:
             assert project_config.get().config_path == tmp_path / "custom.toml"
 
     @pytest.mark.parametrize("explicit", [False, True])
-    def test_symlink_selection_preserves_path_policy(self, tmp_path: Path, explicit: bool) -> None:
+    def test_rejects_config_symlink_without_binding_project(self, tmp_path: Path, explicit: bool) -> None:
         target_dir = tmp_path / "target"
         target_dir.mkdir()
         target = target_dir / "actual.toml"
@@ -80,8 +81,25 @@ class TestLoadProject:
         path = ProjectConfigPath(Path("tool.toml")) if explicit else None
 
         with load_project(ApplicationConfig, cwd=PathInput(tmp_path), path=path) as result:
+            assert result.unwrap_err() == [InvalidProjectPath(path=str(link))]
+            assert not project_config.is_set()
+
+    @pytest.mark.parametrize("explicit", [False, True])
+    def test_directory_alias_selects_resolved_project(self, tmp_path: Path, explicit: bool) -> None:
+        root = tmp_path / "project"
+        root.mkdir()
+        (root / "tool.toml").write_text("count = 4", encoding="utf-8")
+        alias = tmp_path / "alias"
+        alias.symlink_to(root, target_is_directory=True)
+
+        with load_project(
+            ApplicationConfig,
+            cwd=PathInput(alias),
+            path=ProjectConfigPath(alias / "tool.toml") if explicit else None,
+        ) as result:
             assert result.unwrap().count == 4
-            assert project_config.get().config_path == (target if explicit else link)
+            assert project_config.get().config_path == root / "tool.toml"
+            assert project_config.get().project_dir == root
 
     def test_missing_explicit_path_does_not_fall_back(self, tmp_path: Path) -> None:
         (tmp_path / "tool.toml").write_text("", encoding="utf-8")

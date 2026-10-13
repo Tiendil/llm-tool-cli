@@ -19,6 +19,8 @@ Detailed requirements for individual specifications are out of scope except for 
 
 ## Specification documents
 
+Configuration selection and initialization use the shared project-path symlink policy, specified in `specs/behavior/config.md` and `specs/behavior/paths.md`; the latter also owns canonical path identity and caller-selected directory bases.
+
 Reusable root configuration fields for schema version and session directory are specified in `specs/architecture/modules_layout.md` and `specs/behavior/config.md`, including application-owned supported versions and defaults, strict version validation, and descriptive type and compatibility diagnostics.
 
 Journal-record entities, explicit semantic cell summaries, prohibited content-cell journaling, emitter-owned journal construction, configurable factories, and processor ownership are specified in `specs/architecture/modules_layout.md` and `specs/architecture/entities.md`, with delivery and conversion behavior in `specs/behavior/protocol.md`.

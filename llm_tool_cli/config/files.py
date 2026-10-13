@@ -6,21 +6,24 @@ import tomli
 
 from llm_tool_cli.config import errors
 from llm_tool_cli.core.result import Err, Ok, Result, unwrap_to_error
-from llm_tool_cli.paths import PathInput, ProjectConfigPath
+from llm_tool_cli.paths import PathInput, ProjectConfigPath, ProjectRootPath, resolve_inside_project
 
 
+@unwrap_to_error
 def find_config(filename: str, start_dir: Path) -> Result[ProjectConfigPath | None]:
     """Find the nearest file from the resolved start directory through its root.
 
     Matching directories are skipped. No match returns ``Ok(None)``; filesystem
-    failures reported by pathlib return ``Err([DiscoveryFailed(...)])``. The matched file is not read
-    or resolved, preserving its containing directory when it is a symlink.
+    failures reported by pathlib return ``Err([DiscoveryFailed(...)])``.
+    Shared path validation rejects matching symlinks, including broken links,
+    before checking file existence. No matching file is read.
     """
     candidate = start_dir
     try:
         current = start_dir.resolve()
         for directory in (current, *current.parents):
             candidate = directory / filename
+            resolve_inside_project(candidate, ProjectRootPath(directory)).unwrap()
             if candidate.is_file():
                 return Ok(ProjectConfigPath(candidate))
     except (OSError, RuntimeError) as exc:
@@ -28,18 +31,22 @@ def find_config(filename: str, start_dir: Path) -> Result[ProjectConfigPath | No
     return Ok(None)
 
 
+@unwrap_to_error
 def resolve_config_path(path: Path, cwd: Path) -> Result[ProjectConfigPath]:
     """Expand an explicit path's home marker, then resolve it against cwd.
 
-    Follow symlinks without requiring the target to exist. Do not search for a
-    config or interpret application path syntax. Home expansion and resolution
-    failures reported by pathlib return ``Err([PathResolutionFailed(...)])``.
+    Resolve the containing directory as the project root, then apply shared
+    containment and symlink validation to the file. Neither needs to exist.
+    Do not search for a config or interpret application path syntax. Home
+    expansion and directory resolution failures return ``PathResolutionFailed``;
+    shared path diagnostics propagate unchanged.
     """
     candidate = path
     try:
         expanded = path.expanduser()
         candidate = expanded if expanded.is_absolute() else cwd / expanded
-        return Ok(ProjectConfigPath(candidate.resolve()))
+        root = ProjectRootPath(candidate.parent.resolve())
+        return Ok(ProjectConfigPath(resolve_inside_project(root / candidate.name, root).unwrap()))
     except (OSError, RuntimeError) as exc:
         return Err([errors.PathResolutionFailed(path=candidate, reason=str(exc)).with_cause(exc)])
 
@@ -50,7 +57,7 @@ def resolve_init_config_path(
     """Select and resolve a configuration target without upward discovery.
 
     An explicit path takes precedence over the filename under ``cwd``.
-    Reuse ``resolve_config_path`` for home expansion, symlink resolution, and
+    Reuse ``resolve_config_path`` for home expansion, shared path validation, and
     unchanged failure propagation. No file is read or created, and neither the
     target nor its parent is required to exist.
     """

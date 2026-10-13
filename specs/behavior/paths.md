@@ -18,6 +18,8 @@ Canonical identifiers MUST NOT contain `.` or `..` segments.
 Identifiers MAY refer to files, directories, or locations that do not yet exist.
 Identifier validity MUST NOT depend on the target's kind or a filename extension.
 Consumers own any additional target-kind, existence, or extension requirements.
+Path identity MUST be based on the canonical identifier rather than the original input spelling.
+Inputs that normalize to the same canonical identifier MUST identify the same project path.
 
 **Example:** `@/LICENSE`, `@/assets`, and `@/notes/Заметки проекта.md` are valid canonical identifiers, regardless of whether their targets exist.
 
@@ -79,6 +81,7 @@ Other inputs MUST be interpreted as filesystem paths, with home markers expanded
 Absolute filesystem inputs MUST be resolved directly.
 Relative filesystem inputs MUST use the supplied directory base, or the resolved project root when no base is supplied.
 A relative directory base MUST itself be relative to the process current working directory.
+Callers that use a source file as the reference point MUST supply its containing directory as the base without rewriting the input into an identifier first.
 The root and directory base MUST NOT undergo home expansion.
 
 Filesystem inputs MUST pass containment resolution before conversion to a canonical identifier.

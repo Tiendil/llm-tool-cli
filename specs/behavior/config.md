@@ -34,11 +34,14 @@ Configuration path resolution MUST expand a leading `~` or `~user` home-director
 Relative paths MUST resolve against the caller-supplied working directory.
 Absolute paths MUST be independent of that directory.
 Relative working directories MUST resolve against the process working directory.
-Resolution MUST follow symlinks without requiring the target or its parent to exist.
+Resolution MUST first resolve the containing directory as the project root, then validate the configuration file using the shared filesystem containment policy in `specs/behavior/paths.md`.
+Symlinks used to select that directory or its ancestors MAY be resolved; the configuration file itself MUST NOT be a symlink, including an internal link, broken link, or loop.
+Neither the target nor its parent is required to exist.
 Application-specific identifier syntax MUST NOT receive special interpretation.
 
 Path resolution MUST NOT discover configuration files, read their contents, or create files or directories.
-Expected home-expansion and filesystem-resolution failures MUST produce configuration path-resolution diagnostics.
+Expected home-expansion and containing-directory resolution failures MUST produce configuration path-resolution diagnostics.
+Shared containment validation failures MUST propagate their original path diagnostics.
 
 ## Existing configuration selection
 
@@ -47,7 +50,8 @@ An explicit path MUST NOT fall back to discovery when the target is missing or c
 
 Without an explicit path, selection MUST search from the resolved caller-supplied working directory through its parents to the filesystem root for the caller-supplied filename.
 Discovery MUST select the nearest matching file and skip matching directories.
-A discovered symlink MUST retain the path of the discovered entry rather than changing the selected path to its target.
+Each candidate MUST pass the shared containment policy beneath its searched directory before its file kind is checked.
+A matching symlink MUST fail discovery without following its target or falling back to a parent configuration.
 Selection MUST NOT read or validate configuration contents.
 
 A discovery-only lookup MUST distinguish no match from a filesystem failure.
@@ -107,7 +111,7 @@ Both operations MUST accept the caller's schema, working directory, and optional
 Preparation MUST occur when entering the scope.
 Only successful validation MUST establish immutable project settings containing the selected absolute path and its derived parent directory.
 The scope MUST yield the loaded application configuration through a successful result and retain the project binding until exit.
-Selection MUST preserve its existing symlink policy; loading MUST NOT resolve a discovered path again.
+Selection MUST enforce the shared path policy; loading MUST NOT resolve a selected path again.
 The preceding project binding, including its absence, MUST be restored on normal exit and after exceptions or early exits from the scope body.
 Runtime settings MUST remain unchanged, and project preparation MUST NOT require them.
 Expected preparation failures MUST yield their original error result without replacing the preceding project binding or attempting subsequent stages.
@@ -140,5 +144,6 @@ The stable diagnostic codes MUST be:
 | Packaged template cannot be read as UTF-8 | `config_template_unreadable` |
 | Supplied text cannot be encoded or the target cannot be written | `config_unwritable` |
 
+Shared containment failures MUST retain the diagnostics specified in `specs/behavior/paths.md`, including `invalid_project_path` for a configuration-file symlink.
 Configuration operations MUST propagate existing diagnostics without wrapping or reclassifying them.
 Unexpected exceptions MUST remain exceptions rather than becoming expected configuration failures.

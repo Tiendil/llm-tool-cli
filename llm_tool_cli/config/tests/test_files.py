@@ -22,6 +22,7 @@ from llm_tool_cli.config import (
 from llm_tool_cli.core.errors import EnvironmentErrors
 from llm_tool_cli.core.result import Err, Result
 from llm_tool_cli.paths import PathInput, ProjectConfigPath
+from llm_tool_cli.paths.errors import InvalidProjectPath
 
 
 @pytest.fixture
@@ -71,15 +72,30 @@ class TestFindConfig:
         with contextlib.chdir(tmp_path):
             assert find_config("config.toml", Path(".")).unwrap() == config_path
 
-    def test_keeps_discovered_symlink(self, tmp_path: Path) -> None:
-        target = tmp_path / "target.toml"
-        target.touch()
+    @pytest.mark.parametrize("target_kind", ["file", "missing", "loop", "directory"])
+    def test_rejects_symlink_without_falling_back_to_parent(self, tmp_path: Path, target_kind: str) -> None:
         nested = tmp_path / "nested"
         nested.mkdir()
+        (tmp_path / "config.toml").touch()
         config_path = nested / "config.toml"
+        target = config_path if target_kind == "loop" else nested / "target"
+        if target_kind == "file":
+            target.touch()
+        elif target_kind == "directory":
+            target.mkdir()
         config_path.symlink_to(target)
 
-        assert find_config("config.toml", nested).unwrap() == config_path
+        assert find_config("config.toml", nested).unwrap_err() == [InvalidProjectPath(path=str(config_path))]
+
+    def test_accepts_start_directory_alias(self, tmp_path: Path) -> None:
+        root = tmp_path / "project"
+        root.mkdir()
+        config_path = root / "config.toml"
+        config_path.touch()
+        alias = tmp_path / "alias"
+        alias.symlink_to(root, target_is_directory=True)
+
+        assert find_config("config.toml", alias).unwrap() == config_path
 
     def test_resolution_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
         mocker.patch.object(Path, "resolve", side_effect=OSError("resolution failed"))
@@ -116,13 +132,23 @@ class TestResolveConfigPath:
         with contextlib.chdir(tmp_path):
             assert resolve_config_path(Path("custom.toml"), Path("nested")).unwrap() == tmp_path / "nested/custom.toml"
 
-    def test_follows_symlinks(self, tmp_path: Path) -> None:
-        target = tmp_path / "target.toml"
-        target.touch()
+    @pytest.mark.parametrize("target_kind", ["file", "missing", "loop"])
+    def test_rejects_symlinks(self, tmp_path: Path, target_kind: str) -> None:
         link = tmp_path / "custom.toml"
+        target = link if target_kind == "loop" else tmp_path / "target.toml"
+        if target_kind == "file":
+            target.touch()
         link.symlink_to(target)
 
-        assert resolve_config_path(link, tmp_path).unwrap() == target
+        assert resolve_config_path(link, tmp_path).unwrap_err() == [InvalidProjectPath(path=str(link))]
+
+    def test_accepts_containing_directory_alias(self, tmp_path: Path) -> None:
+        root = tmp_path / "project"
+        root.mkdir()
+        alias = tmp_path / "alias"
+        alias.symlink_to(root, target_is_directory=True)
+
+        assert resolve_config_path(alias / "config.toml", tmp_path).unwrap() == root / "config.toml"
 
     def test_expands_home(self, tmp_path: Path, mocker: MockerFixture) -> None:
         home = tmp_path / "home"
@@ -207,17 +233,15 @@ class TestResolveInitConfigPath:
         assert selected == tmp_path / "nested/config.toml"
 
     @pytest.mark.parametrize("explicit", [False, True])
-    def test_follows_symlink_without_modifying_existing_target(self, tmp_path: Path, explicit: bool) -> None:
+    def test_rejects_symlink_without_modifying_existing_target(self, tmp_path: Path, explicit: bool) -> None:
         target = tmp_path / "target.toml"
         target.write_text("original", encoding="utf-8")
         link = ProjectConfigPath(tmp_path / "config.toml")
         link.symlink_to(target)
 
-        selected = resolve_init_config_path(
-            "config.toml", path=link if explicit else None, cwd=PathInput(tmp_path)
-        ).unwrap()
+        result = resolve_init_config_path("config.toml", path=link if explicit else None, cwd=PathInput(tmp_path))
 
-        assert selected == target
+        assert result.unwrap_err() == [InvalidProjectPath(path=str(link))]
         assert target.read_text(encoding="utf-8") == "original"
         assert link.is_symlink()
 
@@ -243,6 +267,27 @@ class TestResolveInitConfigPath:
 
 
 class TestInitializeConfig:
+    @pytest.mark.parametrize("explicit", [False, True])
+    def test_broken_symlink_does_not_create_its_target(
+        self, tmp_path: Path, config_package: str, explicit: bool
+    ) -> None:
+        (tmp_path / "fixtures/starter.toml").write_text("version = 1\n", encoding="utf-8")
+        target = tmp_path / "target.toml"
+        path = ProjectConfigPath(tmp_path / "config.toml")
+        path.symlink_to(target)
+
+        result = initialize_config(
+            "config.toml",
+            package=config_package,
+            template="starter.toml",
+            cwd=PathInput(tmp_path),
+            path=path if explicit else None,
+        )
+
+        assert result.unwrap_err() == [InvalidProjectPath(path=str(path))]
+        assert path.is_symlink()
+        assert not target.exists()
+
     @pytest.mark.parametrize("relative_cwd", [False, True])
     def test_default_path_does_not_reuse_parent_config(
         self, tmp_path: Path, config_package: str, relative_cwd: bool
@@ -418,7 +463,8 @@ class TestLocateConfig:
 
         assert locate_config("config.toml", path=Path("~/custom.toml"), cwd=tmp_path).unwrap() == home / "custom.toml"
 
-    def test_discovered_symlink_keeps_its_directory(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize("explicit", [False, True])
+    def test_rejects_selected_symlink(self, tmp_path: Path, explicit: bool) -> None:
         target = tmp_path / "target.toml"
         target.touch()
         nested = tmp_path / "nested"
@@ -426,7 +472,9 @@ class TestLocateConfig:
         link = nested / "config.toml"
         link.symlink_to(target)
 
-        assert locate_config("config.toml", cwd=nested).unwrap() == link
+        result = locate_config("config.toml", cwd=nested, path=link if explicit else None)
+
+        assert result.unwrap_err() == [InvalidProjectPath(path=str(link))]
 
     def test_missing(self, tmp_path: Path) -> None:
         filename = f"{tmp_path.name}-missing.toml"
