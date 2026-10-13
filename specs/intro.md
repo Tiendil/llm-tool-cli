@@ -19,6 +19,8 @@ Detailed requirements for individual specifications are out of scope except for 
 
 ## Specification documents
 
+Shared glob preparation, wildcard grammar, named captures, and matching of missing references are specified in `specs/behavior/paths.md`, with public matching and capture-validation interfaces in `specs/architecture/modules_layout.md`; file enumeration uses the same grammar.
+
 Configuration selection and initialization use the shared project-path symlink policy, specified in `specs/behavior/config.md` and `specs/behavior/paths.md`; the latter also owns canonical path identity and caller-selected directory bases.
 
 Reusable root configuration fields for schema version and session directory are specified in `specs/architecture/modules_layout.md` and `specs/behavior/config.md`, including application-owned supported versions and defaults, strict version validation, and descriptive type and compatibility diagnostics.

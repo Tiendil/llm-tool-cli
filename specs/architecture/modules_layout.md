@@ -136,7 +136,7 @@ The shared application factory MUST register these option definitions; consumers
 The paths module MUST own lexical project-path operations, filesystem resolution and containment without symlink traversal below the resolved root, deterministic file enumeration, and conversion of resolved filesystem paths to canonical identifiers, together with their semantic types and environment errors.
 Lexical operations MUST include canonical identifier checking, normalization, and component extraction.
 Lexical normalization MUST remain independent of filesystem resolution.
-Consumer-specific artifact or pattern semantics MUST remain consumer-owned.
+Consumer-specific artifact semantics, template substitution, and dependency-rule binding MUST remain consumer-owned.
 Its public interfaces MUST include:
 
 - `llm_tool_cli.paths.normalize_project_path_id` and `llm_tool_cli.paths.ProjectPathId`.
@@ -153,12 +153,16 @@ Its public interfaces MUST include:
 - `llm_tool_cli.paths.project_path_id_from_resolved`, accepting a `ResolvedProjectPath` and the `ProjectRootPath` used for its containment check and returning a `ProjectPathId` directly.
 - `llm_tool_cli.paths.project_path_id_from_filesystem`, accepting a filesystem path and filesystem root and returning a result containing a `ProjectPathId` after root resolution and containment enforcement.
 - `llm_tool_cli.paths.errors.InvalidProjectPath` and `llm_tool_cli.paths.errors.PathResolutionFailed`.
-- `llm_tool_cli.paths.FileGlobPattern`, a `NewType` over `str` owned by `paths.enumeration`, marking a supplied filesystem glob without validity or containment guarantees.
+- `llm_tool_cli.paths.FileGlobPattern`, a `NewType` over `str` owned by `paths.globs`, marking a supplied filesystem glob without validity or containment guarantees.
+- `llm_tool_cli.paths.glob_capture_names(pattern: FileGlobPattern) -> Result[set[str]]`, implemented in `paths.globs`, validating glob syntax and extracting capture names without filesystem access.
+- `llm_tool_cli.paths.match_glob(path: ProjectPathId, pattern: FileGlobPattern, root: Path) -> Result[dict[str, str] | None]`, implemented in `paths.globs`, preparing a pattern and matching an already canonical identifier, returning captures or a non-match.
 - `llm_tool_cli.paths.enumerate_files(root, pattern: FileGlobPattern = FileGlobPattern("**/*")) -> Result[list[ProjectPathId]]`, implemented in `paths.enumeration`, accepting a filesystem root and glob pattern and returning unique regular-file identifiers in path-component order.
 - `llm_tool_cli.paths.errors.FilesUnreadable`, carrying `path`, `reason`, and a private exception cause for enumeration failures.
 
 These semantic filesystem-path constructors MUST preserve the supplied `Path` without runtime validation or conversion.
-The glob-pattern constructor MUST preserve the supplied string without validation; enumeration MUST retain responsibility for path normalization and filesystem checks.
+The glob-pattern constructor MUST preserve the supplied string without validation.
+Shared pattern preparation and compilation MUST belong to `paths.globs` and be reused by identifier matching and enumeration.
+Enumeration MUST retain responsibility for filesystem traversal; consumers MUST retain template substitution, rule binding, and context-specific warning policies.
 
 The configuration module MUST own reusable configuration selection, loading, and creation, with behavior specified in `specs/behavior/config.md`.
 Its public package interface MUST expose the operations implemented in `config.files`.

@@ -2,12 +2,12 @@
 
 ## Goal of the document
 
-This document describes project-path identifiers, their conversion to and from filesystem paths, file enumeration, and their failure behavior.
+This document describes project-path identifiers, their conversion to and from filesystem paths, glob matching and captures, file enumeration, and their failure behavior.
 
 ## Scope
 
 This specification applies to project-path concepts owned by the library.
-Application-specific artifact or pattern semantics are out of scope.
+Application-specific artifact semantics, template substitution, and rule evaluation are out of scope.
 
 ## Identifiers
 
@@ -164,18 +164,48 @@ It MUST support files, directories, and missing targets without imposing existen
 **Example:** A resolved path `/project/notes/Project Plan.md` under `/project` converts to `@/notes/Project Plan.md`.
 The supplied path MUST already satisfy the prohibition on symbolic links below the project root.
 
-## File enumeration
+## Glob patterns
 
-File enumeration MUST return unique canonical identifiers for existing regular files matching a filesystem glob under the project root.
-The default pattern MUST recursively select all files.
 Patterns MUST accept project-root-anchored, root-relative, absolute, and home-relative forms with the same containment and input-normalization rules as mixed path resolution.
+Pattern preparation MUST resolve only the literal prefix preceding the first wildcard and normalize the remaining components lexically.
+Wildcard syntax MUST NOT be resolved as a concrete filesystem name.
 A symbolic link in the literal prefix preceding the first wildcard MUST be rejected before traversal.
 The project root itself MUST be treated as a literal path even when its directory names contain glob metacharacters.
 
 Glob matching MUST use `/` as the separator and match case sensitively.
 Within a segment, `*`, `?`, and bracket character classes MUST retain shell-style matching semantics.
-A complete `**` segment MUST match zero or more directory levels; a terminal `**` MUST also select regular files at any depth.
+Bracket escaping MUST allow literal wildcard characters, such as `[*]`, `[?]`, and `[[]`.
+Backslashes MUST remain ordinary filename characters rather than escapes.
+An unmatched `[` MUST be treated literally, and bracket classes MUST NOT span path separators.
+`**` MUST match zero or more characters across path separators, including when embedded in a segment.
+`**/` MUST also allow zero directory levels.
 Hidden files and directories MUST be treated like ordinary entries, including when selected by wildcards.
+All wildcards MUST support line breaks in filenames.
+
+Patterns MAY define named captures using `{*name}` and `{**name}`.
+Capture names MUST contain only ASCII letters, ASCII digits, and `_`, MUST NOT start with a digit, and MUST be unique within the pattern.
+Malformed capture syntax, including an unclosed capture, MUST fail validation.
+`{*name}` MUST capture zero or more characters inside one segment.
+`{**name}` MUST capture zero or more characters across separators, including before a literal suffix.
+`{**name}/` MUST also allow zero directory levels, exposing an empty string for an omitted directory capture.
+Captures MUST be greedy, subject to matching the rest of the pattern.
+Capture-name extraction MUST validate syntax without accessing the filesystem or performing template substitution.
+
+**Example:** `@/src/{**module_path}.py` matches `@/src/core/api.py` with `module_path` equal to `core/api`.
+The pattern `@/src/{**package}/{*module}.py` matches `@/src/api.py` with an empty `package` and `module` equal to `api`.
+The pattern `@/src/a**.py` matches both `@/src/a.py` and `@/src/a/nested.py`.
+
+Matching MUST accept an already canonical identifier and compare the entire identifier against the prepared pattern.
+It MUST NOT require the referenced target to exist or repeat the caller's path validation.
+A successful match MUST return capture values, including an empty mapping when the pattern has no captures.
+A non-match MUST be distinguishable from invalid-pattern and filesystem-resolution failures.
+
+## File enumeration
+
+File enumeration MUST use the same pattern preparation and matching grammar as identifier matching.
+It MUST return unique canonical identifiers for existing regular files matching the pattern under the project root.
+The default pattern MUST recursively select all files.
+Enumeration MUST NOT expose captures as additional result data.
 Files MUST be returned in lexicographic path-component order, with duplicates from recursive patterns removed.
 
 Enumeration MUST skip every symbolic link encountered through matching, including file links, directory links, broken links, and cycles, without following its target.
@@ -197,9 +227,12 @@ Failures MUST retain the diagnostics of the failed resolution or containment ope
 
 ## Errors
 
-Normalization, resolution, and enumeration MUST report rejected input, including prohibited symbolic links, with one failure diagnostic with the stable code `invalid_project_path`.
+Normalization, resolution, glob preparation, and enumeration MUST report rejected paths, including prohibited symbolic links, with one failure diagnostic with the stable code `invalid_project_path`.
 Its `path` field MUST contain the rejected input with surrounding whitespace removed; containment failures MUST use the supplied filesystem path.
 Consumers MUST be able to identify this failure by its code without parsing the message.
+
+Invalid glob syntax MUST produce one failure diagnostic with the stable code `invalid_glob_pattern`, the rejected pattern in `pattern`, and a description in `reason`.
+Any original compilation exception MUST remain a private cause and MUST NOT appear in serialized diagnostics.
 
 Filesystem failures that prevent root or containment resolution, including permission failures and loops during root resolution, MUST produce one failure diagnostic with the stable code `path_resolution_failed`.
 An inability to expand a home marker during mixed path normalization or resolution MUST use the same failure diagnostic.

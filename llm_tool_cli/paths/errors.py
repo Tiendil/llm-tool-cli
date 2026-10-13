@@ -24,6 +24,15 @@ class PathResolutionFailed(EnvironmentError):
     reason: str
 
 
+class InvalidGlobPattern(EnvironmentError):
+    """A glob contains invalid capture syntax."""
+
+    code: str = "invalid_glob_pattern"
+    message: str = "invalid glob pattern `{error.pattern}`: {error.reason}"
+    pattern: str
+    reason: str
+
+
 class FilesUnreadable(EnvironmentError):
     """Project files could not be enumerated."""
 
