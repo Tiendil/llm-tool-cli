@@ -231,6 +231,7 @@ They MUST NOT hold or perform:
 
 Projections MUST select/construct concrete output types, without a separate application-facing selector.
 Projections/formatting MUST have no output side effects; the emitter MUST own batch rendering and writing.
+Generic human formatting MUST remain extensible through specialized output-cell implementations; diagnostic logic cells MUST select their human presentation independently of LLM and automation presentation.
 The following MUST remain consumer-owned:
 
 - kinds.

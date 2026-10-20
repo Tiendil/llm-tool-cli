@@ -3,23 +3,22 @@ from llm_tool_cli.protocol.output_cells.base import OutputCell, RenderContext
 
 class HumanOutputCell(OutputCell):
     def render(self, context: RenderContext) -> bytes:
-        id = self.short_id
+        sections = [self._render_metadata(), (self.content or "").strip()]
+        text = "\n\n".join(section for section in sections if section) or self.kind
+        return (text + "\n\n").encode("utf-8")
 
-        lines = [f"----- {context.tool_label} CELL {id} -----"]
+    def _render_metadata(self) -> str:
+        return "\n".join(
+            f"{key}: {value}" for key, value in sorted(self.meta.items()) if not (key == "type" and value == self.kind)
+        )
 
-        lines.append(f"kind = {self.kind}")
 
-        if self.media_type is not None:
-            lines.append(f"media_type = {self.media_type}")
+class HumanErrorOutputCell(HumanOutputCell):
+    def render(self, context: RenderContext) -> bytes:
+        sections = [f"Error: {(self.content or '').strip()}".rstrip(), self._render_metadata()]
+        return ("\n\n".join(section for section in sections if section) + "\n\n").encode("utf-8")
 
-        for meta_key, meta_value in sorted(self.meta.items()):
-            lines.append(f"{meta_key} = {meta_value}")
 
-        if self.content:
-            lines.append("")
-            lines.append(self.content.strip())
-
-        lines.append("")
-        lines.append("")
-
-        return "\n".join(lines).encode()
+class HumanWarningOutputCell(HumanOutputCell):
+    def render(self, context: RenderContext) -> bytes:
+        return (f"Warning: {self.meta['message']}".rstrip() + "\n\n").encode("utf-8")

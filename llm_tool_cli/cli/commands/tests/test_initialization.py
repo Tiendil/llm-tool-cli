@@ -56,10 +56,11 @@ class TestRegisterInitCommand:
             assert cell_payloads([json.loads(result.stdout)]) == [
                 {"type": "operation_succeeded", "content": "Configuration created.", "path": str(path)}
             ]
+        elif protocol == "llm":
+            assert "type=operation_succeeded\n" in result.stdout
+            assert f"path={path}\n" in result.stdout
         else:
-            separator = "=" if protocol == "llm" else " = "
-            assert f"type{separator}operation_succeeded\n" in result.stdout
-            assert f"path{separator}{path}\n" in result.stdout
+            assert result.stdout == f"path: {path}\n\nConfiguration created.\n\n"
         assert not project_config.is_set()
         assert not runtime_config.is_set()
         assert not output.is_set()

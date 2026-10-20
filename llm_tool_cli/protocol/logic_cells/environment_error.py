@@ -1,6 +1,7 @@
 from llm_tool_cli.core.errors import EnvironmentError
 from llm_tool_cli.protocol.journal import JournalRecord
 from llm_tool_cli.protocol.logic_cells.uniform import UniformCell
+from llm_tool_cli.protocol.output_cells import HumanErrorOutputCell
 from llm_tool_cli.protocol.output_cells.base import OutputCell, to_meta_value
 
 
@@ -8,6 +9,9 @@ class EnvironmentErrorCell(UniformCell):
     """An operational failure retained as typed data until projection."""
 
     error: EnvironmentError
+
+    def render_human(self) -> list[OutputCell]:
+        return [self._render(HumanErrorOutputCell)]
 
     def to_journal_record(self) -> JournalRecord:
         fields = self.error.as_record()

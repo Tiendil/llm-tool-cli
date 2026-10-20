@@ -6,7 +6,7 @@ import pytest
 from llm_tool_cli.core.errors import EnvironmentError
 from llm_tool_cli.protocol import Protocol
 from llm_tool_cli.protocol.logic_cells import EnvironmentErrorCell
-from llm_tool_cli.protocol.output_cells import AutomationOutputCell, HumanOutputCell, LLMOutputCell
+from llm_tool_cli.protocol.output_cells import AutomationOutputCell, HumanErrorOutputCell, LLMOutputCell
 from llm_tool_cli.protocol.output_cells.base import OutputCell
 
 
@@ -49,7 +49,7 @@ class TestEnvironmentErrorCell:
     @pytest.mark.parametrize(
         ("protocol", "output_type"),
         [
-            (Protocol.human, HumanOutputCell),
+            (Protocol.human, HumanErrorOutputCell),
             (Protocol.llm, LLMOutputCell),
             (Protocol.automation, AutomationOutputCell),
         ],

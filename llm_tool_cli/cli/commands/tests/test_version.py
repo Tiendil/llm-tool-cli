@@ -52,7 +52,7 @@ class TestRegisterVersionCommand:
                     "--TEST-CELL <id> BEGIN--\nkind=version\ntype=version\nversion=9.8.7\n" "--TEST-CELL <id> END--\n"
                 )
             else:
-                assert output == "----- TEST CELL <id> -----\nkind = version\ntype = version\nversion = 9.8.7\n\n"
+                assert output == "version: 9.8.7\n\n"
 
     @pytest.mark.parametrize("config_kind", ["missing", "invalid", "directory"])
     def test_ignores_configuration(self, version_app: typer.Typer, tmp_path: Path, config_kind: str) -> None:

@@ -64,8 +64,8 @@ class TestRegisterSkillCommand:
             assert record.pop("id")
             assert record == {"type": "skill", "document": name, "content": content}
         else:
-            assert result.stdout.startswith("----- TEST CELL " if protocol == "human" else "--TEST-CELL ")
-            separator = " = " if protocol == "human" else "="
+            assert result.stdout.startswith("document: " if protocol == "human" else "--TEST-CELL ")
+            separator = ": " if protocol == "human" else "="
             assert f"document{separator}{name}\n" in result.stdout
             assert content in result.stdout
 
@@ -108,7 +108,7 @@ class TestRegisterSkillCommand:
             assert record["content"]
         else:
             assert not result.stderr
-            separator = " = " if protocol == "human" else "="
+            separator = ": " if protocol == "human" else "="
             assert f"code{separator}skill_unreadable\n" in result.stdout
             assert f"document{separator}usage\n" in result.stdout
 

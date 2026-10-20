@@ -74,18 +74,28 @@ Cells MUST render immutable UTF-8 bytes with terminators, without:
 
 Context MUST supply zero-based position, positive total, and tool label, with `0 <= position < total`.
 Single/multiple-cell boundaries MUST be preserved.
-Text MUST preserve the label exactly; automation MUST ignore it.
+LLM framing MUST preserve the label exactly; human and automation output MUST omit it.
 
-### Human and LLM cells
+### Human cells
+
+Human output MUST use plain text blocks without cell borders, generated ids, or media-type declarations.
+Generic blocks MUST show sorted metadata as `key: value`, followed by a blank line and stripped nonempty content when present.
+Metadata values MUST retain their string representations, including `True`, `False`, and `None`.
+The `type` field MUST be omitted only when its value equals the cell kind; other application metadata, including an application-supplied `id`, MUST remain visible.
+Absent or empty content MUST omit the content section.
+When neither visible metadata nor content remains, the block MUST show the cell kind.
+Blocks MUST end with two newlines, preserving separation between consecutive results.
+
+Human environment errors MUST show the message and guidance first, prefixed with `Error:`, followed by diagnostic metadata in a separate block when present.
+Human warnings MUST show `Warning:` followed by the warning message, without record-field labels.
+These diagnostic prefixes MUST remain visible for empty messages without trailing spaces.
+Compact journal output MUST follow the journal formatting contract below.
+
+### LLM cells
 
 Text MUST emit kind, optional media type, then sorted metadata as strings, including `True`, `False`, and `None`.
 Nonempty content MUST follow a blank line with surrounding whitespace stripped; absent/empty content MUST omit that section.
-
-| Protocol | Opening | Fields | Ending |
-| --- | --- | --- | --- |
-| Human | `----- <label> CELL <id> -----` | `key = value` | Two newlines |
-| LLM | `--<label>-CELL <id> BEGIN--` | `key=value` | `--<label>-CELL <id> END--` and one newline |
-
+Cells MUST open with `--<label>-CELL <id> BEGIN--`, use `key=value` fields, and end with `--<label>-CELL <id> END--` and one newline.
 Ids MUST use compact form.
 
 ### Automation cells
@@ -121,7 +131,7 @@ Remaining native diagnostic fields MUST become converted metadata, including:
 - optional nulls.
 
 Errors MUST remain unchanged; private causes/templates MUST be excluded.
-Ids/framing/serialization MUST use ordinary cells.
+Presentation and serialization MUST follow the selected protocol's cell formatting, including the specialized human diagnostic presentation.
 Error-cell rendering MUST NOT select streams or terminate the process.
 
 ## JSON Lines serialization

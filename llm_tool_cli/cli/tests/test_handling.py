@@ -112,7 +112,7 @@ class TestReportErrorsAndExit:
             assert records == expected
         else:
             assert not captured.err
-            separator = " = " if protocol == Protocol.human else "="
+            separator = ": " if protocol == Protocol.human else "="
             codes = [f"code{separator}{error.code}\n" for error in errors]
             assert all(code in captured.out for code in codes)
             positions = [captured.out.index(code) for code in codes]

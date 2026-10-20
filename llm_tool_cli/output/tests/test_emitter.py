@@ -311,7 +311,7 @@ class TestStreamOutputEmitter:
 
     @pytest.mark.parametrize("protocol", [Protocol.human, Protocol.llm])
     @pytest.mark.parametrize("custom_stream", [False, True])
-    def test_flush__preserves_text_framing_unicode_and_label(
+    def test_flush__preserves_unicode_and_protocol_specific_text(
         self, capsys: pytest.CaptureFixture[str], protocol: Protocol, custom_stream: bool
     ) -> None:
         stream = io.StringIO()
@@ -328,8 +328,7 @@ class TestStreamOutputEmitter:
         assert captured.err == ""
         assert "café 日本語" in text
         if protocol == Protocol.human:
-            assert text.startswith("-----   TOOL   CELL ")
-            assert text.endswith("\n\n")
+            assert text == "café 日本語\n\n"
         else:
             assert text.startswith("--  TOOL  -CELL ")
             assert text.endswith(" END--\n")

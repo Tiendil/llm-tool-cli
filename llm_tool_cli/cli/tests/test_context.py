@@ -172,7 +172,8 @@ class TestCommandContext:
         if protocol == Protocol.automation:
             records = [json.loads(line) for line in output.splitlines()]
             assert [record["content"] for record in records] == messages
+        elif protocol == Protocol.human:
+            assert output == "Café\n\n日本語\n\n"
         else:
-            prefix = "----- TEST CELL " if protocol == Protocol.human else "--TEST-CELL "
-            assert output.startswith(prefix)
+            assert output.startswith("--TEST-CELL ")
             assert output.index(messages[0]) < output.index(messages[1])
