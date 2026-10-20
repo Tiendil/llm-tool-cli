@@ -86,7 +86,7 @@ Output MUST default to stdout and honor the command's effective protocol through
 
 Successful completion MUST deliver results then warnings before command closure.
 Skill, version, and init MUST follow the same completion and failure behavior as custom commands.
-Terminal-error journaling MUST NOT invoke consumer journal factories or require consumer runtime resources to remain active.
+Error reporting MUST NOT require consumer runtime resources to remain active.
 
 ## Protocol selection
 
@@ -139,11 +139,8 @@ Command error reporting MUST use an already selected protocol and accept only va
 Malformed payload failures MUST propagate unchanged before any partial diagnostics; unrelated/framework control-flow exceptions MUST also propagate.
 
 Reported errors MUST render in original order under the Environment-error cells contract in `specs/behavior/protocol.md` and terminate with aggregated status.
-Terminal errors MUST be journaled using their formatted message/code/context without duplicate console diagnostics or consumer context reads.
-Healthy journal delivery MUST process errors irrespective of error types.
-After processor failure, it MUST NOT be called again.
-A reporting-time delivery failure MUST preserve the affected original diagnostic; all original diagnostics MUST precede collected delivery failures and retained warnings without recursive journaling.
-Aggregation MUST include delivery failures without mutating the original list.
+Command error reporting MUST NOT forward diagnostics to journals or create journal records.
+Reporting MUST preserve the original error list without mutation.
 Errors MUST use the emitter stream, default stdout in every protocol regardless of package ownership.
 
 Success MUST flush without forced termination.
@@ -156,7 +153,6 @@ Command failure MUST preserve that command's pending warnings.
 Empty error lists MUST emit nothing and terminate according to the Exit statuses contract below.
 
 Skill, version, and init MUST follow this error-handling contract.
-Error journaling MUST NOT require consumer runtime resources to remain active after application-specific cleanup.
 
 ## Exit statuses
 

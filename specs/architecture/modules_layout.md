@@ -105,7 +105,7 @@ Protocol selection MUST follow `specs/behavior/cli.md`.
 Commands MUST submit cells directly to shared output.
 Shared command scope MUST compose context setup, error handling, and output finalization.
 Consumer command scopes MUST compose it while retaining ownership of application resources, journal construction, and their setup/cleanup.
-Shared error journaling MUST use self-contained errors, without consumer factories or extended runtime scopes.
+Shared error reporting MUST use self-contained errors, without journal delivery, consumer factories, or extended runtime scopes.
 Framework-managed output/project bindings MUST survive finalization.
 
 Shared application construction MUST provide:
