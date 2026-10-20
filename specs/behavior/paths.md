@@ -2,7 +2,7 @@
 
 ## Goal of the document
 
-This document describes project-path identifiers, their conversion to and from filesystem paths, glob matching and captures, file enumeration, and their failure behavior.
+This document describes the shared contract for interpreting project paths.
 
 ## Scope
 
@@ -37,7 +37,6 @@ It MUST NOT impose application-specific existence or filename-extension requirem
 Component extraction MUST accept an already canonical identifier and return its segments in order, excluding the `@/` prefix.
 It MUST preserve every segment's text exactly and return the components directly, with no expected failure outcome for canonical inputs.
 Callers MUST establish canonical form before extraction.
-Extraction MUST NOT repeat normalization or validation.
 It MUST NOT access the filesystem or depend on the current working directory.
 
 **Example:** `@/notes/Project Plan.md` produces the two components `notes` and `Project Plan.md`.
@@ -123,7 +122,7 @@ Consumers MUST enforce any required existence or directory-kind constraints sepa
 
 **Example:** With the working directory `/workspace`, a missing `project` root resolves to `/workspace/project`, while `~/project` resolves to `/workspace/~/project` without home expansion.
 
-Root resolution MUST remain separate from lexical identifier normalization and MUST NOT establish containment of any project path.
+Root resolution MUST NOT establish containment of any project path.
 
 ## Root-anchored resolution
 
@@ -158,7 +157,8 @@ The caller MUST supply the same root used for that containment check.
 Conversion MUST return the path relative to that root with an `@/` prefix and `/` separators, preserving all segment text.
 It MUST return the identifier directly, with no expected failure outcome for inputs satisfying these preconditions.
 
-Conversion MUST NOT access the filesystem, depend on the current working directory, or repeat resolution or validation already established by those preconditions.
+Conversion MUST NOT access the filesystem or depend on the current working directory.
+
 It MUST support files, directories, and missing targets without imposing existence or filename-extension requirements.
 
 **Example:** A resolved path `/project/notes/Project Plan.md` under `/project` converts to `@/notes/Project Plan.md`.
@@ -166,7 +166,13 @@ The supplied path MUST already satisfy the prohibition on symbolic links below t
 
 ## Glob patterns
 
-Patterns MUST accept project-root-anchored, root-relative, absolute, and home-relative forms with the same containment and input-normalization rules as mixed path resolution.
+Patterns MUST accept these forms with the same containment and input-normalization rules as mixed path resolution:
+
+- project-root-anchored.
+- root-relative.
+- absolute.
+- home-relative.
+
 Pattern preparation MUST resolve only the literal prefix preceding the first wildcard and normalize the remaining components lexically.
 Wildcard syntax MUST NOT be resolved as a concrete filesystem name.
 A symbolic link in the literal prefix preceding the first wildcard MUST be rejected before traversal.
@@ -196,7 +202,7 @@ The pattern `@/src/{**package}/{*module}.py` matches `@/src/api.py` with an empt
 The pattern `@/src/a**.py` matches both `@/src/a.py` and `@/src/a/nested.py`.
 
 Matching MUST accept an already canonical identifier and compare the entire identifier against the prepared pattern.
-It MUST NOT require the referenced target to exist or repeat the caller's path validation.
+It MUST NOT require the referenced target to exist.
 A successful match MUST return capture values, including an empty mapping when the pattern has no captures.
 A non-match MUST be distinguishable from invalid-pattern and filesystem-resolution failures.
 
@@ -208,7 +214,13 @@ The default pattern MUST recursively select all files.
 Enumeration MUST NOT expose captures as additional result data.
 Files MUST be returned in lexicographic path-component order, with duplicates from recursive patterns removed.
 
-Enumeration MUST skip every symbolic link encountered through matching, including file links, directory links, broken links, and cycles, without following its target.
+Enumeration MUST skip every symbolic link encountered through matching without following its target, including:
+
+- file links.
+- directory links.
+- broken links.
+- cycles.
+
 Missing search locations and non-directory search prefixes MUST produce no matches.
 Directories and other non-regular files MUST NOT appear in results.
 Unreadable directories or other filesystem inspection failures MUST fail enumeration rather than produce a successful partial result.
@@ -219,7 +231,13 @@ Consumer-specific extension checks, configured search-directory order, and domai
 Conversion of a supplied filesystem path and filesystem root to a canonical identifier MUST resolve the root first, enforce filesystem containment of the path, and return the resolved path's identifier.
 Neither input needs to have been resolved by the caller.
 Relative roots and paths MUST each use the process current working directory as their base; the supplied root MUST NOT implicitly become the base of a relative path.
-Conversion MUST NOT interpret `@/` identifiers, expand home markers, or require an existing target or a particular filesystem kind.
+Conversion MUST NOT:
+
+- interpret `@/` identifiers.
+- expand home markers.
+- require an existing target.
+- require a particular filesystem kind.
+
 Root resolution failures MUST take precedence over target resolution and containment failures.
 Failures MUST retain the diagnostics of the failed resolution or containment operation.
 
@@ -227,19 +245,30 @@ Failures MUST retain the diagnostics of the failed resolution or containment ope
 
 ## Errors
 
-Normalization, resolution, glob preparation, and enumeration MUST report rejected paths, including prohibited symbolic links, with one failure diagnostic with the stable code `invalid_project_path`.
-Its `path` field MUST contain the rejected input with surrounding whitespace removed; containment failures MUST use the supplied filesystem path.
-Consumers MUST be able to identify this failure by its code without parsing the message.
+The following operations MUST report rejected paths, including prohibited symbolic links, with one invalid-path diagnostic:
 
-Invalid glob syntax MUST produce one failure diagnostic with the stable code `invalid_glob_pattern`, the rejected pattern in `pattern`, and a description in `reason`.
+- normalization.
+- resolution.
+- glob preparation.
+- enumeration.
+
+Its `path` field MUST contain the rejected input with surrounding whitespace removed; containment failures MUST use the supplied filesystem path.
+Consumers MUST be able to distinguish the following without parsing messages:
+
+- invalid paths.
+- invalid glob syntax.
+- resolution failures.
+- enumeration failures.
+
+Invalid glob syntax MUST produce one diagnostic with the rejected pattern in `pattern` and a description in `reason`.
 Any original compilation exception MUST remain a private cause and MUST NOT appear in serialized diagnostics.
 
-Filesystem failures that prevent root or containment resolution, including permission failures and loops during root resolution, MUST produce one failure diagnostic with the stable code `path_resolution_failed`.
+Filesystem failures that prevent root or containment resolution, including permission failures and loops during root resolution, MUST produce one resolution-failure diagnostic.
 An inability to expand a home marker during mixed path normalization or resolution MUST use the same failure diagnostic.
 Its `path` field MUST contain the supplied filesystem root for root resolution, the supplied filesystem path for containment resolution, or the original textual input for home expansion.
 Its `reason` field MUST describe the resolution failure, with surrounding whitespace removed from both fields.
 The original exception MUST be retained as a private cause and MUST NOT appear in serialized diagnostics.
 Unexpected failures outside filesystem resolution MUST remain exceptions.
 
-Filesystem failures during enumeration MUST produce one failure diagnostic with the stable code `files_unreadable`, the resolved root in `path`, and a description in `reason`.
+Filesystem failures during enumeration MUST produce one enumeration-failure diagnostic with the resolved root in `path` and a description in `reason`.
 The original exception MUST remain a private cause and MUST NOT appear in serialized diagnostics.

@@ -7,7 +7,13 @@ This document describes language-level implementation conventions for Python lib
 ## Scope
 
 This specification applies to Python implementation conventions in `llm_tool_cli`.
-Module ownership, capability behavior, entity modeling, error contracts, and formatting are out of scope.
+The following are out of scope:
+
+- module ownership.
+- capability behavior.
+- entity modeling.
+- error contracts.
+- formatting.
 
 ## Dictionary
 
@@ -33,7 +39,13 @@ New abstractions MUST NOT be introduced solely to satisfy a checker when a local
 Functions called through project-controlled typed interfaces SHOULD treat annotated parameter types as caller contracts.
 They SHOULD NOT perform runtime checks solely to verify that arguments match their declared types.
 
-Runtime validation remains appropriate at untyped or external boundaries, including configuration, deserialized data, CLI input, and third-party responses.
+Runtime validation remains appropriate at untyped or external boundaries, including:
+
+- configuration.
+- deserialized data.
+- CLI input.
+- third-party responses.
+
 Code MUST validate semantic constraints that type annotations cannot express.
 
 Code that constructs a semantically specific typed value from raw data MUST validate that type's semantic invariants at the construction boundary.
@@ -98,7 +110,13 @@ Predicates named `is_*`, `has_*`, or `can_*` SHOULD return `bool` and MUST NOT r
 
 ## Function extraction
 
-A separate function SHOULD represent a meaningful operation, centralize an invariant, support reuse, or simplify non-trivial control flow.
+A separate function SHOULD serve at least one of these purposes:
+
+- represent a meaningful operation.
+- centralize an invariant.
+- support reuse.
+- simplify non-trivial control flow.
+
 A trivial collection update used at one call site MUST remain inline and MUST NOT be extracted into a separate function merely to isolate the mutation.
 An update is trivial for this rule when its intent is clear from the collection operations and it does not enforce a separate invariant or contain non-obvious control flow.
 Keeping those updates inline preserves their local context without introducing a separate operation contract.

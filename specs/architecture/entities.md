@@ -2,176 +2,140 @@
 
 ## Goal of the document
 
-This document describes conventions for typed library data and the ownership of its validation and serialization.
+This document describes typed library data, validation, and serialization ownership.
 
 ## Scope
 
-This specification applies to Python data structures representing library concepts.
-Individual data schemas, consumer domain models, and external protocol formats are out of scope.
+Python data structures representing library concepts; individual schemas, consumer domain models, and external formats are out of scope.
 
 ## Dictionary
 
-- `entity` — a typed Python object representing one library concept.
-- `value entity` — an entity whose equality is based on its data rather than object identity.
-- `boundary entity` — an entity passed between modules or between the library and a consumer.
-- `serialized representation` — plain data prepared for an external protocol or storage boundary.
+- `entity` — a typed object representing one library concept.
+- `value entity` — an entity compared by data rather than identity.
+- `boundary entity` — an entity crossing module or library/consumer boundaries.
+- `serialized representation` — plain data for external protocols or storage.
 
 ## General principles
 
-Library concepts MUST have explicit typed representations before they cross module boundaries.
-Boundary entities MUST NOT use untyped dictionaries unless the data is already a serialized representation.
-
+Library concepts MUST have explicit typed representations across boundaries, not untyped dictionaries except for serialized data.
 Structured models SHOULD use Pydantic v2 for consistent validation and serialization.
-Very small internal helper values MAY use plain classes when model validation would add no practical value.
-Project data structures MUST NOT use `dataclasses.dataclass`.
-This keeps structured entity validation and serialization under the Pydantic convention instead of introducing a parallel modeling system.
+Small internal helpers MAY use plain classes when validation adds no value.
+Data structures MUST NOT use `dataclasses.dataclass`, keeping one structured modeling system.
 
-Entity behavior SHOULD remain pure and local to its data.
+Entity behavior SHOULD remain pure and local.
 Entities MUST NOT perform:
 
 - filesystem access.
-- configuration file discovery.
+- configuration discovery.
 - process execution.
 - terminal output.
 - other application operations.
 
-Value entities SHOULD be immutable when practical.
-Entities that can be used for de-duplication SHOULD be hashable when practical so collections can identify equivalent values without separate identity rules.
+Value entities SHOULD be immutable when practical; deduplicatable entities SHOULD be hashable when practical so equivalence needs no separate identity rules.
 
 ## Model conventions
 
-To keep model input normalization and validation consistent, model defaults SHOULD:
+For consistent normalization and validation, defaults SHOULD:
 
-- strip surrounding whitespace from string values.
-- validate default values.
+- strip surrounding string whitespace.
+- validate defaults.
 - reject unknown fields.
-- prefer immutable value objects when practical.
-- validate assignment when mutation is explicitly enabled.
-- avoid attribute-based construction unless a boundary explicitly needs it.
+- prefer immutable values.
+- validate assignment when mutation is enabled.
+- avoid attribute-based construction unless a boundary needs it.
 
-Normalization MUST preserve significant whitespace and exact values required by compatibility contracts.
+Normalization MUST preserve significant whitespace and exact compatibility values.
+Models SHOULD use Pydantic fields and validators for local constraints and invariants, and field mechanisms for defaults and discriminators, keeping construction and validation consistent.
+Validators SHOULD cover cohesive invariants for understandable, independently testable failures; they MAY inspect jointly constrained fields.
 
-Models SHOULD express local field constraints and model invariants through Pydantic field metadata and validators so validation stays with the data it governs.
-Default factories and discriminators SHOULD use Pydantic's field mechanisms so model construction and validation share one contract.
-
-Validators SHOULD enforce one cohesive invariant or closely related family of constraints so unrelated validation failures remain understandable and independently testable.
-A validator MAY inspect multiple fields when they jointly define an invariant.
-
-The library MUST provide a shared Pydantic base entity for common validation, copying, and JSON serialization behavior.
-Project models SHOULD inherit from it to apply shared validation and serialization conventions consistently.
-Models MAY use Pydantic directly when they intentionally mirror external input shapes or must satisfy a third-party model contract.
-The shared base entity MUST provide a copy-with-changes operation that deeply copies existing data and applies trusted changes without validation so callers can derive updated values without mutating immutable entities.
-It MUST provide JSON serialization with two-space indentation and validated JSON reconstruction using the concrete entity type.
+The library MUST provide a shared Pydantic base for validation, copying, and JSON serialization.
+Models SHOULD inherit it for consistent behavior, but MAY use Pydantic directly for external input shapes or third-party model contracts.
+The base MUST deeply copy existing data and apply trusted changes without validation in its copy-with-changes operation, allowing immutable updates.
+It MUST support JSON serialization and reconstruct validated instances of the concrete type.
 
 ## Semantic types
 
-Names for boundary concepts SHOULD preserve the terminology of the applicable external contract so readers can relate library types to that contract.
+Boundary names SHOULD preserve external-contract terminology to make their correspondence clear.
+Distinct library primitive meanings MUST have semantic Python types across module/public boundaries and in entities and public signatures, preventing silent interchange of unrelated values.
+`typing.NewType` SHOULD distinguish roles without runtime changes; small custom classes MAY supply extra validation or behavior.
 
-Semantically specific primitive values MUST have semantically specific Python types before they cross module boundaries or the library's public boundary.
-Entities and public function signatures MUST NOT use unqualified primitive types for values with a distinct library meaning.
-These types make semantic distinctions part of the typed interface so callers cannot silently interchange unrelated identifiers or values.
-
-`typing.NewType` SHOULD be used when runtime behavior is identical to the underlying primitive to distinguish semantic roles without changing runtime behavior.
-Semantic primitive types MAY use small custom classes when they need validation or behavior beyond the underlying primitive.
-
-Raw primitives MAY be used at boundaries that convert external data into or out of library types:
+Raw primitives MAY appear during:
 
 - parsing.
 - rendering.
 - storage.
-- serialization.
+- serialization conversion.
 
-Raw primitives MAY be used inside local helper code when the value has already been validated or a semantic type would not improve module-boundary clarity.
-Semantic primitive types MUST belong to the module that owns the corresponding library concept.
+They MAY also appear in local helpers after validation or when semantic typing would not clarify a module boundary.
+
+Semantic types MUST belong to their concept's owner.
 
 ## Static typing suppressions
 
-When a static type checker cannot prove a semantic primitive type relationship that is already guaranteed by validation or construction at the same boundary, code SHOULD use a local `# type: ignore[...]` suppression instead of `typing.cast(...)` or a pure runtime no-op conversion such as `str(...)`.
-This makes the static analysis limitation explicit without adding a runtime operation that suggests conversion or validation.
-Type suppressions MUST be as narrow as practical.
-Type suppressions MUST NOT be used to bypass missing validation, unsafe external input conversion, or a real mismatch between runtime behavior and declared types.
-Type suppressions MUST name the relevant error code when supported by the checker.
+For semantic relationships already guaranteed by validation or construction at the same boundary, code SHOULD prefer local `# type: ignore[...]` over `typing.cast(...)` or runtime no-ops such as `str(...)`, exposing checker limitations without implying conversion.
+Suppressions MUST be as narrow as practical, include supported error codes, and MUST NOT bypass missing validation, unsafe input conversion, or actual type mismatches.
 
 ## Enumeration conventions
 
-Closed sets of named library values MUST use Python enum classes so each concept has one nominal runtime type with discoverable members across typed interfaces.
-Plain strings MUST NOT be the primary internal representation of values with a finite configured, persisted, or specified set of allowed names.
-
-String-valued closed sets MUST use `enum.StrEnum`.
-Library-owned enum values persisted in library-owned storage MUST use `enum.IntEnum` with fixed integer values.
-Integer-valued closed sets MUST use `enum.IntEnum` when the integer value is part of an external contract or persisted state.
-Enum classes MUST use these standard bases instead of `str, enum.Enum` or `int, enum.Enum` to keep primitive-value interoperability under one enum convention.
-
-Enum values that cross external boundaries MUST preserve their specified serialized or persisted representation exactly.
+Closed named sets MUST use Python enums, not primarily raw strings, giving each finite configured, persisted, or specified concept a nominal type with discoverable members.
+String sets MUST use `enum.StrEnum`; library-owned enums persisted in library-owned storage MUST use fixed-value `enum.IntEnum`.
+Integer sets MUST use `enum.IntEnum` when values are externally contracted or persisted.
+These bases MUST replace `str, enum.Enum` and `int, enum.Enum` for consistent primitive interoperability.
+External and persisted representations MUST remain exact.
 
 ## Ownership
 
-An entity MUST belong to the module that owns its meaning.
-External-boundary transfer entities MUST belong to the module that owns that boundary.
-Consumer-specific domain entities MUST remain with the consumer.
-Public re-exports MUST keep the defining owner clear.
-
-Shared entity infrastructure MUST remain independent of capability-specific concepts.
-Entities for concepts shared across library capabilities MUST model those concepts independently from the concrete interfaces that create or render them.
-Those shared entities MUST NOT depend on CLI option parsing, concrete configuration file syntax, or rendered protocol record shapes.
-Entities needed by only one capability MUST remain with that capability.
+Entities MUST belong to their concept or external boundary's owner; consumer domain entities MUST remain consumer-owned.
+Re-exports MUST keep ownership clear.
+Shared infrastructure MUST be capability-independent.
+Cross-capability entities MUST be independent of creating/rendering interfaces and MUST NOT depend on CLI parsing, configuration syntax, or rendered record shapes.
+Single-capability entities MUST remain with that capability.
 
 ## Configuration entities
 
-Configuration entities MAY represent parsed settings data at a configuration-loading boundary.
-They SHOULD use Pydantic validation to reject malformed parsed input before it reaches lower layers so those layers receive validated configuration concepts.
-They MUST preserve enough information to report useful configuration errors.
-Lower layers MUST receive validated library concepts independently from raw configuration file shapes.
-Configuration entities MAY reference other library entities when those concepts have already been validated.
-
-Configuration file loading MUST remain outside entity definitions and Pydantic validators.
+Configuration entities MAY represent parsed settings and reference validated library entities.
+They SHOULD use Pydantic validation before lower layers, which MUST receive validated concepts independent of file shapes.
+They MUST preserve useful error context.
+File loading MUST remain outside entities and validators.
 
 ## Command entities
 
-Command entities MUST represent parsed user intent before command execution.
-They MUST model command selection and parsed options independently from rendered output.
-They MUST NOT contain rendered output or perform command execution.
-Parsed identifiers and paths with library-specific meaning MUST use semantic primitive types after normalization and validation.
+Command entities MUST represent parsed selection and options before execution, independently from output, and MUST NOT contain rendered output or execute commands.
+Normalized, validated library-specific ids and paths MUST use semantic types.
 
 ## Command results
 
-Logic cells MUST be the primary interface for successful domain results passed to a consumer's CLI layer.
-Command-facing domain and runtime operations MAY submit logic cells directly to the shared scoped output emitter and return `Result[None]` when they have no other useful result.
-Operations that compute reusable values MAY retain typed return values, including cells and their ordered collections.
-Concrete cell subclasses MAY retain typed domain entities needed for projection; they MUST NOT require the CLI to inspect those entities or assemble domain output payloads.
-Internal domain operations and low-level library capabilities MAY continue to return their own typed values.
-This boundary keeps result assembly reusable independently of CLI argument parsing and output protocol selection.
+Logic cells MUST be the primary successful domain-to-CLI interface.
+Command-facing operations MAY submit cells to the scoped emitter and return `Result[None]` when no other result is useful.
+Reusable computations MAY return typed values, including cells and ordered cell collections; internal domain operations and low-level capabilities MAY retain their own types.
+Cell subclasses MAY hold typed domain data for projection, but MUST NOT require CLI inspection or payload assembly, keeping result assembly independent of CLI parsing and protocol selection.
 
-Cells MUST carry the information needed for their projections without reading runtime state or writing output.
-Journal records MUST be shared boundary entities constructed from logical-cell data independently of delivery and application runtime contexts.
-Journal-capable cells MUST own explicit semantic summaries; generic content cells MUST prohibit journaling.
-Consumer-specific execution identifiers MUST remain consumer-owned and cross the journal boundary as structured attributes.
-CLI initialization MUST establish output delivery and the effective protocol; the shared emitter MUST own buffering and delivery of submitted cells.
-Expected failures MUST remain structured errors in failed results until the CLI error-handling boundary.
-Generic CLI acknowledgements and already prepared documents MAY use shared content logic cells.
+Cells MUST carry projection data without runtime-state reads or output writes.
+Shared journal-record boundary entities MUST be constructed from cell data independently of delivery and application context.
+Journal-capable cells MUST define semantic summaries; generic content cells MUST prohibit journaling.
+Consumer execution ids MUST remain consumer-owned structured journal attributes.
+CLI initialization MUST establish delivery and protocol; the shared emitter MUST buffer and deliver cells.
+Expected failures MUST remain structured failed-result errors until the CLI error boundary.
+Generic acknowledgements and prepared documents MAY use shared content cells.
 
 ## Data structure conventions
 
-Ordered input from users and external sources SHOULD use ordered collections to preserve meaningful input order.
-Sets MAY be used internally for de-duplication, but externally visible output order MUST be produced explicitly according to the applicable behavior contract.
-Collections representing stacks, queues, or other ordered state MUST preserve order explicitly.
-
-Mappings keyed by semantic identifiers SHOULD use the semantic identifier type so static analysis can distinguish unrelated keys.
-Optional values MUST use `None` instead of sentinel strings.
+User/external ordered input SHOULD use ordered collections to preserve meaning.
+Sets MAY deduplicate internally, but observable order MUST follow the behavior contract explicitly.
+Stacks, queues, and other ordered state MUST preserve order explicitly.
+Semantic-id mappings SHOULD use semantic key types to distinguish unrelated keys.
+Optional values MUST use `None`, not sentinel strings.
 
 ## Serialization boundaries
 
-Serialized representations MUST be created at protocol or storage boundaries and SHOULD be treated as write-only output data to keep internal behavior independent from output formats.
-Models SHOULD use Pydantic serialization methods at boundaries that need model dumps or JSON so serialization follows the model's declared contract.
-Explicit boundary code SHOULD produce serialized representations from models to keep representation choices with the boundary that owns them.
-Internal entity behavior MUST NOT depend on incidental Pydantic dump shapes.
-Incidental Pydantic dump shapes MUST NOT become public contracts without an intentional boundary requirement.
-
-Entity methods that return dictionaries for protocol metadata, logging, or storage MUST return structured values with stable keys and MUST NOT contain presentation formatting.
+Serialized representations MUST be created at protocol/storage boundaries and SHOULD be write-only so internal behavior stays format-independent.
+Models SHOULD use Pydantic serialization through explicit boundary code, keeping representation choices with their owner and declared model contract.
+Internal behavior MUST NOT depend on incidental dump shapes, which MUST NOT become public contracts without intentional boundary requirements.
+Dictionary-returning metadata/logging/storage methods MUST use stable structured keys and MUST NOT format presentation.
 
 ## Validation boundaries
 
-Parsing layers SHOULD validate external data before creating entities used by lower layers so malformed input is rejected at the boundary that can explain it.
-Pydantic model validation MAY enforce local invariants that are always true for an entity.
-Validation that requires filesystem access, configuration discovery, or command execution MUST live outside pure entity definitions.
-Invalid external input MUST be reported through the error architecture instead of returning partially valid entities.
+Parsing layers SHOULD validate external input before constructing lower-layer entities, rejecting it where failures can be explained.
+Model validation MAY enforce always-true local invariants.
+Filesystem, discovery, and command-dependent validation MUST stay outside pure entities.
+Invalid input MUST follow the error architecture, never produce partially valid entities.

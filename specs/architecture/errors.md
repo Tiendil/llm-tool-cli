@@ -13,7 +13,7 @@ Capability-specific error inventories and presentation formats are out of scope.
 
 - `fatal error` — a problem that prevents the requested operation from completing successfully.
 - `non-fatal problem` — a problem discovered during an operation that does not prevent it from producing useful requested output.
-- `error code` — a stable machine-readable identifier for an expected fatal error.
+- `error code` — a machine-readable identifier for an expected fatal error.
 - `module environment-error root` — a module-owned base model that classifies its expected operational failures.
 - `module internal-exception root` — a module-owned base exception that classifies its internal and technical failures.
 - `exception boundary` — a module boundary with defined recovery, translation, or context-enrichment behavior for exceptions.
@@ -71,9 +71,9 @@ Propagation MUST preserve existing error values unless translation adds domain m
 Package ownership alone MUST NOT require wrapping a returned error.
 
 `UnwrapError` MUST expose a read-only `errors` property typed as `EnvironmentErrors`.
-The property MUST return the list stored in `details["error"]` without copying the list or its error values, preserving order and allowing an empty list.
-That details entry MUST remain the single payload storage location.
-If the entry is missing, is not a list, or contains a value outside the shared `EnvironmentError` hierarchy, the property MUST raise the original `UnwrapError` rather than normalize or partially recover the payload.
+The property MUST return the original failure payload without copying the list or its error values, preserving order and allowing an empty list.
+The exception MUST retain one payload source of truth.
+If the payload is missing, is not a list, or contains a value outside the shared `EnvironmentError` hierarchy, the property MUST raise the original `UnwrapError` rather than normalize or partially recover the payload.
 
 The `unwrap_to_error` decorator SHOULD be used when it makes composition of result-returning functions easier to follow.
 It MUST convert only the technical `UnwrapError` raised by unsuccessful unwrapping back into `Err` with the original payload.
@@ -82,7 +82,7 @@ It MUST NOT hide arbitrary exceptions or misuse of error unwrapping on a success
 Callers MUST maintain compatibility between propagated error payloads and their declared return contracts.
 
 An external callback boundary that cannot return `Result` MAY use `EnvironmentErrorsProxy` to carry expected error values.
-The shared proxy MUST inherit from `InternalError` and carry the original `EnvironmentErrors` list in `details["errors"]`.
+The shared proxy MUST inherit from `InternalError` and carry the original `EnvironmentErrors` list without copying its values or changing their order.
 It MUST remain distinct from result-unwrapping exceptions so callback recovery does not intercept unrelated internal failures.
 Technical propagation exceptions MUST belong to the internal-exception hierarchy and MUST preserve the original failure category of their payloads.
 That exception MUST be caught at the nearest controlled boundary and converted back into an error result.
@@ -102,14 +102,17 @@ The shared internal-exception base MUST NOT define environment-error codes, corr
 
 ### Environment errors
 
-Environment errors MUST expose stable error codes.
-Error codes MUST contain only lowercase ASCII letters, ASCII digits, `_`, and `.`.
-Their exact values and compatibility requirements MUST be specified with the owning capability.
+Environment errors MUST expose machine-readable error codes identifying failure kinds independently of message text.
+Error codes MUST contain only:
 
-Environment errors MUST declare their process exit status through an inherited `cli_exit_code: ClassVar[ExitCode]`, independently of the diagnostic `code` and any exit-code context from external commands.
-The shared base MUST default to `ExitCode.environment_error`; module roots and concrete error classes MAY override that class attribute.
-The configuration-error root MUST declare `ExitCode.configuration_error`, and `InvalidArguments` MUST declare `ExitCode.invalid_arguments`.
-The `cli_exit_code` declaration MUST NOT become a per-instance model field or appear in serialized entities, diagnostic records, or cell metadata.
+- lowercase ASCII letters.
+- ASCII digits.
+- `_`.
+- `.`.
+
+Environment errors MUST declare their process exit status as inherited class policy, independently of the diagnostic code and any exit-code context from external commands.
+Module roots and concrete error classes MAY override the shared default according to the categories in `specs/behavior/cli.md`.
+Exit policy MUST NOT become per-instance model data or appear in serialized entities, diagnostic records, or cell metadata.
 
 Environment errors MUST carry a human-readable message and MAY carry corrective guidance and typed context fields so consumers can diagnose failures without implementation stack details.
 Messages and corrective guidance MAY reference context through `{error.<field>}` formatting.
@@ -118,7 +121,13 @@ The shared environment-error model MUST remain independent of protocol-specific 
 Consumers MAY extend it with their own presentation metadata.
 Environment-error context MUST contain values that can be rendered deterministically.
 When context needs serialization, it SHOULD use plain JSON-compatible scalar and collection values so rendering does not depend on Python object representations.
-Native diagnostic records MUST contain `type`, `code`, and the formatted `message`, together with serialized context fields.
+Native diagnostic records MUST contain:
+
+- `type`.
+- `code`.
+- the formatted `message`.
+- serialized context fields.
+
 The reserved record fields MUST take precedence over conflicting context fields.
 Message templates and corrective guidance MUST NOT become context fields in those records.
 An original exception retained for debugging MUST remain outside serialized diagnostic data.
@@ -174,7 +183,13 @@ Pydantic validation errors MAY be used directly inside tests for low-level entit
 
 ## Presentation boundaries
 
-Library operations outside an explicitly documented output or CLI integration boundary MUST NOT print errors or warnings, select terminal formatting, or terminate the process.
+Library operations outside an explicitly documented output or CLI integration boundary MUST NOT:
+
+- print errors.
+- print warnings.
+- select terminal formatting.
+- terminate the process.
+
 Error types MAY declare process exit codes through the shared core contract without depending on CLI implementation or performing output or process termination.
 Lower-level modules and error types MUST NOT know about HTTP status codes.
 Consumers own application-level handling and presentation unless they explicitly delegate it to a library capability.
@@ -182,7 +197,7 @@ Consumers own application-level handling and presentation unless they explicitly
 A known error class alone MUST NOT make a failure part of a caller-correctable external error contract.
 A boundary MAY report an unexpected stored-state integrity failure as a generic failure, but MUST NOT assign it a stable capability error code or present it as a condition the caller can correct.
 
-The shared core MUST aggregate an environment-error list by returning the highest declared exit code, or `ExitCode.success` for an empty list.
+The shared core MUST aggregate an environment-error list by returning the highest declared exit status, or success for an empty list.
 Aggregation MUST preserve error values and their order and MUST NOT render output or terminate the process.
 CLI boundaries MUST use the shared aggregation contract rather than maintaining mappings from error types to exit codes.
 The shared CLI handling boundary MUST own validated unwrap-error recovery, ordered diagnostic emission through the configured emitter, and process termination. Error cells MUST use stdout by default in every protocol.

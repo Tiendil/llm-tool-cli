@@ -2,45 +2,45 @@
 
 ## Goal of the document
 
-This document lists LLM Tool CLI specification documents and specification directories, and briefly describes their purpose.
+This document indexes the project's specifications and their purposes.
 
 ## Scope
 
-The scope of this specification is limited to the specification index.
-Detailed requirements for individual specifications are out of scope except for brief descriptions needed to keep the index useful.
+The specification index and its maintenance; detailed product requirements are out of scope.
+
+## Index requirements
+
+The index MUST list every specification with its path and a brief description.
+Each description MUST identify the specification's stable subject or purpose rather than enumerate its contents.
+Descriptions MUST NOT list individual requirements or current implementation details.
+Descriptions SHOULD remain accurate when details change within the specification's existing scope.
+The index MUST be kept complete and accurate when specifications are added, removed, or change scope.
+
+**Example:** Describe a configuration specification as “The project configuration contract,” without listing its current configuration fields.
 
 ## Specification directories
 
-- `specs/` contains all project specifications used by depmesh governance rules.
-- `specs/architecture/` contains specifications related to package ownership, Python conventions, entities, errors, and tests.
-- `specs/behavior/` contains specifications for library capability contracts.
-- `specs/documentation/` contains specifications related to repository documentation artifacts.
-- `specs/meta/` contains specifications related to requirements for specification documents.
+- `specs/` — all specifications, used by specification-governance rules.
+- `specs/architecture/` — library architecture.
+- `specs/behavior/` — observable contracts at library and CLI boundaries.
+- `specs/documentation/` — repository documentation requirements.
+- `specs/meta/` — specification-writing requirements.
 
 ## Specification documents
 
-Shared glob preparation, wildcard grammar, named captures, and matching of missing references are specified in `specs/behavior/paths.md`, with public matching and capture-validation interfaces in `specs/architecture/modules_layout.md`; file enumeration uses the same grammar.
-
-Configuration selection and initialization use the shared project-path symlink policy, specified in `specs/behavior/config.md` and `specs/behavior/paths.md`; the latter also owns canonical path identity and caller-selected directory bases.
-
-Reusable root configuration fields for schema version and session directory are specified in `specs/architecture/modules_layout.md` and `specs/behavior/config.md`, including application-owned supported versions and defaults, strict version validation, and descriptive type and compatibility diagnostics.
-
-Journal-record entities, explicit semantic cell summaries, prohibited content-cell journaling, emitter-owned journal construction, configurable factories, and processor ownership are specified in `specs/architecture/modules_layout.md` and `specs/architecture/entities.md`, with delivery and conversion behavior in `specs/behavior/protocol.md`.
-Record conversion, empty arguments for missing journal fields, and emitter-local journal failure tracking are specified in `specs/behavior/protocol.md`; terminal-error journaling and delivery-failure recovery without error-type classification are specified in `specs/behavior/cli.md` and `specs/architecture/errors.md`.
-
-- `specs/intro.md` is this file and indexes all specification documents.
-- `specs/dictionary.md` defines project terminology shared by multiple specifications and dependency metadata rules.
-- `specs/meta/general.md` defines general rules for project specification documents.
-- `specs/meta/behavior.md` defines the content and abstraction level of behavior specifications, separating observable contracts from implementation interfaces.
-- `specs/architecture/modules_layout.md` describes shared output-emitter and journal-processor ownership, scoped delivery and test capture, package organization, package initializer responsibilities, shared pytest fixture ownership and distribution, public import boundaries including independent frozen static, runtime, and project configuration, typed configuration-option parsing, shared protocol-option construction and diagnostics, and protocol-default selection, canonical identifier checking, component extraction, mixed path normalization and resolution, shared filesystem path types with a single untrusted input type (`PathInput`) and configuration interfaces including complete initialization, shared protocol utilities including the typed configuration-creation success shortcut, output-cell base ownership, protocol-specific output cells and rendering contexts, the logic-cell package with general and uniform bases, content cells, and consumer-owned projections, shared typed environment-error cells and deferred diagnostic projection, consumer ownership, and shared result infrastructure; Typer dependency ownership is managed by the shared library; shared application construction, skill- and version-command registration, and the shared exit-code enum are also defined here; it also covers shared invalid-argument error ownership; shared file enumeration with `FileGlobPattern` inputs and rejection of symbolic links below the resolved project root are included. Shared project loading and initialization contexts own discovery, validation, and project scopes using a filename from static settings. The emitter owns batch-rendering orchestration and delivery to an optional text stream, with stdout as the default. Shared command execution scopes and complete initialization-command registration are managed by the library.
-- `specs/architecture/python.md` describes Python typing, result-based validation, and class conventions.
-- `specs/architecture/entities.md` describes entity modeling, typed data conventions including static typing suppressions, and validation and serialization boundaries, with logic cells and their ordered collections as the primary domain-to-CLI result interface; module ownership of this boundary is defined in `specs/architecture/modules_layout.md`. Shared project loading and initialization contexts own discovery, validation, and project scopes using a filename from static settings.
-- `specs/architecture/errors.md` describes deferred warning cells and native journal processor diagnostics, independent internal-exception and environment-error hierarchies, result propagation with typed unwrap-error recovery, warnings, and consumer presentation boundaries.
-- `specs/architecture/tests.md` describes test organization, result and failure coverage, reusable pytest fixture placement, settings isolation with an approved replacement of the static configuration binding, and shared automation payload extraction and error-cell assertions whose test-only import boundaries are defined in `specs/architecture/modules_layout.md`. Shared project loading and initialization contexts own discovery, validation, and project scopes using a filename from static settings.
-- `specs/behavior/cli.md` describes shared configuration and protocol-option parsing with LLM invalid-protocol diagnostics, deferred filesystem validation, independent immutable runtime and project configuration with restoration on command exit, and shared command contexts for unresolved input retrieval, protocol selection, and output scope setup, with direct emitter submission, finalization, and failure handling; shared application setup owns root global-option registration, help, completion, and skill- and version-command behavior; it also covers shared invalid-argument diagnostic data. Shared project loading and initialization contexts own discovery, validation, and project scopes using a filename from static settings. All cell kinds, including errors, use stdout in every protocol. Shared command execution scopes and complete initialization-command registration are managed by the library.
-- `specs/behavior/config.md` describes configuration discovery, path resolution, initialization target selection and complete configuration initialization, TOML loading and schema validation, exclusive creation from text or packaged templates, and shared failure diagnostics. Shared project loading and initialization contexts own discovery, validation, and project scopes using a filename from static settings.
-- `specs/behavior/protocol.md` describes shared output protocols, output cell construction and common message, configuration-creation, skill-document, and version shortcuts with default successful-operation record metadata, logic-cell construction and projections including uniform single-cell projection, metadata conversion, emitter-owned batch rendering and cell writing with protocol selection, position, total, configured labels and stream selection, and typed environment-error cells with corrective guidance, compact Unicode JSON Lines serialization, per-cell journal and warning flags, ordered buffered delivery, immediate journal processing, compact journal projections with shared logical-cell whitespace normalization, and external command forwarding. All cell kinds share the emitter's configured text stream, defaulting to current stdout.
-- `specs/behavior/paths.md` describes lexical project-path identifiers, canonical identifier checks and component extraction, mixed identifier and filesystem normalization and resolution with home expansion, explicit normalization bases, absolute-input restrictions, filesystem containment and conversion, and failure diagnostics; shared file enumeration and rejection of symbolic links below the resolved project root are included.
-- `specs/behavior/skills.md` describes packaged UTF-8 skill-document loading and shared read-failure diagnostics, with module ownership and public interfaces defined in `specs/architecture/modules_layout.md`; loading remains independent of the shared CLI command. Shared project loading and initialization contexts own discovery, validation, and project scopes using a filename from static settings.
-- `specs/documentation/readme.md` describes the content and tone of the brief root README.
-- `specs/documentation/changelog.md` describes Changy source files, version-record structure, and entry formatting.
+- `specs/intro.md` — Index of project specifications.
+- `specs/dictionary.md` — Shared project terminology.
+- `specs/meta/general.md` — Requirements for specification content and presentation.
+- `specs/meta/behavior.md` — Rules for expressing observable behavior in specifications.
+- `specs/architecture/modules_layout.md` — Ownership boundaries within the library and between the library and its consumers.
+- `specs/architecture/python.md` — Python implementation conventions.
+- `specs/architecture/entities.md` — Conventions for modeling project data.
+- `specs/architecture/errors.md` — Conventions for representing and propagating diagnostics.
+- `specs/architecture/tests.md` — Requirements for verifying project behavior.
+- `specs/behavior/cli.md` — Contracts for reusable command-line application support.
+- `specs/behavior/config.md` — Contracts for reusable configuration support.
+- `specs/behavior/protocol.md` — The shared output protocol contract.
+- `specs/behavior/paths.md` — The shared contract for interpreting project paths.
+- `specs/behavior/skills.md` — The contract for loading packaged skill documentation.
+- `specs/documentation/readme.md` — Requirements for the root README.
+- `specs/documentation/changelog.md` — Requirements for maintaining the project changelog.

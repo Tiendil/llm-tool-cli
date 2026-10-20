@@ -2,12 +2,17 @@
 
 ## Goal of the document
 
-This document describes the changelog tooling, source files, version-record structure, and entry format.
+This document describes requirements for maintaining the project changelog.
 
 ## Scope
 
 This specification applies to changelog documentation artifacts.
-Release version selection, package publishing, Git tagging, and release automation are out of scope.
+The following are out of scope:
+
+- release version selection.
+- package publishing.
+- Git tagging.
+- release automation.
 
 ## Dictionary
 

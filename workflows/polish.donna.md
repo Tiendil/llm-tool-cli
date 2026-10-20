@@ -7,13 +7,11 @@ start_operation_id = "run_tach_script"
 
 Initiate operations to polish and refine the llm-tool-cli codebase: running and fixing module-boundary checks, formatters, linting, type checking, spelling checks, and tests. This workflow MUST NOT be used to introduce new logic into the project or refactor it - only to fix existing issues.
 
-Polishing MUST preserve intended behavior.
-Check configuration MUST NOT be weakened merely to hide findings.
+Polishing MUST preserve intended behavior and MUST NOT weaken checker configuration merely to hide findings.
 Fixes SHOULD address the cause of a finding before adding a suppression.
-Suppressions MUST be narrow, understood, and consistent with the applicable architecture.
-
-Automated cleanup MUST preserve intentional public re-exports and imports required for documented side effects.
-Remaining failures MUST be reported rather than presented as successful verification.
+Suppressions MUST address understood findings, use the smallest practical scope, and respect the applicable architecture.
+Use the project development environment for all checks.
+Changes requiring new behavior, architectural restructuring, or an uncertain domain decision need developer authorization unless already covered by the current task.
 
 ## Run Tach
 
@@ -56,6 +54,8 @@ Allowed fixes:
 - Use an existing public API owned by the target module.
 
 Do not change Tach configuration only to allow an import unless the project architecture itself is intentionally being changed.
+Do not move modules or create new boundaries unless architectural restructuring is already authorized.
+Ask the developer when the correct dependency direction is unclear.
 
 ## Run Autoflake
 
@@ -83,6 +83,10 @@ kind = "donna.lib.request_action"
 ```
 {{ donna.lib.task_variable("autoflake_output") }}
 ```
+
+Mechanical cleanup MUST preserve required dynamic behavior, public re-exports, and initialization side effects.
+Inspect the purpose of any removed symbol that may serve those roles before accepting its removal.
+Imports retained for side effects SHOULD make their purpose explicit enough to survive cleanup.
 
 1. Fix the autoflake issues based on the output above.
 2. Ensure your changes are saved.
@@ -182,8 +186,16 @@ kind = "donna.lib.request_action"
 3. Ensure your changes are saved.
 4. `{{ donna.lib.goto("run_tach_script") }}`
 
-Do not change external names, serialized values, fixture data, command output expectations, URLs, or compatibility strings unless the surrounding behavior explicitly permits the spelling change.
-Project terminology SHOULD be added to a narrow spelling allowlist when the spelling is intentional.
+Do not change compatibility-sensitive values unless the surrounding contract permits the correction:
+
+- external names.
+- serialized values.
+- fixture data.
+- command output expectations.
+- URLs.
+- compatibility strings.
+
+Intentional project terminology SHOULD use the configured spelling allowlist when available.
 
 ## Run Flake8
 
@@ -220,11 +232,15 @@ kind = "donna.lib.request_action"
 Allowed fixes:
 
 - `E800 Found commented out code`: remove the commented-out code unless the comment is part of documented behavior, example text, or fixture data.
-- `CCR001 Cognitive complexity is too high`: ignore by adding `# noqa: CCR001` at the end of the line.
+- `CCR001 Cognitive complexity is too high`: when behavior is understood and complexity is accepted for the current design, add a narrow `# noqa: CCR001`; otherwise report the finding without broad refactoring.
 - `F821 undefined name` when there are missing imports: add the necessary import statements at the top of the file.
 - Use narrow suppressions only when you understand the finding and the suppression correctly represents the exception.
 
 For `F821 undefined name` in all other cases, ask the developer to fix it manually. Do not guess undefined names that are not explained by missing imports.
+
+Prefer clear, local fixes over broad refactoring.
+Security findings MUST NOT be suppressed unless the reported behavior is intentional and its implications are understood; ask the developer when unclear.
+For print-output findings, use the existing output or diagnostic mechanism; test fixes SHOULD follow the test's intent.
 
 ## Run Mypy
 
@@ -275,6 +291,8 @@ Changes you are not allowed to make:
 - Adding or removing class attributes. If you need to do it, ask the developer to fix the problem manually.
 - Adding `type: ignore[import-untyped]`. If you need to use it, ask the developer to install the missing types first or to fix the issue manually.
 
+Follow the static typing suppression rules in `specs/architecture/entities.md`.
+
 ## Run Tests
 
 ```toml donna
@@ -314,4 +332,4 @@ id = "finish"
 kind = "donna.lib.finish"
 ```
 
-Polishing workflow completed. Report the results and any remaining issues to the developer.
+Polishing workflow completed. Report the checks performed, any unavailable checks, and unresolved findings with enough context for the developer to decide the next action.

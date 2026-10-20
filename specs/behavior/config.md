@@ -2,148 +2,144 @@
 
 ## Goal of the document
 
-This document describes shared configuration fields, configuration-file selection, loading, creation, project scopes, and failure diagnostics.
+This document describes shared configuration support.
 
 ## Scope
 
-This specification covers reusable configuration fields, configuration-file mechanics, and project preparation and scope management.
-Application-specific schema semantics, template contents, workspace construction, and CLI presentation and exit policies are out of scope.
+This specification covers reusable configuration fields, file mechanics, and project preparation/scoping.
+The following are out of scope:
+
+- application schemas.
+- application templates.
+- application workspaces.
+- CLI presentation.
+- exit policy.
 
 ## General behavior
 
-Configuration selection and loading MUST be deterministic for the same inputs, working directory, and filesystem state.
+Selection/loading MUST be deterministic for the same inputs, cwd, and filesystem.
 
 ## Shared root fields
 
-Applications MUST be able to reuse configuration-version and session-directory field definitions independently in their own schemas.
-Application schemas MUST own their supported versions and defaults, independently of other applications and the shared library.
-The shared version field MUST apply the application's supplied version constraint without prescribing a supported version or default.
-Version validation MUST inspect the original input and reject non-integer values, including booleans, floating-point numbers, and strings, without coercion.
-Wrong-type diagnostics MUST explain that an integer is required and identify the received value.
-Unsupported-version diagnostics for application-supplied literal constraints MUST identify both the received version and the supported values.
-Other schema-validation failures MUST retain their original details.
-The shared session-directory field MUST accept project-relative filesystem paths and reject absolute paths and any `..` path component.
-Applications MUST supply session-directory defaults and own storage behavior.
-Session-directory validation MUST remain lexical: it MUST NOT resolve paths, expand home markers, inspect the filesystem, or create directories.
-Validated session-directory values MUST retain the shared relative-project-path representation and serialize as path strings in JSON.
-Shared field validation failures MUST use the existing schema-validation diagnostic when loaded from configuration files.
+Applications MUST be able to reuse version/session-directory fields independently, owning their constraints and defaults.
+The library MUST NOT prescribe versions/defaults.
+Shared field failures during file loading MUST use existing schema-validation diagnostics.
+
+### Version
+
+Version validation MUST inspect original inputs, reject non-integers without coercion (including booleans, floats, and strings), and identify received values in integer-required diagnostics.
+Unsupported literal-version diagnostics MUST identify received/supported values; other schema failures MUST retain details.
+
+### Session directory
+
+Session directories MUST accept relative paths and reject absolute paths or any `..` component.
+Validation MUST remain lexical, without:
+
+- resolution.
+- home expansion.
+- filesystem inspection.
+- creation.
+
+Values MUST retain shared relative-path representation and JSON path-string serialization.
+Applications MUST own defaults/storage.
 
 ## Path resolution
 
-Configuration path resolution MUST expand a leading `~` or `~user` home-directory marker before resolving the path.
-Relative paths MUST resolve against the caller-supplied working directory.
-Absolute paths MUST be independent of that directory.
-Relative working directories MUST resolve against the process working directory.
-Resolution MUST first resolve the containing directory as the project root, then validate the configuration file using the shared filesystem containment policy in `specs/behavior/paths.md`.
-Symlinks used to select that directory or its ancestors MAY be resolved; the configuration file itself MUST NOT be a symlink, including an internal link, broken link, or loop.
-Neither the target nor its parent is required to exist.
-Application-specific identifier syntax MUST NOT receive special interpretation.
+Paths MUST expand leading `~`/`~user`.
+Relative paths MUST use supplied cwd; absolute paths MUST be cwd-independent; relative cwd MUST use process cwd.
+Resolution MUST resolve the parent as project root, then apply `specs/behavior/paths.md` containment to the file.
+Root/ancestor symlinks MAY resolve; file symlinks MUST be rejected, including internal/broken/looping links.
+Neither target nor parent needs to exist.
+Application identifier syntax MUST NOT be interpreted.
 
-Path resolution MUST NOT discover configuration files, read their contents, or create files or directories.
-Expected home-expansion and containing-directory resolution failures MUST produce configuration path-resolution diagnostics.
-Shared containment validation failures MUST propagate their original path diagnostics.
+Resolution MUST NOT discover, read, or create files/directories.
+Expected home/parent-resolution failures MUST use configuration-resolution diagnostics; shared containment failures MUST propagate unchanged.
 
 ## Existing configuration selection
 
-An explicit configuration path MUST take precedence over discovery and use shared configuration path resolution.
-An explicit path MUST NOT fall back to discovery when the target is missing or cannot be loaded.
+Explicit paths MUST use shared resolution and override discovery without fallback on missing/unloadable targets.
+Otherwise selection MUST search resolved cwd through filesystem-root parents for the supplied filename, choosing the nearest file and skipping directories.
+Each candidate MUST pass containment before kind inspection.
+Matching symlinks MUST fail without following or falling back.
+Selection MUST NOT read/validate contents.
 
-Without an explicit path, selection MUST search from the resolved caller-supplied working directory through its parents to the filesystem root for the caller-supplied filename.
-Discovery MUST select the nearest matching file and skip matching directories.
-Each candidate MUST pass the shared containment policy beneath its searched directory before its file kind is checked.
-A matching symlink MUST fail discovery without following its target or falling back to a parent configuration.
-Selection MUST NOT read or validate configuration contents.
-
-A discovery-only lookup MUST distinguish no match from a filesystem failure.
-Selection that requires a configuration MUST report `config_not_found` when discovery finds no match.
-That diagnostic MUST identify the search starting directory in `path` and the filename and search scope in `reason`.
+Discovery-only lookup MUST distinguish absence from filesystem failure.
+Required selection with no match MUST return a missing-configuration diagnostic, identifying starting directory in `path` and filename/search scope in `reason`.
 
 ## Initialization target selection
 
-Initialization MUST select an explicit configuration path when supplied.
-Otherwise, it MUST select the caller-supplied default filename in the supplied working directory.
-The selected target MUST use shared configuration path resolution.
-Initialization target selection MUST NOT search parent directories or read or create files or directories.
-
-**Example:** When a parent directory contains `tool.toml`, initialization from its child still selects the child's `tool.toml` unless an explicit path is supplied.
-Loading an existing project from that same child can discover the parent's file.
+Initialization MUST resolve an explicit path or the default filename in supplied cwd.
+Selection MUST NOT search ancestors, read, or create.
+**Example:** Child-directory initialization selects the child's file even when ordinary loading would discover a parent's configuration.
 
 ## Configuration loading
 
-Configuration reading MUST accept UTF-8 TOML 1.1 and return the parsed document without applying an application schema.
-An empty document MUST produce an empty mapping.
-Reading MUST use the supplied path without additional discovery or resolution.
-
-Schema-based loading MUST validate the parsed document using the caller-supplied schema and its defaults.
-The caller MUST own schema composition and application-specific field meanings and validation rules; reused shared fields MUST retain their shared validation.
-Read failures MUST propagate unchanged.
-Expected schema-validation failures MUST produce configuration validation diagnostics.
-Unexpected schema failures MUST propagate as exceptions.
+Reading MUST use the supplied path without discovery/resolution, accept UTF-8 TOML 1.1, and return parsed data without schema application; empty documents MUST yield empty mappings.
+Schema loading MUST apply the supplied schema/defaults.
+Callers MUST own schema composition/semantics, preserving reused shared validation.
+Read failures MUST propagate unchanged; expected schema failures MUST become validation diagnostics; unexpected failures MUST remain exceptions.
 
 ## Configuration creation
 
-Creation MUST write supplied text as UTF-8 without changing the text.
-It MUST use the supplied target path without additional discovery or resolution.
-Creation MUST be exclusive and MUST refuse an existing filesystem entry at that path, including a symlink.
-It MUST NOT overwrite a file created concurrently.
-The parent directory MUST already exist; creation MUST NOT create directories.
-Creation MUST NOT validate the text as TOML or apply an application schema.
-A failed write MAY leave a partial newly created file.
+Creation MUST write exact supplied UTF-8 text to the supplied path without:
 
-Template-based creation MUST read the caller-selected packaged template as UTF-8 text before attempting target creation.
-A template-read failure MUST leave the target untouched, including when the target already exists.
-Successful template reading MUST use the same exclusive creation behavior as supplied text.
+- resolution.
+- discovery.
+- TOML validation.
+- schema validation.
+
+It MUST exclusively refuse every existing entry, including symlinks and concurrent creations.
+Parents MUST already exist; creation MUST NOT create directories.
+Failed writes MAY leave partial new files.
+
+Template creation MUST first read supplied packaged UTF-8 text, leaving targets untouched on read failure even if already existing, then use the same exclusive creation.
 Creation failures MUST propagate unchanged.
 
 ## Configuration initialization
 
-Initialization MUST combine initialization target selection with template-based creation, in that order.
-The caller MUST supply the default filename, working directory, resource package, and template, and MAY supply an explicit target path.
-Initialization MUST return the resolved configuration path only after successful creation.
-A failed stage MUST stop initialization and propagate its diagnostics unchanged without attempting subsequent stages.
-Initialization MUST NOT load or validate the created configuration or construct or install an application workspace.
+Initialization MUST select the target then create from template, returning the resolved path only on success.
+Callers MUST supply:
+
+- filename.
+- cwd.
+- resource package.
+- template.
+
+They MAY supply an explicit path.
+
+Failed stages MUST propagate unchanged and stop subsequent stages.
+File initialization MUST NOT:
+
+- load the created file.
+- validate the created file.
+- construct workspaces.
+- install workspaces.
 
 ## Project scopes
 
-Project loading MUST combine existing configuration selection and schema-based loading, using the default filename declared in static application settings.
-Project initialization MUST combine configuration-file initialization and schema-based loading of the created file, using the same static filename.
-Both operations MUST accept the caller's schema, working directory, and optional explicit path; initialization MUST also accept the template resource location.
-Preparation MUST occur when entering the scope.
-Only successful validation MUST establish immutable project settings containing the selected absolute path and its derived parent directory.
-The scope MUST yield the loaded application configuration through a successful result and retain the project binding until exit.
-Selection MUST enforce the shared path policy; loading MUST NOT resolve a selected path again.
-The preceding project binding, including its absence, MUST be restored on normal exit and after exceptions or early exits from the scope body.
-Runtime settings MUST remain unchanged, and project preparation MUST NOT require them.
-Expected preparation failures MUST yield their original error result without replacing the preceding project binding or attempting subsequent stages.
-A created file MUST remain on disk if its subsequent loading or validation fails.
-Unexpected preparation failures and exceptions from the scope body MUST propagate unchanged.
-Attempting project setup without a static configuration filename MUST raise an internal exception before filesystem operations.
-Application-specific configuration binding, workspace construction, and output MUST remain with the caller.
-Commands without project requirements MUST NOT enter a project scope.
+Entering a project-loading scope MUST select and validate configuration; entering a project-initialization scope MUST create and validate it.
+Both MUST use the configured default filename and supplied schema/cwd/optional path; initialization MUST also accept template location.
+Preparation MUST occur on entry.
+Only successful validation MUST expose the selected absolute path and derived parent as the active project and yield loaded configuration as success.
+The selected project MUST remain unchanged and available until scope exit.
+Selection MUST enforce path policy; subsequent loading MUST use the selected path and root.
+
+Preparation MUST neither require nor alter the effective runtime protocol.
+Expected failures MUST yield unchanged errors without replacing the caller's active project or continuing preparation.
+Created files MUST remain after subsequent load/validation failure.
+Unexpected preparation/body exceptions MUST propagate unchanged.
+Missing default filenames MUST raise internally before filesystem access.
+Preparation MUST NOT install application-specific settings, construct workspaces, or emit output.
 
 ## Failure diagnostics
 
-Expected failures MUST use the shared environment-error result contract.
-Configuration diagnostics MUST include `path` and `reason`.
-Template-read diagnostics MUST additionally include `template`, with `path` identifying the intended target.
-Schema-validation details MUST be carried in `reason`.
-Underlying exceptions MUST be retained as private causes when available, outside serialized diagnostic data.
+Expected failures MUST use shared error results with `path`/`reason`; template errors MUST also include `template` and identify target in `path`.
+Schema details MUST reside in `reason`.
+Available original exceptions MUST remain private causes outside serialized data.
 
-The stable diagnostic codes MUST be:
+Diagnostics MUST identify the failed operation and distinguish filesystem failures from invalid content.
+Content diagnostics MUST distinguish text-decoding failures, invalid TOML, and schema violations.
+Creation diagnostics MUST distinguish an existing target from template-read and output-write failures.
 
-| Condition | Code |
-| --- | --- |
-| Configuration path resolution fails | `config_path_resolution_failed` |
-| Configuration discovery fails | `config_discovery_failed` |
-| Required discovery finds no configuration | `config_not_found` |
-| Configuration cannot be opened or read, including a missing explicit file | `config_unreadable` |
-| Configuration is not valid UTF-8 | `config_invalid_encoding` |
-| Configuration is not valid TOML | `config_invalid_toml` |
-| Parsed configuration fails the supplied schema | `config_validation_failed` |
-| Creation target already exists | `config_already_exists` |
-| Packaged template cannot be read as UTF-8 | `config_template_unreadable` |
-| Supplied text cannot be encoded or the target cannot be written | `config_unwritable` |
-
-Shared containment failures MUST retain the diagnostics specified in `specs/behavior/paths.md`, including `invalid_project_path` for a configuration-file symlink.
-Configuration operations MUST propagate existing diagnostics without wrapping or reclassifying them.
-Unexpected exceptions MUST remain exceptions rather than becoming expected configuration failures.
+Shared containment diagnostics MUST follow `specs/behavior/paths.md`, including rejection of file symlinks.
+Existing diagnostics MUST propagate without wrapping/reclassification; unexpected exceptions MUST remain exceptions.

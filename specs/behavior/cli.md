@@ -2,199 +2,171 @@
 
 ## Goal of the document
 
-This document describes shared application setup, invocation options, output protocol selection, command error handling, and built-in documentation, version, and initialization commands.
+This document describes shared command-line application support.
 
 ## Scope
 
-This specification covers reusable application setup and shared command-line behavior.
-Consumer-specific command execution, configuration schemas and loading mechanics, and output-cell layouts are out of scope.
+Reusable application setup and CLI behavior; consumer command execution, configuration schemas/loading mechanics, and cell layouts are out of scope.
 
 ## Application setup
 
-The library MUST construct independently configurable applications using the consumer's help description.
-Each application MUST be a command group with shared global options registered at its root, even when it has only one command.
-The library MUST retain parsed global options as framework inputs before the selected command executes, without loading configuration or selecting a command's default protocol at the root.
-Consumers MUST retain ownership of application-specific command registration and startup.
-`-h` and `--help` MUST display generated help and exit successfully at the root and subcommand levels.
-Help MUST describe registered commands, arguments, and options using the framework's normal text output.
-Help MUST NOT require project configuration.
+Applications MUST be independently configurable command groups using consumer help, even with one command.
+Root options MUST retain parsed inputs without loading configuration or choosing command defaults.
+Applications MUST be able to register custom commands before execution.
+Root/subcommand `-h`/`--help` MUST show framework text describing commands/arguments/options and exit successfully without configuration.
 
-The root application MUST expose `--show-completion` and `--install-completion` using the framework's shell integration.
-Showing completion MUST print a script without installing it.
-Installing completion MUST require explicit invocation of the installation option.
-Application construction and ordinary command execution MUST NOT install completion.
-Completion MUST include registered command names, options, and declared document choices.
+Root `--show-completion` MUST print a shell script; `--install-completion` MUST install only when explicitly invoked.
+Construction/ordinary execution MUST NOT install completion.
+Completion MUST include registered commands, options, and document choices.
 
 ## Application identity
 
-The application MUST initialize immutable static configuration containing its tool label in the execution context used for command-line parsing or shared sequence rendering, before either operation.
-The label MUST preserve its exact string value, including whitespace and an empty string.
-The label MUST remain separate from parsed invocation options and MUST NOT be obtained from workspace configuration.
-Reading uninitialized static configuration MUST raise an internal exception.
-Static configuration MAY also declare the application's default configuration filename; project setup MUST require it, while parsing and rendering MUST remain independent of it.
-Repeated initialization with identical static settings MUST succeed without changing them.
-Initialization with a different label MUST raise an internal exception and preserve the installed label.
-Initialization with a different configuration filename MUST likewise fail and preserve the installed settings.
-
-**Example:** An unsupported protocol can produce an error cell with the application's label before its root command callback runs.
+Immutable static identity MUST be initialized before parsing/shared rendering, preserving exact labels including whitespace/empty text.
+It MUST remain separate from invocation/workspace settings.
+Unset access MUST raise an internal exception.
+An optional static default filename MUST be required for project setup, not parsing/rendering.
+Identical initialization MUST succeed unchanged; conflicting labels or filenames MUST raise internal errors without replacing settings.
+**Example:** Invalid-protocol output can use the label before the root callback runs.
 
 ## Global options
 
-Global options MUST distinguish an explicitly selected protocol from an unspecified protocol.
-They MUST carry an optional configuration file path without expanding home markers, resolving the path, or checking the filesystem.
-An absent configuration path MUST remain absent for later configuration selection.
+Options MUST distinguish explicit/unspecified protocol and retain optional unresolved configuration input.
+Absent paths MUST remain absent for later selection.
 
 ## Configuration option
 
-`--config PATH` MUST be an optional global option accepted before the subcommand.
-Its value MUST be parsed as a filesystem path, preserving home markers and relative paths for shared configuration resolution.
-Omission MUST leave the configuration path unspecified.
-Parsing MUST NOT expand home markers, resolve the path, or check its existence, file type, or readability.
-Filesystem validation and its diagnostics MUST belong to the configuration operation that uses the path.
-An unusable configuration path MUST NOT prevent execution of a command that does not use configuration.
-An option supplied without a value MUST remain a command-line parsing error.
+Global `--config PATH` MUST precede the subcommand and parse filesystem paths without:
 
-**Example:** A directory supplied as `--config PATH` reaches configuration loading and produces a shared configuration diagnostic.
-A command that only prints a version can run with that same option because it does not use configuration.
+- home expansion.
+- resolution.
+- existence checks.
+- kind checks.
+- readability checks.
+
+Configuration-dependent operations MUST validate paths and report their diagnostics when used.
+Unusable paths MUST NOT prevent configuration-independent commands.
+Missing option values MUST remain parsing errors.
+**Example:** A directory reaches configuration loading for diagnosis but does not prevent a version command.
 
 ## Protocol option
 
-`-p PROTOCOL` and `--protocol PROTOCOL` MUST be aliases for one optional global option accepted before the subcommand.
-Accepted values MUST be the exact, case-sensitive names of the shared output protocols.
-Omission MUST leave the protocol unspecified for command-default selection.
-Help MUST identify the option value as `PROTOCOL` and describe the accepted values and shared command defaults.
+Global `-p PROTOCOL`/`--protocol PROTOCOL` MUST be aliases preceding the subcommand.
+Values MUST match shared protocol names exactly/case-sensitively; omission MUST remain unspecified.
+Help MUST use `PROTOCOL` and describe accepted values/defaults.
 
-An unsupported value MUST stop execution before the command runs, write one LLM error cell to stdout, and exit with status `1`.
-The cell MUST use the initialized application tool label and the shared invalid-argument diagnostic, with a `reason` identifying the rejected value and the accepted values.
-The fallback MUST always use LLM output because the requested protocol is invalid.
-Supplying the option without a value MUST remain a framework command-line parsing error.
+Invalid values MUST stop before execution, emit one LLM error cell on stdout, and exit `1`.
+The cell MUST use initialized identity and the shared invalid-argument diagnostic, with a reason naming rejected/accepted values.
+This fallback MUST always be LLM and require no runtime/project settings.
+Missing option values MUST remain framework parsing errors.
 
 ## Invalid-argument diagnostics
 
-The library MUST provide a shared environment-error value for explicit argument-validation failures, including invalid protocol values and consumer-owned argument checks.
-It MUST use the stable code `invalid_arguments` and a textual `reason` field.
-Its formatted message MUST be the reason, using the shared environment-error normalization and serialization rules.
-Diagnostic construction MUST NOT select an output protocol or stream, write output, or terminate the process; those responsibilities belong to the handling CLI boundary, which MUST use the error class's declared exit status.
-Framework parsing failures MUST retain their existing framework diagnostics unless explicitly handled by a shared option or command.
+Explicit validation, including consumer checks, MUST report an invalid-argument diagnostic with textual `reason` as its formatted message under the Environment-error cells contract in `specs/behavior/protocol.md`.
+Construction MUST NOT:
+
+- select protocol.
+- select stream.
+- output.
+- terminate.
+
+The CLI boundary MUST use the declared error exit status.
+Unadapted framework parsing MUST retain its diagnostics.
 
 ## Invocation context
 
-Command setup MUST establish immutable context-scoped runtime settings owning the effective output protocol, independently of the CLI framework and project availability.
-Project settings MUST have their own independent binding and MUST require an absolute active configuration path.
-The project directory MUST be derived from that path, never initialized independently.
-All configuration entities MUST be complete when constructed and immutable thereafter.
-Unresolved CLI configuration input MUST remain separate from project settings.
-Shared project contexts MUST construct and bind project settings after successful configuration loading and validation, including after creation, and retain them around project-dependent execution and output.
-Commands that do not use configuration MUST NOT establish project settings, even when `--config` is supplied.
-A failed loading or creation operation MUST NOT replace an existing project binding with the failed candidate.
-Application-specific loaded configuration MUST remain separate from these shared settings.
+Command setup MUST expose a complete effective protocol without requiring a framework context or an active project.
+An active project MUST identify an absolute configuration path and its parent root.
+Project preparation MUST follow the Project scopes contract in `specs/behavior/config.md`, preserving the selected project through dependent execution and output.
+Projectless commands MUST NOT establish an active project even with `--config`.
 
-Each command context MUST establish fresh runtime settings without changing unrelated framework context data.
-The preceding runtime binding, including an absent binding, MUST be restored when the framework command context closes, including after command errors and early exits.
-Consumer setup MUST register shared project contexts with the framework command context so project bindings are restored when it closes.
-Runtime readers, including output writing, MUST consult the active settings rather than retained copies.
-Constructing a command context MUST NOT resolve configuration paths, load a workspace, or emit output.
-The context MUST bind fresh shared output delivery independently of project settings, using stdout by default.
-Commands MUST submit cell batches directly to the active emitter.
-The preceding output binding MUST be restored when the framework context closes.
-Successful command completion MUST flush buffered results followed by warnings before runtime and project bindings close.
-Command execution MUST have a shared scope composing context setup, error handling, and output finalization.
-The shared skill, version, and initialization commands MUST use this scope; consumers MAY compose it with application-specific responsibilities.
-Shared terminal-error journaling MUST remain independent of consumer runtime resources and MUST NOT invoke consumer journal-cell factories.
-Explicit function arguments remain permitted for operations that receive values directly.
+Each command MUST start with fresh output state without changing unrelated caller context.
+Command closure MUST restore the caller's preceding protocol, project, and output state, including absence, after success, failure, or early exit.
+Preparing command support without entering execution MUST NOT resolve paths, load workspaces, or emit.
+Output MUST default to stdout and honor the command's effective protocol throughout execution.
+
+Successful completion MUST deliver results then warnings before command closure.
+Skill, version, and init MUST follow the same completion and failure behavior as custom commands.
+Terminal-error journaling MUST NOT invoke consumer journal factories or require consumer runtime resources to remain active.
 
 ## Protocol selection
 
-An explicit protocol MUST take precedence over command defaults.
-When no protocol is specified, the invoked command named `skill` MUST select `llm` and all other command names MUST select `human`.
-The library MUST own both defaults and the selection rule.
-Selection MUST publish the effective protocol in runtime settings before command execution.
-
-**Example:** With no explicit protocol, printing a skill document selects LLM output, while the next version command selects human output.
-An explicit `human` protocol selects human output for the skill command as well.
-Invalid-protocol diagnostics MUST use static application identity and the explicit LLM fallback without requiring runtime or project settings.
+Explicit protocol MUST win; otherwise command named `skill` MUST use LLM, all others human.
+The effective protocol MUST be available to the caller before execution.
+**Example:** Skill defaults to LLM, version to human; explicit human overrides skill's default.
 
 ## Skill command
 
-The shared `skill [DOCUMENT]` command MUST use the consumer's packaged documents and declared document choices.
-The consumer's choices MUST include `usage`.
-Omitting the document argument MUST select `usage`.
-Explicit document names MUST match the supplied choices exactly and case-sensitively.
-Help and shell completion MUST use the same document choices as validation.
-Unknown names MUST remain framework argument errors with exit status `2`, before document loading.
-The command MUST NOT load workspace configuration or require a consumer command context.
+`skill [DOCUMENT]` MUST use consumer choices/resources, including `usage` as the omitted-argument default.
+Document retrieval MUST follow `specs/behavior/skills.md`.
+Validation/help/completion MUST share exact case-sensitive choices.
+Unknown names MUST fail through the framework with exit `2` before loading.
+The command MUST NOT require workspace configuration or application-specific runtime preparation.
 
-The command MUST select its protocol through the shared invocation options and command-default rule.
-It MUST load the selected packaged document and write one skill cell to stdout, exiting with status `0`.
-The cell MUST carry Markdown content, kind `skill`, and metadata `type = skill` and `document` naming the selected document.
-Document contents MUST remain consumer-owned and use the existing shared cell normalization and formatting.
-
-A document read failure MUST use shared command error handling to emit the `skill_unreadable` diagnostic and exit with status `3`.
-Unexpected exceptions MUST propagate without being converted to expected read failures.
+Protocol selection MUST follow the Protocol selection contract above.
+Success MUST emit one stdout Markdown cell with kind/type `skill` and selected `document`, using consumer content and shared normalization/formatting, then exit `0`.
+Read failures MUST use shared skill-read diagnostics and exit `3`; unexpected exceptions MUST propagate.
 
 ## Version command
 
-The shared `version` command MUST report the installed version of the consumer-supplied distribution.
-It MUST look up package metadata when the command executes, without caching the version during registration.
-Registration and help MUST NOT require the distribution's metadata to be available.
-The command MUST NOT accept positional arguments or command-specific options.
-It MUST NOT load workspace configuration or require a consumer command context.
-
-The command MUST select its protocol through the shared invocation options and command-default rule.
-It MUST write one shared metadata-only version cell to stdout and exit with status `0`.
-The cell MUST contain the installed version string using the shared version-cell contract.
-Help MUST describe printing the installed package version without consumer-specific wording.
-
-Metadata lookup failures, including missing distribution metadata, MUST propagate without being converted to environment-error cells or successful fallback output.
+Version MUST look up the supplied distribution's installed metadata during execution, never cache it at registration.
+Registration/help MUST NOT require metadata.
+No positional arguments or command-specific options MUST be accepted.
+It MUST NOT require workspace configuration or application-specific runtime preparation.
+Protocol selection MUST follow the Protocol selection contract above; success MUST emit one metadata-only version cell to stdout and exit `0` under `specs/behavior/protocol.md`.
+Help MUST describe installed-version printing without consumer-specific wording.
+Lookup failures, including missing metadata, MUST propagate without error cells or successful fallback.
 
 ## Initialization command
 
-The shared `init` command MUST use the consumer's configuration schema, packaged starter template, and optional help text.
-Registration and help MUST NOT perform project preparation or require an existing configuration.
-The command MUST NOT accept positional arguments or command-specific options.
-It MUST use shared project initialization with the invocation working directory and optional unresolved configuration input; the default filename MUST come from static configuration.
-Initialization MUST create and validate the starter before binding project settings or reporting success.
-The created file MUST remain on disk when subsequent validation fails, and the failed candidate MUST NOT establish a project binding.
-After success, the command MUST emit one shared configuration-creation success cell with the active configuration path, honoring the selected protocol and retaining the project scope through output delivery.
-Expected failures MUST use shared command error handling without success output; unexpected exceptions MUST propagate unchanged.
-The command MUST NOT require consumer-specific runtime setup.
+Init MUST use:
+
+- the consumer schema.
+- the consumer template.
+- optional consumer help.
+- the static filename.
+
+Registration/help MUST NOT prepare projects or require existing configuration.
+No positional arguments or command-specific options MUST be accepted.
+Initialization MUST use invocation cwd and optional unresolved input, create/validate before exposing the project or reporting success, and retain the project through output.
+Failed validation MUST leave the created file without replacing the caller's active project.
+Success MUST emit one creation cell with the active path under the selected protocol and `specs/behavior/protocol.md`.
+Expected failures MUST follow Command error handling below without success output; unexpected exceptions MUST propagate.
+Application-specific runtime preparation MUST NOT be required.
 
 ## Command error handling
 
-The library MUST provide a shared error-handling scope for command execution using an already selected protocol.
-It MUST recover only failed result unwrapping, using the validated environment-error accessor from the shared result contract.
-It MUST report every recovered error in order through shared error cells and terminate with the aggregated exit status.
-Terminal error cells MUST be journal-enabled and converted into shared journal records without constructing separate journal cells or duplicating console diagnostics.
-Journal records MUST preserve the formatted error message, code, and structured diagnostic fields without loading consumer execution context.
-After the active emitter's journal processor fails, reporting MUST NOT invoke that processor again.
-The CLI MUST NOT infer processor failure from the types of errors being reported; a healthy emitter MUST journal error cells regardless of their error types.
-If journal delivery fails while reporting another error, the original diagnostic MUST still be emitted, followed by the delivery failures without recursive journaling.
-All original diagnostics MUST retain their order, and collected delivery failures MUST follow them before retained warnings.
-Exit-status aggregation MUST include journal-delivery failures without mutating the original error list.
-Error cells MUST use the emitter's configured stream, defaulting to stdout in every protocol, independently of the error's package ownership.
-Malformed unwrapping payloads MUST propagate unchanged without partial diagnostic output.
-Unrelated exceptions and framework control-flow exceptions MUST propagate unchanged.
-Successful execution MUST flush the active emitter and leave the scope without forcing process termination.
-Expected failures MUST discard buffered ordinary results, report diagnostics, and flush retained warnings after them.
-Unexpected exceptions and framework exits MUST NOT flush pending ordinary results.
+Command error reporting MUST use an already selected protocol and accept only valid failed-result payloads.
+Malformed payload failures MUST propagate unchanged before any partial diagnostics; unrelated/framework control-flow exceptions MUST also propagate.
 
-The same reporting and termination operation MUST be available for explicit error lists, including argument validation before command execution.
-Early validation MUST supply its chosen fallback protocol; the reporter MUST use the same stream and exit rules as command failures without consuming an unrelated outer emitter.
-Command failure reporting MUST use the command's emitter so its retained warnings follow diagnostics.
-An empty error list MUST emit no diagnostics and terminate with the shared aggregation result.
+Reported errors MUST render in original order under the Environment-error cells contract in `specs/behavior/protocol.md` and terminate with aggregated status.
+Terminal errors MUST be journaled using their formatted message/code/context without duplicate console diagnostics or consumer context reads.
+Healthy journal delivery MUST process errors irrespective of error types.
+After processor failure, it MUST NOT be called again.
+A reporting-time delivery failure MUST preserve the affected original diagnostic; all original diagnostics MUST precede collected delivery failures and retained warnings without recursive journaling.
+Aggregation MUST include delivery failures without mutating the original list.
+Errors MUST use the emitter stream, default stdout in every protocol regardless of package ownership.
 
-Shared commands MUST use this error-handling scope.
-Consumers MUST retain application-specific workspace construction, runtime setup, and cleanup.
-Shared error journaling MUST NOT require extending the lifetime of consumer runtime resources.
+Success MUST flush without forced termination.
+Expected failure MUST suppress pending ordinary results, report errors, then deliver warnings.
+Unexpected exceptions/framework exits MUST NOT flush pending ordinary results.
+
+Explicit error-list reporting MUST offer the same stream/exit behavior, including before command execution.
+Early validation MUST use a supplied fallback protocol without consuming another command's pending output.
+Command failure MUST preserve that command's pending warnings.
+Empty error lists MUST emit nothing and terminate according to the Exit statuses contract below.
+
+Skill, version, and init MUST follow this error-handling contract.
+Error journaling MUST NOT require consumer runtime resources to remain active after application-specific cleanup.
 
 ## Exit statuses
 
-Shared successful execution MUST use status `0`.
-Expected failures MUST use the exit status declared by their environment-error class.
-The defaults MUST be `1` for explicit shared invalid-argument diagnostics, `2` for configuration errors, and `3` for other environment errors, including unreadable skill documents.
-Error subclasses MUST inherit their parent class's status unless they declare an override.
-A CLI handling multiple environment errors MUST render all errors in their original order and use the highest declared status, independently of error order.
-An empty list or a list whose errors all declare status `0` MUST produce status `0`.
-Exit-status aggregation MUST be provided by the shared core error contract.
-Framework parsing failures MUST retain status `2`; they MUST NOT be changed to status `1` merely to use shared exit statuses.
-Consumers MAY declare application-specific error-class overrides; emitter configuration and process termination MUST remain at the handling CLI boundary.
+Success MUST use `0`; expected failures MUST use each diagnostic's declared exit status, with these defaults unless overridden:
+
+- Explicit shared invalid arguments — status `1`.
+- Configuration errors — status `2`.
+- Other environment errors, including unreadable skills — status `3`.
+
+Exit-status aggregation MUST choose the highest declared status independently of order, preserving diagnostic order.
+Empty/all-zero lists MUST yield `0`.
+Framework parsing MUST retain `2`, not become `1` merely for uniformity.
+Consumers MAY declare diagnostic exit-status overrides; command termination MUST occur only at the CLI boundary.

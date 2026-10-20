@@ -98,6 +98,13 @@ Terms that are used by multiple specifications SHOULD be defined in `./specs/dic
 - Specifications MUST follow [RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119).
 - Specifications MUST NOT break long lines to fit within 80 characters or any other number; they MUST use as many characters as needed to express the idea clearly.
 - When a prose statement names four or more distinct items, those items SHOULD be formatted as a Markdown list rather than inline prose.
+- Specifications SHOULD use Markdown lists for simple enumerations, including terms with definitions and named items with descriptions or a few associated properties.
+- Tables SHOULD be used only when alignment across rows and columns materially helps readers compare items or understand relationships.
+- Having multiple properties per item MUST NOT by itself justify a table; those properties MAY be expressed within list items or nested lists.
+- Formatting choices SHOULD favor readability of Markdown source and clarity of diffs over compactness of the rendered document.
+
+**Example:** Terms with definitions, or configuration fields with defaults and descriptions, ordinarily belong in lists.
+A comparison of supported capabilities across output formats may justify a table.
 
 Each sentence in a prose paragraph MUST be written on a separate Markdown source line.
 Consecutive sentence lines MUST NOT be separated by a blank line when they belong to the same paragraph.
@@ -223,6 +230,16 @@ Stable contracts include:
 - naming conventions that all implementations are expected to follow.
 - concrete dependencies or language features that are intentional architectural choices.
 
+Specifications MUST describe intended behavior and architectural constraints independently of the current implementation.
+Concepts MUST be defined through their meaning, responsibilities, and required properties.
+
+Specifications MUST NOT duplicate implementation facts or maintain catalogs that merely mirror code declarations.
+Concrete names, values, and representations MUST be prescribed only when changing them would violate an independently established requirement.
+A detail’s existence, consistency, or visibility in the implementation MUST NOT by itself establish such a requirement.
+
+Enumerations MUST express an intentionally required set or constraints on its membership, rather than document the implementation’s current contents.
+Changes within an existing conceptual contract SHOULD NOT require specification updates solely to synchronize implementation details or catalogs.
+
 When a requirement can be expressed either as an implementation detail or as a general architectural rule, the specification MUST prefer the general rule.
 
 For example, a specification SHOULD require closed sets of named values to use enums instead of raw strings.
@@ -230,6 +247,14 @@ It SHOULD NOT require a specific enum class name or file location unless that cl
 
 Examples in specifications SHOULD illustrate behavior or ownership.
 Examples SHOULD NOT be treated as a place to enumerate every current implementation file or symbol.
+
+### Consumer independence
+
+Specifications MUST define library requirements independently of specific consumer applications.
+Consumer integration requirements MUST describe caller responsibilities and library guarantees without naming concrete consumers or prescribing their internal architecture.
+Application-specific requirements MUST belong to the consuming application's specifications.
+These restrictions MUST also apply to examples and terminology.
+Consumers used for repository development MUST be described by their development role; concrete tool instructions MUST remain in `AGENTS.md`.
 
 ### Terminology stability
 

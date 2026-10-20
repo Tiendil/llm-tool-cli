@@ -25,8 +25,14 @@ A dictionary term MAY be renamed only when its existing name or definition has b
 - `expected failure` — a failure anticipated by the called operation's documented contract for which the caller has a defined response.
 - `unexpected failure` — a failure outside expected operational conditions, including programming defects, violated internal invariants, or stored-state integrity failures.
 - `warning` — a non-fatal problem discovered while processing a request that can still produce useful requested output.
-- `specification` — a Markdown document under `specs/` that describes expected behavior, architecture, terminology, or documentation rules.
+- `specification` — a Markdown document under `specs/` that describes:
+
+  - expected behavior.
+  - architecture.
+  - terminology.
+  - documentation rules.
+
 - `architecture test` — a test that verifies a project-wide structural rule or convention defined by an architecture specification.
 - `development helper` — a repository command under `bin/` used to develop, verify, or release the library.
-- `Donna workflow` — a Markdown workflow artifact executed by Donna to coordinate development work.
+- `development workflow` — a project-local sequence of actions coordinated by a workflow tool to perform development work.
 - `changelog fragment` — a Markdown file under `changes/` consumed by Changy.
