@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "llm-tool-cli"
-version = "0.1.0"
+version = "0.2.0"
 description = "Shared foundations for LLM-oriented Python command-line tools."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.12,<4.0"
