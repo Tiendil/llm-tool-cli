@@ -2,257 +2,239 @@
 
 ## Goal of the document
 
-This document describes test organization, behavior coverage, and test isolation for the library and repository tooling.
+This document describes test organization, coverage, and isolation.
 
 ## Scope
 
-This specification applies to automated tests of Python library code and repository development helpers.
-Exact test-runner configuration, CI implementation, and performance benchmarks are out of scope.
-Exact fixture names and package publishing checks are also out of scope.
+This specification covers Python library and development-helper tests.
+The following are out of scope:
+
+- runner/CI configuration.
+- exact fixture names.
+- publishing checks.
+- performance benchmarks.
 
 ## Dictionary
 
-- `unit test` — a test focused on one module or a small group of closely related functions or entities.
-- `integration test` — a test that checks multiple modules through a public boundary.
-- `fixture` — test data or setup used by one or more tests.
+- `unit test` — tests one module or a small related group of functions/entities.
+- `integration test` — tests multiple modules through a public boundary.
+- `fixture` — reusable test data or setup.
 
 ## General principles
 
-Tests MUST be written as part of the Python project.
-Tests MUST verify observable behavior or invariants owned by the subject under test.
-Tests MUST NOT be introduced only to mirror an empty module, passive declaration, or unchanged framework behavior.
+Tests MUST belong to the Python project and verify owned behavior/invariants, not mirror empty modules, passive declarations, or unchanged framework behavior.
+Tests SHOULD prefer real code, temporary files, and explicit fixtures, minimizing mocks/stubs/patches to exercise integration.
+They SHOULD use public boundaries, including end-to-end coverage when practical; owning-module tests MAY directly test private helpers.
 
-Tests SHOULD prefer real project code, temporary files, and small explicit fixtures over mocked collaborators.
-Tests SHOULD minimize mocking, stubbing, and monkeypatching so coverage exercises real integration behavior.
-Tests SHOULD prefer end-to-end coverage through public boundaries when practical so tests verify that cooperating modules satisfy their public contracts.
-Tests SHOULD exercise other modules through their public boundaries.
-Tests of an owning module MAY use functionality from that module, including directly exercising a private helper as the subject of its required test class.
+Tests MUST NOT use networks or user-specific files, or modify Docker configuration/runtime parameters.
+They SHOULD be deterministic under controlled inputs/environment.
+Time tests SHOULD use a current-time baseline unless specific calendar/timezone values matter, avoiding incidental date constraints.
 
-Tests MUST NOT depend on network access or user-specific files.
-Tests MUST NOT modify Docker configuration or runtime parameters.
-Tests SHOULD be deterministic for the same inputs and controlled environment.
-Tests SHOULD prefer a real current-time baseline for time-related cases when the exact calendar date is not part of the behavior under test, so incidental dates do not constrain the case.
-Hard-coded calendar datetimes SHOULD be used only when their specific calendar values or timezone boundaries are relevant to the tested behavior.
+Required state MUST be prepared at test start or through class/module autouse fixtures.
+Application-owned state MUST be prepared/mutated through production transitions, not directly, except with developer approval documented beside the bypass and explaining why production code cannot produce that state.
+The shared settings-isolation fixture MAY replace static configuration with a fresh binding: production initialization deliberately cannot clear or replace labels.
+It MUST use `pytest-mock` to restore the prior binding even on failure; its tests MUST exercise real initialization/access.
+Tests MAY inspect application state directly but MUST NOT clean up shared application-owned state unless explicitly requested.
 
-Tests that require specific state MUST prepare it explicitly at the start of the relevant test or with an autouse fixture at the test class or test module level.
-Tests MUST prepare and mutate application-owned state through the production code that owns the corresponding state transition and invariants.
-Tests MUST NOT bypass production logic by writing directly to application-owned state unless the developer explicitly approves the exception.
-An approved exception MUST be documented next to the bypass and MUST explain why the required state cannot be produced through production code.
-Tests MAY inspect application-owned state directly to assert observable effects; this permission does not allow direct mutation.
-Tests MUST NOT clean up shared application-owned state after themselves unless the developer explicitly requests cleanup behavior.
+Test-scoped process changes MUST be restored before completion, regardless of the shared-state cleanup restriction, including:
 
-Changes to process state MUST be scoped to the test and restored before the test ends.
-The shared-state cleanup restriction MUST NOT be used to skip restoring test-scoped process state.
-Process state includes:
-
-- the working directory.
-- environment variables.
-- mutable global state and registries.
+- cwd.
+- environment.
+- mutable globals/registries.
 - context variables.
 - installed configuration.
-- replaced collaborators and mocks.
+- replaced collaborators/mocks.
 
-**Example:** A test that updates shared application-owned files restores its working directory before ending, while the shared files remain available unless cleanup was requested.
+**Example:** Restore a test's cwd while retaining shared application files unless cleanup was requested.
 
-Development-related test execution MUST use the project's Docker-backed helpers.
-The normal complete test command is `./bin/dev-tests.sh`.
-Targeted pytest runs MAY use `./bin/dev.sh uv run pytest <path>`.
+Execution MUST use Docker-backed helpers: normally `./bin/dev-tests.sh`; targeted runs MAY use `./bin/dev.sh uv run pytest <path>`.
 
 ## Test placement
 
-Library tests SHOULD live in a `tests` subpackage of the nearest package that owns the tested behavior.
-Test file names MUST use the `test_` prefix followed by the tested module's name.
-Nested component tests SHOULD remain with their component when this makes ownership clear.
-Cross-module integration tests MAY live under the module that owns the public boundary being exercised.
-CLI integration tests SHOULD live under the package that owns the CLI boundary so its public behavior and tests share an owner.
+Tests SHOULD live in the nearest owning package's `tests` subpackage, retaining nested component ownership when clearer.
+Files MUST use `test_<module>.py`.
+Integration tests MAY belong to the exercised public boundary; CLI tests SHOULD belong to their CLI package.
+**Example:** `example/paths.py` maps to `example/tests/test_paths.py`; no example module is required.
 
-**Example:** Tests for `llm_tool_cli/example/paths.py` would belong in `llm_tool_cli/example/tests/test_paths.py` if that module were introduced.
-This example does not require an `example` module.
+Reusable test utilities SHOULD be owned as follows:
 
-Reusable test-object constructors SHOULD live in the owning test package's `make` module.
-The `make` module SHOULD contain small factories for valid test data so setup remains explicit and reusable.
-The `make` module MUST NOT contain assertions or behavior-verification helpers.
+- `make` — Small valid-data factories; no assertions or verification.
+- `helpers` — No ordinary constructors fitting `make`; owns:
+
+  - Setup.
+  - Assertions.
+  - Workflows.
+  - Permitted cleanup.
+
 Constructors MUST NOT contain assertions.
-Reusable setup, assertion, and workflow helpers SHOULD live in the owning test package's `helpers` module.
-Cleanup helpers for permitted cleanup SHOULD live there with the other test workflow utilities so their ownership is clear.
-The `helpers` module MUST NOT contain ordinary test-data constructors when those constructors fit the `make` module.
-Tests MAY reuse constructors, fixtures, and helpers from another module's `tests` package to avoid duplicating non-owned setup or to support integration coverage.
-Cross-module test helper reuse MUST remain test-only.
-Production code MUST NOT import test helpers.
-
-Behavior tests for a function re-exported without a wrapper MUST live with the module that owns its implementation.
+`make` MUST NOT contain assertions or behavior-verification helpers; `helpers` MUST NOT contain ordinary constructors fitting `make`.
+Reusable pytest fixtures MUST live in the owner's `fixtures` module.
+Tests MAY reuse another module's test utilities for non-owned setup or integration; reuse MUST remain test-only and production MUST NOT import them.
+Directly re-exported functions MUST have behavior tests at their implementation owner.
 
 ## Test organization
 
-Tests SHOULD be grouped around the tested function or class.
-Each production module-level function MUST have a corresponding test class.
-Each production class SHOULD have a corresponding test class so its owned behavior is discoverable together, subject to the exclusions for passive declarations and unchanged inherited behavior below.
-Test classes MUST use `Test<SubjectName>` naming, where `<SubjectName>` is the tested function or class name converted to PascalCase.
-Tests for a class MUST group its method tests inside that class's test class.
-Tests for a class method MUST use `test_<method_name>__<case>` naming.
-The method name MUST be the tested method name in snake case.
-The case name MUST describe the execution path or behavior being verified in snake case.
-These grouping and naming conventions make coverage discoverable from production subjects.
-Tests for one module-level function MAY use `test_<case>` inside its test class.
-Test-only helper functions do not need corresponding test classes.
-Standalone tests SHOULD be used only for package-level invariants or infrastructure contracts that do not naturally belong to one function or class, so subject-owned behavior remains grouped with its subject.
+Tests SHOULD group by subject for discoverable coverage.
+Every production module-level function MUST have a test class; production classes SHOULD have one subject to passive/inherited-behavior exclusions.
+Classes MUST use `Test<PascalCaseSubject>`, grouping all method tests inside.
+Method cases MUST use `test_<snake_case_method>__<snake_case_behavior>`; module-function cases MAY use `test_<case>`.
+Test-only helpers need no test class.
+Standalone tests SHOULD be limited to package invariants/infrastructure without a natural function/class owner.
 
-**Example:** A function named `normalize_path` has a `TestNormalizePath` test class whose cases can use names such as `test_empty_value`.
-A class method named `normalize` uses case names such as `test_normalize__empty_value` inside its class's test class.
+**Example:** `normalize_path` has `TestNormalizePath.test_empty_value`; class method `normalize` uses `test_normalize__empty_value`.
 
-Every possible execution path of a tested function or method MUST have a corresponding test method or parametrized test case.
-Execution paths include:
+Each possible execution path MUST have a method or parametrized case, including:
 
-- successful paths.
-- default-value paths.
-- empty-input paths.
-- invalid-input paths.
-- handled error paths.
-- warning-producing paths.
-- branch-specific paths.
+- success/defaults.
+- empty/invalid inputs.
+- handled errors.
+- warnings.
+- individual branches.
 
-Tests MUST cover corner cases for each tested function or method.
-Corner cases include:
+Tests MUST cover corner cases, including:
 
-- boundary values.
-- empty collections and empty strings.
-- missing optional values.
-- duplicate values.
-- unsupported values.
-- malformed input.
-- paths that do not exist.
-- values that require normalization.
-- repeated calls that may reveal state leaks.
+- boundaries.
+- empty collections/strings.
+- missing optionals.
+- duplicates.
+- unsupported/malformed values.
+- missing paths.
+- normalization.
+- repeated calls exposing state leaks.
 
-Boundary cases SHOULD follow from the capability's contract or observed failures rather than hypothetical future requirements.
-Orthogonal behaviors SHOULD have separate test cases so failures identify the broken contract.
+Cases SHOULD follow contracts or observed failures, not hypothetical requirements.
+Orthogonal behaviors SHOULD have separate cases to identify failures clearly.
 
 ## Entity and error tests
 
 ### Entity tests
 
-Entity tests MUST verify behavior or invariants owned by the entity.
-Entity tests SHOULD cover the following owned behavior so validation and representation contracts are checked at their source:
+Tests MUST verify owned behavior/invariants and SHOULD cover:
 
-- field constraints and field validation.
-- model validation.
-- non-trivial defaults and default factories.
+- field/model constraints.
+- non-trivial defaults/factories.
 - normalization.
-- methods and computed properties.
-- serialization and deserialization.
-- rejection of invalid values.
+- methods/computed properties.
+- serialization/deserialization.
+- invalid-value rejection.
 
-Entity tests MUST NOT assert that constructor arguments appear unchanged in passive fields.
-Entity tests MUST NOT verify simple model construction when the entity has no custom behavior or constraints.
-Entity tests MUST NOT verify plain `NewType` declarations, enum member existence, or passive data-container fields unless they verify non-trivial owned behavior or compatibility contracts.
-Entity tests SHOULD NOT repeat behavior inherited unchanged from a shared base entity, so inherited behavior is tested at its owner.
-Tests MUST NOT repeat inherited Pydantic behavior or inspect annotations merely to restate a declaration.
-For modules containing only passive entities, omitting a matching test file SHOULD be preferred over adding meaningless tests.
-Entity tests MUST NOT require filesystem access, because entity behavior is required to remain independent of filesystem operations.
-Entity tests MUST NOT verify external presentation or CLI rendering.
-Low-level entity validation tests MAY assert `pydantic.ValidationError` as permitted by the error architecture.
+Tests MUST NOT merely verify:
+
+- passive construction/field assignment.
+- plain `NewType`.
+- enum existence.
+- passive containers without owned behavior/compatibility contracts.
+
+They SHOULD NOT repeat unchanged shared-base behavior and MUST NOT repeat inherited Pydantic behavior or inspect annotations merely to restate declarations.
+Passive-only modules SHOULD omit meaningless test files.
+Entity tests MUST NOT access filesystems or test external presentation/CLI rendering.
+Low-level validation tests MAY assert `pydantic.ValidationError`.
 
 ### Error tests
 
-Error tests SHOULD verify customized behavior and failure translation at the boundary that produces it.
-Error-class unit tests SHOULD be added only for behavior beyond inherited construction and static declarations, so producing-boundary tests remain the source of evidence for ordinary failures.
-Such tests SHOULD cover customized behavior when present, including:
+Tests SHOULD verify custom behavior and translation at producing boundaries.
+Error unit tests SHOULD exist only beyond inherited construction/static declarations, covering custom:
 
-- constructor logic.
-- error-code computation.
+- construction.
+- code computation.
 - message formatting.
-- validation or normalization.
-- structured detail derivation.
-- behavior added by an intermediate error class.
+- validation/normalization.
+- detail derivation.
+- intermediate-class behavior.
 
-Error tests MUST NOT assert only that static codes, messages, or constructor fields are present unchanged.
-Error tests SHOULD NOT repeat unchanged error inheritance or shared base-error behavior, so each behavior is tested at its owner.
-A module-level `tests/test_errors.py` file is optional and SHOULD be omitted when producing-function or entity tests already cover all meaningful error behavior.
-Exact production error message text MUST NOT be asserted in ordinary unit tests unless a behavior specification declares that text as a stable external contract.
+They MUST NOT merely assert unchanged static values/constructor fields and SHOULD NOT repeat inherited error behavior.
+Optional `test_errors.py` SHOULD be omitted when producers cover all meaningful behavior.
+Exact production messages MUST NOT be asserted unless behavior specs make them stable contracts.
 
-Tests for exception boundaries SHOULD verify that expected low-level failures are raised as library-specific exceptions, including `pydantic.ValidationError` from external input, so consumers receive the documented failure contract.
-Tests for produced errors SHOULD assert the expected exception type, stable error code, and relevant structured fields through the producing boundary so they verify usable failures rather than static declarations.
-Tests for unexpected failures MUST verify that the operation remains failed rather than recovering with a successful, empty, or fallback result.
-Tests for stored-state integrity failures MUST NOT classify those failures as expected caller-correctable input errors.
+Boundary tests SHOULD verify expected low-level errors, including external-input Pydantic failures, become returned environment errors.
+Producer tests SHOULD assert failure type and relevant context fields.
+Code propagation tests SHOULD compare against the owning error's declaration; literal code assertions MUST require an independently specified compatibility contract.
+Composition tests SHOULD cover:
+
+- complete-list propagation.
+- success.
+- short-circuiting.
+- unrelated raised exceptions.
+
+Unexpected-failure tests MUST verify failure persists, not successful/empty/fallback recovery.
+Stored-state integrity failures MUST NOT be tested as expected caller-correctable input errors.
 
 ## Behavior coverage
 
-Behavior specifications define expected capability contracts.
-Architecture specifications define expected project-wide conventions.
-Tests SHOULD cover specification examples and rules when the corresponding behavior is implemented and runtime-testable, so implementation coverage remains connected to its requirements.
-Coverage requirements apply to implemented library responsibilities and do not require introducing capabilities solely to satisfy a test checklist.
+Behavior specs define capability contracts; architecture specs define conventions.
+Tests SHOULD cover implemented, runtime-testable examples/rules, without introducing capabilities to satisfy checklists.
+Changes to runtime code SHOULD be verified by tests covering affected behavior.
+Changes limited to specifications, documentation, or static-analysis configuration MAY omit runtime tests when no runtime behavior is affected.
+Typing SHOULD use static analysis/review/architecture checks rather than annotation-inspecting unit tests.
+Only dedicated broad-convention architecture tests MAY inspect annotations.
 
-Static typing requirements SHOULD be enforced by static analysis, code review, or dedicated architecture checks rather than ordinary unit tests that inspect runtime annotations, so unit tests remain focused on runtime behavior.
-Tests MAY inspect annotations only in dedicated architecture tests that validate a broad project-wide convention.
+Configuration tests MUST verify owned entity/loading/setup behavior and SHOULD cover:
 
-Configuration tests MUST verify behavior owned by the configuration entity or loading and setup boundary.
-Tests for implemented configuration behavior SHOULD cover the following cases so configuration failures are detected at their owning boundary:
-
-- discovery and explicit configuration selection.
-- supported input structure.
-- environment variable parsing.
+- discovery/explicit selection.
+- input structure.
+- environment parsing.
 - non-trivial defaults.
 - path normalization.
-- invalid configuration failures.
+- invalid configuration.
 - initialization failures.
 
-Configuration tests MUST NOT merely verify unchanged literal default assignments when no custom behavior exists.
-For modules containing only passive configuration declarations, omitting a matching test file SHOULD be preferred over adding meaningless tests.
+They MUST NOT merely verify unchanged literal defaults; passive-only configuration modules SHOULD omit meaningless tests.
 
-CLI integration tests SHOULD exercise implemented library-owned CLI behavior through command execution so parsing, wiring, and presentation are verified together.
-Coverage SHOULD include the following implemented responsibilities:
+CLI tests SHOULD execute commands to cover integrated:
 
-- command forms and wiring.
-- argument and option parsing and validation.
-- output protocol selection.
-- structured output shape and ordering.
+- command forms/wiring.
+- argument/option parsing and validation.
+- protocol selection.
+- record shape/order.
 - warnings.
-- errors and exit behavior.
+- errors/exits.
 
-When the library owns a delegated CLI error boundary, tests SHOULD verify fatal-error exit categories and the default non-zero exit code for unmapped library exceptions so the mapping preserves failure classification.
-Tests SHOULD verify that fatal errors use the boundary's documented error representation so consumers can recognize them.
-Tests SHOULD verify that warnings alone do not cause a non-zero exit code when the operation otherwise succeeds, so non-fatal problems remain distinct from failure.
-Warning tests MUST follow the specified warning architecture and MUST NOT introduce warning storage or delivery channels solely for testing.
+Delegated error-boundary tests SHOULD cover:
 
-Tests for implemented parsing and stateful operations SHOULD cover the following contracts when present so external data and state transitions are verified at their owners:
+- inherited/aggregated exits.
+- stdout in every protocol.
+- explicit streams.
+- diagnostic order.
+- propagation of unexpected exceptions/malformed unwrap payloads.
 
-- supported inputs and their normalization.
-- malformed input.
-- expected external-system failures.
-- persisted state changes and error states.
-- idempotency of repeated calls.
-- retry behavior.
-- coordination across module public boundaries.
+They SHOULD verify documented fatal-error representations and successful exits for warnings alone.
+Warning tests MUST follow production architecture without test-only storage/delivery channels.
+
+Implemented parsing/stateful tests SHOULD cover applicable:
+
+- inputs/normalization.
+- malformed data.
+- expected external failures.
+- persisted changes/error states.
+- idempotency.
+- retries.
+- public-boundary coordination.
 
 ## Fixtures and mocking
 
-Test data SHOULD be as small as possible while preserving the behavior under test.
-Short external inputs SHOULD be inline; reusable fixture files MAY be used when they improve readability.
-Filesystem tests SHOULD use test-created temporary directories.
-Fixture paths SHOULD use forward slashes in expected normalized identifiers so expectations use a consistent normalized representation.
+Data SHOULD be minimal, short inputs inline, and filesystem fixtures temporary.
+Reusable files MAY improve readability.
+Expected normalized paths SHOULD use forward slashes for consistency.
 
-When ordinary Python collaborators must be replaced, tests SHOULD use the `pytest-mock` fixture for scoped replacement and call assertions.
-Patches SHOULD target the name as it is looked up by the subject under test.
-Use `mocker.patch("<import.path>", ...)` for imported module-level collaborators and settings.
-Use `mocker.patch.object(...)` when replacing an attribute on an object or class already available in the test.
-Direct `unittest.mock.MagicMock` and `unittest.mock.AsyncMock` MUST be used only for local fake objects or callables passed into the code under test.
-Tests SHOULD NOT use pytest `monkeypatch` for ordinary Python attribute replacement, so replacement uses the standard mocking fixture's cleanup and call assertions.
-Small explicit fakes SHOULD be preferred over mocks when they make collaborator behavior easier to understand.
-Tests MAY use specialized testing tools for their own domain boundaries, subject to the network restriction.
+Ordinary collaborator replacement SHOULD use scoped `pytest-mock` and patch the lookup location:
+`mocker.patch("<import.path>", ...)` for imported names/settings; `mocker.patch.object(...)` for available objects/classes.
+Direct `MagicMock`/`AsyncMock` MUST be limited to local fakes passed into subjects.
+Ordinary attribute replacement SHOULD NOT use `monkeypatch`, keeping standard cleanup/assertions.
+Explicit fakes SHOULD replace mocks when clearer.
+Specialized boundary tools MAY be used without networks.
 
 ## Assertions
 
-Tests SHOULD assert structured values before rendered text when structured data is available.
-Tests for machine-readable output SHOULD parse that output before asserting its contents.
-Rendered output tests SHOULD assert exact output only for stable public or persisted-state contracts so incidental wording does not become an accidental contract.
-Rendered output tests MAY assert selected lines, fields, or records when exact text is outside the relevant specification.
-Tests MUST verify both changed state and required unchanged state when those effects are part of the operation's contract.
-Persistence operation tests MUST verify affected-record counts when cardinality is part of the contract.
-Assertions about persisted effects MUST isolate the operations responsible for those effects.
-Count assertions MUST supplement structured assertions about persisted content when record contents are part of the behavior under test.
-Tests whose subject is a public count operation MAY verify cardinality through that operation.
-Tests SHOULD assert both positive and negative outcomes when a branch excludes another branch so contradictory effects cannot pass unnoticed.
-Tests that verify branch-specific behavior through log events MUST assert expected event counts and zero occurrences of mutually exclusive branch events.
+Shared automation extraction MUST validate UUID4 ids, remove only `id` from record copies, and preserve all other fields/order without mutating input; empty input MUST yield an empty list.
+Shared error assertions MUST reuse it, checking count/order/native diagnostics with `message` moved to `content`.
+This covers errors without guidance whose context retains native JSON representation.
+Consumers SHOULD reuse helpers while owning parsing/filtering/policies.
+Shared projection tests MUST retain independent expected payloads.
 
-Tests MUST NOT use identity assertions except for `None` checks.
-Boolean checks MUST use `assert condition` or `assert not condition` rather than identity comparisons.
+Tests SHOULD prefer structured assertions and parse machine-readable output.
+Exact rendering SHOULD be asserted only for stable public/persisted contracts; selected lines/fields/records MAY be asserted otherwise.
+Required changed and unchanged state MUST both be verified.
+Persistence tests MUST verify contracted affected counts, isolate responsible operations, and supplement counts with structured content assertions when content matters.
+Public-count tests MAY verify cardinality through that operation.
+Exclusive branches SHOULD assert positive and negative outcomes; log-based branch tests MUST check expected counts and zero mutually exclusive events.
+Identity assertions MUST NOT be used except for `None`; booleans MUST use `assert condition`/`assert not condition`.

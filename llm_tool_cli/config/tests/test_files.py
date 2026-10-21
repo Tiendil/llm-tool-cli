@@ -1,0 +1,826 @@
+import contextlib
+import importlib.util
+import sys
+from pathlib import Path
+
+import pydantic
+import pytest
+from pytest_mock import MockerFixture
+
+from llm_tool_cli.config import (
+    create_config,
+    create_config_from_template,
+    errors,
+    find_config,
+    initialize_config,
+    load_config,
+    locate_config,
+    read_toml,
+    resolve_config_path,
+    resolve_init_config_path,
+)
+from llm_tool_cli.core.errors import EnvironmentErrors
+from llm_tool_cli.core.result import Err, Result
+from llm_tool_cli.paths import PathInput, ProjectConfigPath
+from llm_tool_cli.paths.errors import InvalidProjectPath
+
+
+@pytest.fixture
+def config_package(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    package = "config_fixture_package"
+    initializer = tmp_path / "__init__.py"
+    initializer.write_text("", encoding="utf-8")
+    spec = importlib.util.spec_from_file_location(package, initializer)
+    assert spec is not None
+    monkeypatch.setitem(sys.modules, package, importlib.util.module_from_spec(spec))
+    (tmp_path / "fixtures").mkdir()
+    return package
+
+
+class TestFindConfig:
+    def test_nearest_file(self, tmp_path: Path) -> None:
+        nested = tmp_path / "nested"
+        nested.mkdir()
+        (tmp_path / "config.toml").touch()
+        nearest = nested / "config.toml"
+        nearest.write_text("not valid TOML", encoding="utf-8")
+
+        assert find_config("config.toml", nested).unwrap() == nearest
+
+    def test_searches_parents_and_skips_directories(self, tmp_path: Path) -> None:
+        nested = tmp_path / "nested"
+        nested.mkdir()
+        (nested / "config.toml").mkdir()
+        outer = tmp_path / "config.toml"
+        outer.touch()
+
+        assert find_config("config.toml", nested).unwrap() == outer
+
+    def test_missing(self, tmp_path: Path) -> None:
+        assert find_config(f"{tmp_path.name}-missing.toml", tmp_path).unwrap() is None
+
+    def test_searches_filesystem_root(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        root_config = Path(tmp_path.anchor) / "config.toml"
+        mocker.patch.object(Path, "is_file", autospec=True, side_effect=lambda path: path == root_config)
+
+        assert find_config("config.toml", tmp_path).unwrap() == root_config
+
+    def test_resolves_relative_start(self, tmp_path: Path) -> None:
+        config_path = tmp_path / "config.toml"
+        config_path.touch()
+
+        with contextlib.chdir(tmp_path):
+            assert find_config("config.toml", Path(".")).unwrap() == config_path
+
+    @pytest.mark.parametrize("target_kind", ["file", "missing", "loop", "directory"])
+    def test_rejects_symlink_without_falling_back_to_parent(self, tmp_path: Path, target_kind: str) -> None:
+        nested = tmp_path / "nested"
+        nested.mkdir()
+        (tmp_path / "config.toml").touch()
+        config_path = nested / "config.toml"
+        target = config_path if target_kind == "loop" else nested / "target"
+        if target_kind == "file":
+            target.touch()
+        elif target_kind == "directory":
+            target.mkdir()
+        config_path.symlink_to(target)
+
+        assert find_config("config.toml", nested).unwrap_err() == [InvalidProjectPath(path=str(config_path))]
+
+    def test_accepts_start_directory_alias(self, tmp_path: Path) -> None:
+        root = tmp_path / "project"
+        root.mkdir()
+        config_path = root / "config.toml"
+        config_path.touch()
+        alias = tmp_path / "alias"
+        alias.symlink_to(root, target_is_directory=True)
+
+        assert find_config("config.toml", alias).unwrap() == config_path
+
+    def test_resolution_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        mocker.patch.object(Path, "resolve", side_effect=OSError("resolution failed"))
+
+        caught = find_config("config.toml", tmp_path).unwrap_err()[0]
+        assert isinstance(caught, errors.DiscoveryFailed)
+
+        assert caught.code == "config_discovery_failed"
+        assert caught.path == tmp_path
+        assert isinstance(caught.cause, OSError)
+
+    def test_inspection_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        mocker.patch.object(Path, "is_file", side_effect=PermissionError("access denied"))
+
+        caught = find_config("config.toml", tmp_path).unwrap_err()[0]
+        assert isinstance(caught, errors.DiscoveryFailed)
+
+        assert caught.code == "config_discovery_failed"
+        assert caught.path == tmp_path / "config.toml"
+        assert isinstance(caught.cause, PermissionError)
+        assert caught.reason == str(caught.cause)
+
+
+class TestResolveConfigPath:
+    def test_relative_missing_path(self, tmp_path: Path) -> None:
+        assert resolve_config_path(Path("nested/../custom.toml"), tmp_path).unwrap() == tmp_path / "custom.toml"
+
+    def test_absolute_path_ignores_cwd(self, tmp_path: Path) -> None:
+        config_path = tmp_path / "custom.toml"
+
+        assert resolve_config_path(config_path, tmp_path / "missing").unwrap() == config_path
+
+    def test_relative_cwd(self, tmp_path: Path) -> None:
+        with contextlib.chdir(tmp_path):
+            assert resolve_config_path(Path("custom.toml"), Path("nested")).unwrap() == tmp_path / "nested/custom.toml"
+
+    @pytest.mark.parametrize("target_kind", ["file", "missing", "loop"])
+    def test_rejects_symlinks(self, tmp_path: Path, target_kind: str) -> None:
+        link = tmp_path / "custom.toml"
+        target = link if target_kind == "loop" else tmp_path / "target.toml"
+        if target_kind == "file":
+            target.touch()
+        link.symlink_to(target)
+
+        assert resolve_config_path(link, tmp_path).unwrap_err() == [InvalidProjectPath(path=str(link))]
+
+    def test_accepts_containing_directory_alias(self, tmp_path: Path) -> None:
+        root = tmp_path / "project"
+        root.mkdir()
+        alias = tmp_path / "alias"
+        alias.symlink_to(root, target_is_directory=True)
+
+        assert resolve_config_path(alias / "config.toml", tmp_path).unwrap() == root / "config.toml"
+
+    def test_expands_home(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        home = tmp_path / "home"
+        mocker.patch.dict("os.environ", {"HOME": str(home)})
+
+        assert resolve_config_path(Path("~/config.toml"), tmp_path / "cwd").unwrap() == home / "config.toml"
+
+    def test_preserves_application_syntax(self, tmp_path: Path) -> None:
+        assert resolve_config_path(Path("@/config.toml"), tmp_path).unwrap() == tmp_path / "@/config.toml"
+
+    def test_home_expansion_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        path = Path("~/config.toml")
+        mocker.patch.object(Path, "expanduser", side_effect=RuntimeError("home directory unavailable"))
+
+        caught = resolve_config_path(path, tmp_path).unwrap_err()[0]
+        assert isinstance(caught, errors.PathResolutionFailed)
+
+        assert caught.code == "config_path_resolution_failed"
+        assert caught.path == path
+        assert isinstance(caught.cause, RuntimeError)
+        assert caught.reason == str(caught.cause)
+
+    def test_reported_symlink_loop(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        link = tmp_path / "loop"
+        mocker.patch.object(Path, "resolve", side_effect=RuntimeError("symlink loop"))
+
+        caught = resolve_config_path(link, tmp_path).unwrap_err()[0]
+        assert isinstance(caught, errors.PathResolutionFailed)
+
+        assert caught.code == "config_path_resolution_failed"
+        assert caught.path == link
+        assert isinstance(caught.cause, (OSError, RuntimeError))
+
+    def test_filesystem_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        mocker.patch.object(Path, "resolve", side_effect=PermissionError("access denied"))
+
+        caught = resolve_config_path(Path("custom.toml"), tmp_path).unwrap_err()[0]
+        assert isinstance(caught, errors.PathResolutionFailed)
+
+        assert caught.code == "config_path_resolution_failed"
+        assert caught.path == tmp_path / "custom.toml"
+        assert isinstance(caught.cause, PermissionError)
+
+
+class TestResolveInitConfigPath:
+    def test_default_stays_in_cwd_without_reading_or_creating(self, tmp_path: Path) -> None:
+        parent_config = tmp_path / "config.toml"
+        parent_config.write_text("invalid TOML [", encoding="utf-8")
+        cwd = PathInput(tmp_path / "missing")
+
+        selected = resolve_init_config_path("config.toml", cwd=cwd).unwrap()
+
+        assert selected == tmp_path / "missing/config.toml"
+        assert not cwd.exists()
+        assert parent_config.read_text(encoding="utf-8") == "invalid TOML ["
+
+    @pytest.mark.parametrize("absolute", [False, True])
+    def test_explicit_path_overrides_filename(self, tmp_path: Path, absolute: bool) -> None:
+        path = tmp_path / "custom.toml" if absolute else Path("nested/../custom.toml")
+        cwd = PathInput(tmp_path / "elsewhere" if absolute else tmp_path)
+
+        selected = resolve_init_config_path("config.toml", path=ProjectConfigPath(path), cwd=cwd).unwrap()
+
+        assert selected == tmp_path / "custom.toml"
+        assert not selected.exists()
+
+    def test_home_relative_path(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        home = tmp_path / "home"
+        mocker.patch.dict("os.environ", {"HOME": str(home)})
+
+        selected = resolve_init_config_path(
+            "config.toml", path=ProjectConfigPath(Path("~/custom.toml")), cwd=PathInput(tmp_path)
+        ).unwrap()
+
+        assert selected == home / "custom.toml"
+        assert not home.exists()
+
+    def test_relative_cwd(self, tmp_path: Path) -> None:
+        with contextlib.chdir(tmp_path):
+            selected = resolve_init_config_path("config.toml", cwd=PathInput(Path("nested"))).unwrap()
+
+        assert selected == tmp_path / "nested/config.toml"
+
+    @pytest.mark.parametrize("explicit", [False, True])
+    def test_rejects_symlink_without_modifying_existing_target(self, tmp_path: Path, explicit: bool) -> None:
+        target = tmp_path / "target.toml"
+        target.write_text("original", encoding="utf-8")
+        link = ProjectConfigPath(tmp_path / "config.toml")
+        link.symlink_to(target)
+
+        result = resolve_init_config_path("config.toml", path=link if explicit else None, cwd=PathInput(tmp_path))
+
+        assert result.unwrap_err() == [InvalidProjectPath(path=str(link))]
+        assert target.read_text(encoding="utf-8") == "original"
+        assert link.is_symlink()
+
+    @pytest.mark.parametrize("explicit", [False, True])
+    def test_resolution_failure_propagates(self, tmp_path: Path, mocker: MockerFixture, explicit: bool) -> None:
+        failures: EnvironmentErrors = [
+            errors.PathResolutionFailed(path=tmp_path / name, reason="permission denied")
+            for name in ("first.toml", "second.toml")
+        ]
+        mocker.patch("llm_tool_cli.config.files.resolve_config_path", return_value=Err(failures))
+
+        result = resolve_init_config_path(
+            "config.toml", path=ProjectConfigPath(Path("custom.toml")) if explicit else None, cwd=PathInput(tmp_path)
+        )
+
+        assert result.unwrap_err() == failures
+
+    def test_unexpected_failure_propagates(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        mocker.patch.object(Path, "resolve", side_effect=TypeError("unexpected failure"))
+
+        with pytest.raises(TypeError, match="unexpected failure"):
+            resolve_init_config_path("config.toml", cwd=PathInput(tmp_path))
+
+
+class TestInitializeConfig:
+    @pytest.mark.parametrize("explicit", [False, True])
+    def test_broken_symlink_does_not_create_its_target(
+        self, tmp_path: Path, config_package: str, explicit: bool
+    ) -> None:
+        (tmp_path / "fixtures/starter.toml").write_text("version = 1\n", encoding="utf-8")
+        target = tmp_path / "target.toml"
+        path = ProjectConfigPath(tmp_path / "config.toml")
+        path.symlink_to(target)
+
+        result = initialize_config(
+            "config.toml",
+            package=config_package,
+            template="starter.toml",
+            cwd=PathInput(tmp_path),
+            path=path if explicit else None,
+        )
+
+        assert result.unwrap_err() == [InvalidProjectPath(path=str(path))]
+        assert path.is_symlink()
+        assert not target.exists()
+
+    @pytest.mark.parametrize("relative_cwd", [False, True])
+    def test_default_path_does_not_reuse_parent_config(
+        self, tmp_path: Path, config_package: str, relative_cwd: bool
+    ) -> None:
+        text = "# café\ninvalid TOML ["
+        (tmp_path / "fixtures/starter.toml").write_text(text, encoding="utf-8")
+        parent_config = tmp_path / "config.toml"
+        parent_config.write_text("original", encoding="utf-8")
+        project = tmp_path / "project"
+        project.mkdir()
+
+        with contextlib.chdir(tmp_path):
+            selected = initialize_config(
+                "config.toml",
+                package=config_package,
+                template="starter.toml",
+                cwd=PathInput(Path("project") if relative_cwd else project),
+            ).unwrap()
+
+        assert selected == project / "config.toml"
+        assert selected.read_text(encoding="utf-8") == text
+        assert parent_config.read_text(encoding="utf-8") == "original"
+
+    @pytest.mark.parametrize("absolute", [False, True])
+    def test_explicit_path_overrides_filename(self, tmp_path: Path, config_package: str, absolute: bool) -> None:
+        (tmp_path / "fixtures/starter.toml").write_text("version = 1\n", encoding="utf-8")
+        path = tmp_path / "custom.toml" if absolute else Path("custom.toml")
+
+        selected = initialize_config(
+            "config.toml",
+            package=config_package,
+            template="starter.toml",
+            cwd=PathInput(tmp_path / "elsewhere" if absolute else tmp_path),
+            path=ProjectConfigPath(path),
+        ).unwrap()
+
+        assert selected == tmp_path / "custom.toml"
+        assert selected.read_text(encoding="utf-8") == "version = 1\n"
+        assert not (tmp_path / "config.toml").exists()
+
+    def test_home_relative_path(self, tmp_path: Path, config_package: str, monkeypatch: pytest.MonkeyPatch) -> None:
+        (tmp_path / "fixtures/starter.toml").write_text("version = 1\n", encoding="utf-8")
+        home_dir = tmp_path / "home"
+        home_dir.mkdir()
+        monkeypatch.setenv("HOME", str(home_dir))
+
+        selected = initialize_config(
+            "config.toml",
+            package=config_package,
+            template="starter.toml",
+            cwd=PathInput(tmp_path),
+            path=ProjectConfigPath(Path("~/custom.toml")),
+        ).unwrap()
+
+        assert selected == home_dir / "custom.toml"
+        assert selected.read_text(encoding="utf-8") == "version = 1\n"
+
+    def test_existing_file(self, tmp_path: Path, config_package: str) -> None:
+        (tmp_path / "fixtures/starter.toml").write_text("version = 1\n", encoding="utf-8")
+        path = tmp_path / "config.toml"
+        path.write_text("original", encoding="utf-8")
+
+        failure = initialize_config(
+            "config.toml", package=config_package, template="starter.toml", cwd=PathInput(tmp_path)
+        ).unwrap_err()[0]
+
+        assert isinstance(failure, errors.AlreadyExists)
+        assert failure.path == path
+        assert path.read_text(encoding="utf-8") == "original"
+
+    def test_missing_parent_is_not_created(self, tmp_path: Path, config_package: str) -> None:
+        (tmp_path / "fixtures/starter.toml").write_text("version = 1\n", encoding="utf-8")
+        cwd = tmp_path / "missing"
+
+        failure = initialize_config(
+            "config.toml", package=config_package, template="starter.toml", cwd=PathInput(cwd)
+        ).unwrap_err()[0]
+
+        assert isinstance(failure, errors.Unwritable)
+        assert failure.path == cwd / "config.toml"
+        assert not cwd.exists()
+
+    def test_concurrent_creation_preserves_existing_config(
+        self, tmp_path: Path, config_package: str, mocker: MockerFixture
+    ) -> None:
+        (tmp_path / "fixtures/starter.toml").write_text("version = 1\n", encoding="utf-8")
+
+        def create_concurrently(path: ProjectConfigPath, text: str) -> Result[None]:
+            path.write_text("original", encoding="utf-8")
+            return create_config(path, text)
+
+        mocker.patch("llm_tool_cli.config.files.create_config", side_effect=create_concurrently)
+
+        failure = initialize_config(
+            "config.toml", package=config_package, template="starter.toml", cwd=PathInput(tmp_path)
+        ).unwrap_err()[0]
+
+        assert isinstance(failure, errors.AlreadyExists)
+        assert failure.path == tmp_path / "config.toml"
+        assert failure.path.read_text(encoding="utf-8") == "original"
+
+    def test_resolution_failure_stops_before_template_reading(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        failures: EnvironmentErrors = [
+            errors.PathResolutionFailed(path=tmp_path / name, reason="permission denied")
+            for name in ("first.toml", "second.toml")
+        ]
+        mocker.patch("llm_tool_cli.config.files.resolve_init_config_path", return_value=Err(failures))
+        read_template = mocker.patch("llm_tool_cli.config.files.importlib.resources.files")
+
+        result = initialize_config("config.toml", package="unused", template="starter.toml", cwd=PathInput(tmp_path))
+
+        assert result.unwrap_err() == failures
+        read_template.assert_not_called()
+
+    @pytest.mark.parametrize("content", [None, b"\xff"])
+    def test_template_read_failure_preserves_cause(
+        self, tmp_path: Path, config_package: str, content: bytes | None
+    ) -> None:
+        if content is not None:
+            (tmp_path / "fixtures/starter.toml").write_bytes(content)
+
+        failure = initialize_config(
+            "config.toml", package=config_package, template="starter.toml", cwd=PathInput(tmp_path)
+        ).unwrap_err()[0]
+
+        assert isinstance(failure, errors.TemplateUnreadable)
+        assert isinstance(failure.cause, FileNotFoundError if content is None else UnicodeDecodeError)
+        assert failure.path == tmp_path / "config.toml"
+        assert failure.template == "starter.toml"
+        assert failure.reason == str(failure.cause)
+        assert not failure.path.exists()
+
+    def test_write_failures_propagate(self, tmp_path: Path, config_package: str, mocker: MockerFixture) -> None:
+        (tmp_path / "fixtures/starter.toml").write_text("version = 1\n", encoding="utf-8")
+        failures: EnvironmentErrors = [errors.Unwritable(path=tmp_path / "config.toml", reason="read-only filesystem")]
+        mocker.patch("llm_tool_cli.config.files.create_config", return_value=Err(failures))
+
+        result = initialize_config(
+            "config.toml", package=config_package, template="starter.toml", cwd=PathInput(tmp_path)
+        )
+
+        assert result.unwrap_err() == failures
+
+
+class TestLocateConfig:
+    def test_discovers_nearest_without_reading(self, tmp_path: Path) -> None:
+        nested = tmp_path / "nested"
+        nested.mkdir()
+        (tmp_path / "config.toml").touch()
+        nearest = nested / "config.toml"
+        nearest.write_text("invalid TOML [", encoding="utf-8")
+
+        assert locate_config("config.toml", cwd=nested).unwrap() == nearest
+
+    def test_discovers_in_parent(self, tmp_path: Path) -> None:
+        nested = tmp_path / "nested"
+        nested.mkdir()
+        config_path = tmp_path / "config.toml"
+        config_path.touch()
+
+        assert locate_config("config.toml", path=None, cwd=nested).unwrap() == config_path
+
+    def test_explicit_missing_path_does_not_fall_back(self, tmp_path: Path) -> None:
+        (tmp_path / "config.toml").touch()
+
+        assert (
+            locate_config("config.toml", path=Path("custom.toml"), cwd=tmp_path).unwrap() == tmp_path / "custom.toml"
+        )
+
+    def test_explicit_home_path(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        home = tmp_path / "home"
+        mocker.patch.dict("os.environ", {"HOME": str(home)})
+
+        assert locate_config("config.toml", path=Path("~/custom.toml"), cwd=tmp_path).unwrap() == home / "custom.toml"
+
+    @pytest.mark.parametrize("explicit", [False, True])
+    def test_rejects_selected_symlink(self, tmp_path: Path, explicit: bool) -> None:
+        target = tmp_path / "target.toml"
+        target.touch()
+        nested = tmp_path / "nested"
+        nested.mkdir()
+        link = nested / "config.toml"
+        link.symlink_to(target)
+
+        result = locate_config("config.toml", cwd=nested, path=link if explicit else None)
+
+        assert result.unwrap_err() == [InvalidProjectPath(path=str(link))]
+
+    def test_missing(self, tmp_path: Path) -> None:
+        filename = f"{tmp_path.name}-missing.toml"
+
+        caught = locate_config(filename, cwd=tmp_path).unwrap_err()[0]
+        assert isinstance(caught, errors.NotFound)
+
+        assert caught.code == "config_not_found"
+        assert caught.path == tmp_path
+        assert filename in caught.reason
+        assert caught.cause is None
+        assert caught.as_record() == {
+            "type": "error",
+            "code": "config_not_found",
+            "message": caught.format_message(),
+            "path": str(tmp_path),
+            "reason": caught.reason,
+        }
+
+    def test_discovery_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        mocker.patch.object(Path, "is_file", side_effect=PermissionError("access denied"))
+
+        caught = locate_config("config.toml", cwd=tmp_path).unwrap_err()[0]
+        assert isinstance(caught, errors.DiscoveryFailed)
+
+        assert caught.path == tmp_path / "config.toml"
+        assert isinstance(caught.cause, PermissionError)
+
+    def test_explicit_resolution_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        mocker.patch.object(Path, "resolve", side_effect=PermissionError("access denied"))
+
+        caught = locate_config("config.toml", path=Path("custom.toml"), cwd=tmp_path).unwrap_err()[0]
+        assert isinstance(caught, errors.PathResolutionFailed)
+
+        assert caught.path == tmp_path / "custom.toml"
+        assert isinstance(caught.cause, PermissionError)
+
+
+class TestReadToml:
+    def test_toml_1_1_and_utf8(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.toml"
+        path.write_text('item = {\n label = "café",\n enabled = true,\n}\n', encoding="utf-8")
+
+        assert read_toml(path).unwrap() == {"item": {"label": "café", "enabled": True}}
+
+    def test_empty(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.toml"
+        path.touch()
+
+        assert read_toml(path).unwrap() == {}
+
+    def test_invalid_toml(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.toml"
+        path.write_text("item = [", encoding="utf-8")
+
+        caught = read_toml(path).unwrap_err()[0]
+        assert isinstance(caught, errors.InvalidToml)
+
+        assert caught.code == "config_invalid_toml"
+        assert caught.path == path
+        assert isinstance(caught.cause, ValueError)
+        assert caught.reason == str(caught.cause)
+
+    def test_invalid_encoding(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.toml"
+        path.write_bytes(b'label = "\xff"')
+
+        caught = read_toml(path).unwrap_err()[0]
+        assert isinstance(caught, errors.InvalidEncoding)
+
+        assert caught.code == "config_invalid_encoding"
+        assert caught.path == path
+        assert isinstance(caught.cause, UnicodeDecodeError)
+
+    def test_missing(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.toml"
+
+        caught = read_toml(path).unwrap_err()[0]
+        assert isinstance(caught, errors.Unreadable)
+
+        assert caught.code == "config_unreadable"
+        assert caught.path == path
+        assert isinstance(caught.cause, FileNotFoundError)
+        assert caught.as_record() == {
+            "type": "error",
+            "code": "config_unreadable",
+            "message": caught.format_message(),
+            "path": str(path),
+            "reason": str(caught.cause),
+        }
+
+    def test_directory(self, tmp_path: Path) -> None:
+        caught = read_toml(tmp_path).unwrap_err()[0]
+        assert isinstance(caught, errors.Unreadable)
+
+        assert caught.code == "config_unreadable"
+        assert caught.path == tmp_path
+        assert isinstance(caught.cause, IsADirectoryError)
+
+    def test_read_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        path = tmp_path / "config.toml"
+        path.touch()
+        mocker.patch("llm_tool_cli.config.files.tomli.load", side_effect=OSError("read failed"))
+
+        caught = read_toml(path).unwrap_err()[0]
+        assert isinstance(caught, errors.Unreadable)
+
+        assert caught.code == "config_unreadable"
+        assert caught.path == path
+        assert isinstance(caught.cause, OSError)
+
+    def test_unexpected_parser_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        path = tmp_path / "config.toml"
+        path.touch()
+        mocker.patch("llm_tool_cli.config.files.tomli.load", side_effect=AssertionError("parser defect"))
+
+        with pytest.raises(AssertionError):
+            read_toml(path)
+
+
+class TestLoadConfig:
+    def test_supplied_model(self, tmp_path: Path) -> None:
+        class Config(pydantic.BaseModel):
+            count: int
+            label: str = "default"
+
+        path = tmp_path / "custom.toml"
+        path.write_text('count = "3"\n', encoding="utf-8")
+
+        loaded: Config = load_config(path, Config).unwrap()
+
+        assert loaded == Config(count=3)
+
+    def test_empty_file_uses_model_defaults(self, tmp_path: Path) -> None:
+        class Config(pydantic.BaseModel):
+            enabled: bool = True
+
+        path = tmp_path / "custom.toml"
+        path.touch()
+
+        assert load_config(path, Config).unwrap() == Config()
+
+    @pytest.mark.parametrize("text", ["", 'count = "invalid"\n', "count = -1\n"])
+    def test_validation_failure(self, tmp_path: Path, text: str) -> None:
+        class Config(pydantic.BaseModel):
+            count: int = pydantic.Field(gt=0)
+
+        path = Path("custom.toml")
+        (tmp_path / path).write_text(text, encoding="utf-8")
+
+        with contextlib.chdir(tmp_path):
+            caught = load_config(path, Config).unwrap_err()[0]
+
+        assert isinstance(caught, errors.ValidationFailed)
+
+        assert caught.code == "config_validation_failed"
+        assert caught.path == path
+        assert isinstance(caught.cause, pydantic.ValidationError)
+        assert caught.reason == str(caught.cause)
+        assert caught.as_record() == {
+            "type": "error",
+            "code": "config_validation_failed",
+            "message": caught.format_message(),
+            "path": str(path),
+            "reason": str(caught.cause),
+        }
+
+    @pytest.mark.parametrize(
+        ("data", "expected_error"),
+        [(None, errors.Unreadable), (b"item = [", errors.InvalidToml), (b'label = "\xff"', errors.InvalidEncoding)],
+    )
+    def test_read_failure(
+        self, tmp_path: Path, data: bytes | None, expected_error: type[errors.EnvironmentError]
+    ) -> None:
+        path = tmp_path / "custom.toml"
+        if data is not None:
+            path.write_bytes(data)
+
+        caught = load_config(path, pydantic.BaseModel).unwrap_err()[0]
+        assert isinstance(caught, expected_error)
+
+        assert caught.path == path
+        assert caught.cause is not None
+
+    def test_unexpected_model_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        path = tmp_path / "custom.toml"
+        path.touch()
+        mocker.patch.object(pydantic.BaseModel, "model_validate", side_effect=TypeError("model defect"))
+
+        with pytest.raises(TypeError):
+            load_config(path, pydantic.BaseModel)
+
+
+class TestCreateConfig:
+    @pytest.mark.parametrize("text", ["", '# comment\r\nlabel = "café"\r\n'])
+    def test_preserves_text(self, tmp_path: Path, text: str) -> None:
+        path = ProjectConfigPath(tmp_path / "config.toml")
+
+        assert create_config(path, text).unwrap() is None
+
+        assert path.read_bytes() == text.encode("utf-8")
+
+    def test_refuses_overwrite(self, tmp_path: Path) -> None:
+        path = ProjectConfigPath(tmp_path / "config.toml")
+        create_config(path, "original").unwrap()
+
+        caught = create_config(path, "replacement").unwrap_err()[0]
+        assert isinstance(caught, errors.AlreadyExists)
+
+        assert caught.code == "config_already_exists"
+        assert caught.path == path
+        assert isinstance(caught.cause, FileExistsError)
+        assert path.read_text(encoding="utf-8") == "original"
+
+    def test_existing_directory(self, tmp_path: Path) -> None:
+        caught = create_config(ProjectConfigPath(tmp_path), "text").unwrap_err()[0]
+        assert isinstance(caught, errors.AlreadyExists)
+
+        assert caught.code == "config_already_exists"
+        assert caught.path == tmp_path
+        assert tmp_path.is_dir()
+
+    @pytest.mark.parametrize("target_exists", [False, True])
+    def test_existing_symlink(self, tmp_path: Path, target_exists: bool) -> None:
+        target = tmp_path / "target.toml"
+        if target_exists:
+            target.write_text("original", encoding="utf-8")
+        path = ProjectConfigPath(tmp_path / "config.toml")
+        path.symlink_to(target)
+
+        caught = create_config(path, "replacement").unwrap_err()[0]
+        assert isinstance(caught, errors.AlreadyExists)
+
+        assert caught.code == "config_already_exists"
+        assert path.is_symlink()
+        if target_exists:
+            assert target.read_text(encoding="utf-8") == "original"
+        else:
+            assert not target.exists()
+
+    def test_missing_parent(self, tmp_path: Path) -> None:
+        path = ProjectConfigPath(tmp_path / "missing/config.toml")
+
+        caught = create_config(path, "text").unwrap_err()[0]
+        assert isinstance(caught, errors.Unwritable)
+
+        assert caught.code == "config_unwritable"
+        assert caught.path == path
+        assert isinstance(caught.cause, FileNotFoundError)
+        assert not path.parent.exists()
+
+    def test_invalid_text(self, tmp_path: Path) -> None:
+        path = ProjectConfigPath(tmp_path / "config.toml")
+
+        caught = create_config(path, "\ud800").unwrap_err()[0]
+        assert isinstance(caught, errors.Unwritable)
+
+        assert caught.code == "config_unwritable"
+        assert caught.path == path
+        assert isinstance(caught.cause, UnicodeEncodeError)
+        assert not path.exists()
+
+    def test_write_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        path = ProjectConfigPath(tmp_path / "config.toml")
+        stream = mocker.patch.object(Path, "open").return_value.__enter__.return_value
+        stream.write.side_effect = OSError("write failed")
+
+        caught = create_config(path, "text").unwrap_err()[0]
+        assert isinstance(caught, errors.Unwritable)
+
+        assert caught.code == "config_unwritable"
+        assert caught.path == path
+        assert isinstance(caught.cause, OSError)
+
+
+class TestCreateConfigFromTemplate:
+    @pytest.mark.parametrize(
+        ("template", "text"),
+        [("empty.toml", ""), ("custom.toml", '  # Привет 🌍\nlabel = "café"\n\n'), ("invalid.toml", "item = [")],
+    )
+    def test_creates_from_selected_package_and_template(
+        self, tmp_path: Path, config_package: str, template: str, text: str
+    ) -> None:
+        (tmp_path / "fixtures" / template).write_text(text, encoding="utf-8")
+        path = ProjectConfigPath(Path("custom.toml"))
+
+        with contextlib.chdir(tmp_path):
+            assert create_config_from_template(path, package=config_package, template=template).unwrap() is None
+
+        assert (tmp_path / path).read_bytes() == text.encode("utf-8")
+
+    @pytest.mark.parametrize("content", [None, b"\xff"])
+    @pytest.mark.parametrize("target_exists", [False, True])
+    def test_template_failure_precedes_creation_and_preserves_target(
+        self, tmp_path: Path, config_package: str, content: bytes | None, target_exists: bool
+    ) -> None:
+        if content is not None:
+            (tmp_path / "fixtures" / "base.toml").write_bytes(content)
+        path = ProjectConfigPath(tmp_path / "custom.toml")
+        if target_exists:
+            path.write_text("original", encoding="utf-8")
+
+        failures = create_config_from_template(path, package=config_package, template="base.toml").unwrap_err()
+
+        assert len(failures) == 1
+        failure = failures[0]
+        assert isinstance(failure, errors.TemplateUnreadable)
+        assert isinstance(failure.cause, FileNotFoundError if content is None else UnicodeDecodeError)
+        assert failure.as_record() == {
+            "type": "error",
+            "code": "config_template_unreadable",
+            "message": failure.format_message(),
+            "path": str(path),
+            "template": "base.toml",
+            "reason": str(failure.cause),
+        }
+        if target_exists:
+            assert path.read_text(encoding="utf-8") == "original"
+        else:
+            assert not path.exists()
+
+    @pytest.mark.parametrize("target_exists", [False, True])
+    def test_creation_failure_keeps_write_diagnostic(
+        self, tmp_path: Path, config_package: str, target_exists: bool
+    ) -> None:
+        (tmp_path / "fixtures" / "base.toml").write_text("replacement", encoding="utf-8")
+        path = ProjectConfigPath(tmp_path / "target" / "config.toml")
+        if target_exists:
+            path.parent.mkdir()
+            path.write_text("original", encoding="utf-8")
+
+        failure = create_config_from_template(path, package=config_package, template="base.toml").unwrap_err()[0]
+
+        if target_exists:
+            assert isinstance(failure, errors.AlreadyExists)
+            assert path.read_text(encoding="utf-8") == "original"
+        else:
+            assert isinstance(failure, errors.Unwritable)
+            assert not path.parent.exists()
+        assert failure.path == path
+        assert isinstance(failure.cause, FileExistsError if target_exists else FileNotFoundError)
+
+    def test_unexpected_resource_failure_propagates(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        mocker.patch("llm_tool_cli.config.files.importlib.resources.files", side_effect=RuntimeError("broken loader"))
+
+        with pytest.raises(RuntimeError, match="broken loader"):
+            create_config_from_template(
+                ProjectConfigPath(tmp_path / "config.toml"), package="config_fixture_package", template="base.toml"
+            )

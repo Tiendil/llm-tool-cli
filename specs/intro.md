@@ -2,29 +2,45 @@
 
 ## Goal of the document
 
-This document lists LLM Tool CLI specification documents and specification directories, and briefly describes their purpose.
+This document indexes the project's specifications and their purposes.
 
 ## Scope
 
-The scope of this specification is limited to the specification index.
-Detailed requirements for individual specifications are out of scope except for brief descriptions needed to keep the index useful.
+The specification index and its maintenance; detailed product requirements are out of scope.
+
+## Index requirements
+
+The index MUST list every specification with its path and a brief description.
+Each description MUST identify the specification's stable subject or purpose rather than enumerate its contents.
+Descriptions MUST NOT list individual requirements or current implementation details.
+Descriptions SHOULD remain accurate when details change within the specification's existing scope.
+The index MUST be kept complete and accurate when specifications are added, removed, or change scope.
+
+**Example:** Describe a configuration specification as “The project configuration contract,” without listing its current configuration fields.
 
 ## Specification directories
 
-- `specs/` contains all project specifications used by depmesh governance rules.
-- `specs/architecture/` contains specifications related to package ownership, Python conventions, entities, errors, and tests.
-- `specs/documentation/` contains specifications related to repository documentation artifacts.
-- `specs/meta/` contains specifications related to requirements for specification documents.
+- `specs/` — all specifications, used by specification-governance rules.
+- `specs/architecture/` — library architecture.
+- `specs/behavior/` — observable contracts at library and CLI boundaries.
+- `specs/documentation/` — repository documentation requirements.
+- `specs/meta/` — specification-writing requirements.
 
 ## Specification documents
 
-- `specs/intro.md` is this file and indexes all specification documents.
-- `specs/dictionary.md` defines project terminology shared by multiple specifications and dependency metadata rules.
-- `specs/meta/general.md` defines general rules for project specification documents.
-- `specs/architecture/modules_layout.md` describes package organization, public import boundaries, and consumer ownership.
-- `specs/architecture/python.md` describes Python typing, validation, and class conventions.
-- `specs/architecture/entities.md` describes entity modeling, typed data conventions including static typing suppressions, and validation and serialization boundaries.
-- `specs/architecture/errors.md` describes library exceptions and warnings, including failure classification and consumer presentation boundaries.
-- `specs/architecture/tests.md` describes test organization, required behavior coverage, and test isolation.
-- `specs/documentation/readme.md` describes the content and tone of the brief root README.
-- `specs/documentation/changelog.md` describes Changy source files, version-record structure, and entry formatting.
+- `specs/intro.md` — Index of project specifications.
+- `specs/dictionary.md` — Shared project terminology.
+- `specs/meta/general.md` — Requirements for specification content and presentation.
+- `specs/meta/behavior.md` — Rules for expressing observable behavior in specifications.
+- `specs/architecture/modules_layout.md` — Ownership boundaries within the library and between the library and its consumers.
+- `specs/architecture/python.md` — Python implementation conventions.
+- `specs/architecture/entities.md` — Conventions for modeling project data.
+- `specs/architecture/errors.md` — Conventions for representing and propagating diagnostics.
+- `specs/architecture/tests.md` — Requirements for verifying project behavior.
+- `specs/behavior/cli.md` — Contracts for reusable command-line application support.
+- `specs/behavior/config.md` — Contracts for reusable configuration support.
+- `specs/behavior/protocol.md` — The shared output protocol contract.
+- `specs/behavior/paths.md` — The shared contract for interpreting project paths.
+- `specs/behavior/skills.md` — The contract for loading packaged skill documentation.
+- `specs/documentation/readme.md` — Requirements for the root README.
+- `specs/documentation/changelog.md` — Requirements for maintaining the project changelog.

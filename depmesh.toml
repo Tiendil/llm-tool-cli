@@ -97,6 +97,16 @@ output = { type = "files", pattern = "@/specs/**/*.md" }
 
 [[rules]]
 relation = "governed_by"
+input = { type = "glob", pattern = "@/specs/behavior/**/*.md" }
+output = { type = "list", artifacts = ["@/specs/meta/behavior.md"] }
+
+[[rules]]
+relation = "governs"
+input = { type = "one_of", artifacts = ["@/specs/meta/behavior.md"] }
+output = { type = "files", pattern = "@/specs/behavior/**/*.md" }
+
+[[rules]]
+relation = "governed_by"
 input = { type = "glob", pattern = "@/llm_tool_cli/**/*.py" }
 output = { type = "files", pattern = "@/specs/architecture/*.md" }
 
@@ -106,6 +116,66 @@ input = { type = "glob", pattern = "@/specs/architecture/*.md" }
 output = { type = "files", pattern = "@/llm_tool_cli/**/*.py" }
 
 # Dependency discovery and boundary checks reflect the module ownership rules.
+[[rules]]
+relation = "governed_by"
+input = { type = "glob", pattern = "@/llm_tool_cli/config/**/*.py" }
+output = { type = "list", artifacts = ["@/specs/behavior/config.md"] }
+
+[[rules]]
+relation = "governs"
+input = { type = "one_of", artifacts = ["@/specs/behavior/config.md"] }
+output = { type = "files", pattern = "@/llm_tool_cli/config/**/*.py" }
+
+[[rules]]
+relation = "governed_by"
+input = { type = "glob", pattern = "@/llm_tool_cli/cli/**/*.py" }
+output = { type = "list", artifacts = ["@/specs/behavior/cli.md"] }
+
+[[rules]]
+relation = "governs"
+input = { type = "one_of", artifacts = ["@/specs/behavior/cli.md"] }
+output = { type = "files", pattern = "@/llm_tool_cli/cli/**/*.py" }
+
+[[rules]]
+relation = "governed_by"
+input = { type = "glob", pattern = "@/llm_tool_cli/skills/**/*.py" }
+output = { type = "list", artifacts = ["@/specs/behavior/skills.md"] }
+
+[[rules]]
+relation = "governs"
+input = { type = "one_of", artifacts = ["@/specs/behavior/skills.md"] }
+output = { type = "files", pattern = "@/llm_tool_cli/skills/**/*.py" }
+
+[[rules]]
+relation = "governed_by"
+input = { type = "glob", pattern = "@/llm_tool_cli/protocol/**/*.py" }
+output = { type = "list", artifacts = ["@/specs/behavior/protocol.md"] }
+
+[[rules]]
+relation = "governed_by"
+input = { type = "glob", pattern = "@/llm_tool_cli/output/**/*.py" }
+output = { type = "list", artifacts = ["@/specs/behavior/protocol.md"] }
+
+[[rules]]
+relation = "governs"
+input = { type = "one_of", artifacts = ["@/specs/behavior/protocol.md"] }
+output = { type = "files", pattern = "@/llm_tool_cli/output/**/*.py" }
+
+[[rules]]
+relation = "governs"
+input = { type = "one_of", artifacts = ["@/specs/behavior/protocol.md"] }
+output = { type = "files", pattern = "@/llm_tool_cli/protocol/**/*.py" }
+
+[[rules]]
+relation = "governed_by"
+input = { type = "glob", pattern = "@/llm_tool_cli/paths/**/*.py" }
+output = { type = "list", artifacts = ["@/specs/behavior/paths.md"] }
+
+[[rules]]
+relation = "governs"
+input = { type = "one_of", artifacts = ["@/specs/behavior/paths.md"] }
+output = { type = "files", pattern = "@/llm_tool_cli/paths/**/*.py" }
+
 [[rules]]
 relation = "governed_by"
 input = { type = "one_of", artifacts = [

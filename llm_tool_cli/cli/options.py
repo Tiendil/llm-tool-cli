@@ -1,0 +1,48 @@
+from pathlib import Path
+from typing import Annotated
+
+import typer
+
+from llm_tool_cli.cli.errors import InvalidArguments
+from llm_tool_cli.cli.handling import report_errors_and_exit
+from llm_tool_cli.paths import ProjectConfigPath
+from llm_tool_cli.protocol import Protocol
+
+
+def _parse_config_path(value: str) -> ProjectConfigPath:
+    return ProjectConfigPath(Path(value))
+
+
+ConfigOption = Annotated[
+    ProjectConfigPath | None,
+    typer.Option(
+        "--config",
+        parser=_parse_config_path,
+        metavar="PATH",
+        help="Configuration file path. Overrides the command's default configuration location.",
+    ),
+]
+
+
+def _parse_protocol(value: str) -> Protocol:
+    try:
+        return Protocol(value)
+    except ValueError:
+        choices = ", ".join(protocol.value for protocol in Protocol)
+        failure = InvalidArguments(reason=f"invalid protocol `{value}`; expected one of: {choices}")
+        report_errors_and_exit([failure], protocol=Protocol.llm)
+
+
+ProtocolOption = Annotated[
+    Protocol | None,
+    typer.Option(
+        "--protocol",
+        "-p",
+        parser=_parse_protocol,
+        metavar="PROTOCOL",
+        help=(
+            f"Output protocol ({', '.join(protocol.value for protocol in Protocol)}). "
+            "Defaults to llm for skill and human for other commands."
+        ),
+    ),
+]
