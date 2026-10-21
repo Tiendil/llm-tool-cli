@@ -1,4 +1,4 @@
-Moved common functionality from `donna` and `depmesh` into the this library.
+Moved common functionality from `donna` and `depmesh` into this library.
 
 ### Changes
 
