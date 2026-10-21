@@ -21,5 +21,6 @@ Moved common functionality from `donna` and `depmesh` into this library.
 - Added a context-bound `OutputEmitter` and stream implementation.
 - Added `output.get().journal(...)`, configurable journal-cell factories, and `JournalRecord`.
 - Command processors execute argument lists without a shell and substitute whole-argument record placeholders; missing or null fields become empty arguments. Compact text journals occupy one physical line while automation retains normalized multiline messages.
-- Added shared exit-status policy.: success uses `0`, explicit invalid arguments `1`, configuration errors `2`, and other environment errors `3` by default. - Added Typer application and command-context helpers.
+- Added shared exit-status policy: success uses `0`, explicit invalid arguments `1`, configuration errors `2`, and other environment errors `3` by default.
+- Added Typer application and command-context helpers.
 - Added reusable `init`, `version`, and `skill` command registration.
