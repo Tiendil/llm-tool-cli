@@ -36,8 +36,8 @@ Preserve the wording and structure of existing specifications where they remain 
 
 ## Development environment
 
-All development-related operations MUST be performed in Docker Compose containers through the repository helpers.
-Agents MUST NOT perform development-related operations directly on the host machine.
+All development-related operations MUST be performed in Docker Compose containers through the repository helpers, except for the host-side tools explicitly required below.
+Agents MUST NOT perform other development-related operations directly on the host machine.
 Code and file searches MUST run on the host using host-installed tools, including `ast-grep` and `rg`, without Docker or development-helper wrappers.
 Reading and editing files MAY also be done on the host.
 Do not replace the Compose-managed environment with direct `docker run` or `docker build` commands.
@@ -96,11 +96,14 @@ These tools MUST have the highest priority when an agent is deciding which tool 
 Use Donna to run project-local deterministic workflows when the developer, these instructions, or an active Donna workflow explicitly asks for one.
 Donna controls workflow state only. Agents remain responsible for reading project instructions, using Depmesh where applicable, editing files, running checks, and reporting results.
 
+Run the host-installed `donna` executable directly from the project root, without Docker, development-helper, or `uv run` wrappers.
+Development commands executed by Donna workflows MUST still use the repository's container helpers.
+
 At the start of each work session, read usage and list workflows:
 
 ```bash
-./bin/dev.sh donna -p llm skill usage
-./bin/dev.sh donna -p llm list
+donna -p llm skill usage
+donna -p llm list
 ```
 
 Use the LLM protocol for agent-facing invocations unless a human explicitly asks for another protocol.
@@ -110,7 +113,7 @@ Starting a workflow in the existing session is different from resetting the sess
 After making changes, run `@/workflows/polish.donna.md` at a point when the repository should be in a working state:
 
 ```bash
-./bin/dev.sh donna -p llm run @/workflows/polish.donna.md
+donna -p llm run @/workflows/polish.donna.md
 ```
 
 Follow Donna's returned action instructions and report their outcomes.
@@ -120,10 +123,11 @@ Run individual operations separately only when a specific operation is needed fo
 ### `depmesh`
 
 Agents MUST use Depmesh for dependency types supported by `depmesh.toml`.
+Run the host-installed `depmesh` executable directly from the project root, without Docker, development-helper, or `uv run` wrappers.
 At the start of a work session, read its usage:
 
 ```bash
-./bin/dev.sh uv run -- depmesh -p llm skill usage
+depmesh -p llm skill usage
 ```
 
 Query affected files for governing specifications, related tests, imports, and reverse imports when those relationships are relevant.
