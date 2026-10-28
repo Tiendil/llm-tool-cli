@@ -18,6 +18,8 @@ ResolvedProjectPath = NewType("ResolvedProjectPath", Path)
 @unwrap_to_error
 def _project_path_input(value: str, root: ProjectRootPath, *, allow_absolute: bool = True) -> Result[PathInput]:
     """Select a filesystem candidate without interpreting its target."""
+    if not value:
+        return Err([InvalidProjectPath(path=value)])
     if value.startswith("@"):
         normalized = normalize_project_path_id(value).unwrap()
         return Ok(PathInput(root.joinpath(*project_path_parts(normalized))))
@@ -35,7 +37,7 @@ def _project_path_input(value: str, root: ProjectRootPath, *, allow_absolute: bo
 
 @unwrap_to_error
 def resolve_project_path(value: str, root: Path, *, allow_absolute: bool = True) -> Result[ResolvedProjectPath]:
-    """Resolve an identifier or filesystem input strictly below a project root.
+    """Resolve an identifier or filesystem input at or below a project root.
 
     Resolve the root first. Normalize identifiers before checking for symlinks;
     expand home markers only in filesystem inputs. Relative filesystem inputs
@@ -80,7 +82,7 @@ def normalize_path(value: str, root: Path, *, cwd: Path | None = None) -> Result
 def project_path_id_from_filesystem(path: Path, root: Path) -> Result[ProjectPathId]:
     """Resolve a filesystem path and convert it to a project identifier.
 
-    Resolve the supplied root first, then enforce containment strictly below it.
+    Resolve the supplied root first, then enforce containment at or below it.
     Relative roots and paths use the process working directory. Do not expand
     home markers, interpret identifiers, or require an existing target.
     Preserve root and target resolution failures and containment diagnostics.
@@ -91,12 +93,12 @@ def project_path_id_from_filesystem(path: Path, root: Path) -> Result[ProjectPat
 
 
 def project_path_id_from_resolved(path: ResolvedProjectPath, root: ProjectRootPath) -> ProjectPathId:
-    """Convert a resolved path strictly below its resolved root to an identifier.
+    """Convert a resolved path at or below its resolved root to an identifier.
 
     The path must already have passed containment resolution for this root.
     Preserve segment text without filesystem access or repeated validation.
     """
-    return ProjectPathId("@/" + path.relative_to(root).as_posix())
+    return ProjectPathId("@/" + "/".join(path.relative_to(root).parts))
 
 
 def resolve_project_root(root: Path) -> Result[ProjectRootPath]:
@@ -133,7 +135,7 @@ def _validate_no_symlinks(path: Path, root: ProjectRootPath) -> Result[None]:  #
 
 @unwrap_to_error
 def resolve_inside_project(path: Path, root: ProjectRootPath) -> Result[ResolvedProjectPath]:
-    """Resolve a filesystem path and require it to be strictly below the root.
+    """Resolve a filesystem path and require it to be at or below the root.
 
     The root must already be resolved. Relative paths use the process working
     directory; callers choose any other base before calling. Do not expand
@@ -145,7 +147,7 @@ def resolve_inside_project(path: Path, root: ProjectRootPath) -> Result[Resolved
     except (OSError, RuntimeError) as error:
         return Err([PathResolutionFailed(path=str(path), reason=str(error)).with_cause(error)])
 
-    if resolved == root or not resolved.is_relative_to(root):
+    if not resolved.is_relative_to(root):
         return Err([InvalidProjectPath(path=str(path))])
 
     return Ok(ResolvedProjectPath(resolved))
@@ -153,7 +155,7 @@ def resolve_inside_project(path: Path, root: ProjectRootPath) -> Result[Resolved
 
 @unwrap_to_error
 def resolve_root_anchored_path(value: str, root: ProjectRootPath) -> Result[ResolvedProjectPath]:
-    """Normalize an ``@/`` identifier and resolve it strictly below the root.
+    """Normalize an ``@/`` identifier and resolve it at or below the root.
 
     The root must already be resolved. Normalize identifier segments before
     resolving symlinks and checking containment, without requiring an existing

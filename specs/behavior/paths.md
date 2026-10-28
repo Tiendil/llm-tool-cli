@@ -11,8 +11,8 @@ Application-specific artifact semantics, template substitution, and rule evaluat
 
 ## Identifiers
 
-A canonical project-path identifier MUST start with `@/` and identify a path below the project root.
-It MUST contain one or more non-empty `/`-separated segments after the prefix.
+A canonical project-path identifier MUST start with `@/` and identify a path at or below the project root.
+The project root MUST be represented by `@/`; other identifiers MUST contain one or more non-empty `/`-separated segments after the prefix.
 Canonical identifiers MUST NOT contain `.` or `..` segments.
 
 Identifiers MAY refer to files, directories, or locations that do not yet exist.
@@ -35,6 +35,7 @@ It MUST NOT impose application-specific existence or filename-extension requirem
 ## Identifier components
 
 Component extraction MUST accept an already canonical identifier and return its segments in order, excluding the `@/` prefix.
+The root identifier MUST produce an empty sequence of components.
 It MUST preserve every segment's text exactly and return the components directly, with no expected failure outcome for canonical inputs.
 Callers MUST establish canonical form before extraction.
 It MUST NOT access the filesystem or depend on the current working directory.
@@ -47,14 +48,15 @@ The backslash in `@/a\b/file` remains part of the first component.
 Normalization MUST accept a textual identifier and either produce its canonical form or report an invalid-path failure.
 Invalid input MUST NOT be treated as a successful operation with no identifier.
 
-Normalization MUST require the `@/` prefix and reject empty segments, including repeated and trailing separators.
+Normalization MUST require the `@/` prefix, accept the root identifier, and reject empty segments after the prefix, including repeated and trailing separators.
 It MUST remove `.` segments and use each `..` segment to remove the preceding remaining segment.
 It MUST reject traversal above the root at any point, even if later segments would return below it.
-It MUST reject a normalized identifier that denotes only the root.
+It MUST normalize identifiers denoting only the root to `@/`.
 It MUST preserve all other segment text exactly, including case and whitespace.
 Backslashes and application syntax characters MUST be treated as ordinary segment text.
 
 **Example:** `@/a/./b/../c` normalizes to `@/a/c`, while `@/a/../../c` is invalid because it traverses above the root.
+Inputs `@/`, `@/.`, and `@/a/..` normalize to `@/`.
 Inputs `@/a//b` and `@/a/` are invalid because they contain empty segments; normalization does not collapse repeated separators or strip trailing ones.
 
 Normalization MUST NOT access the filesystem or depend on the current working directory.
@@ -95,8 +97,9 @@ With an explicit base `/home/user/project/nested`, `file` produces `@/nested/fil
 
 Resolution of an identifier or filesystem input MUST resolve the supplied project root before processing the input.
 Root resolution failures MUST take precedence over input rejection, home expansion, and target resolution failures.
-Successful resolution MUST produce an absolute filesystem path strictly below the resolved root.
+Successful resolution MUST produce an absolute filesystem path at or below the resolved root.
 Rejected input MUST produce a failure rather than a successful absence.
+Empty textual inputs MUST be rejected with an invalid-path failure whose `path` field is empty.
 
 Inputs starting with `@` MUST use root-anchored resolution, including lexical normalization before filesystem resolution and rejection of a missing `@/` prefix.
 Other inputs MUST be interpreted as filesystem paths with home markers expanded before resolution.
@@ -126,7 +129,7 @@ Root resolution MUST NOT establish containment of any project path.
 
 ## Root-anchored resolution
 
-Resolving a root-anchored identifier inside an already resolved project root MUST first apply lexical identifier normalization, then resolve the normalized path below that root with filesystem containment enforcement.
+Resolving a root-anchored identifier inside an already resolved project root MUST first apply lexical identifier normalization, then resolve the normalized path at or below that root with filesystem containment enforcement.
 The supplied root MUST determine the base independently of the current working directory.
 Resolution MUST NOT expand home markers or require the target to exist or have a particular filesystem kind.
 Lexical normalization failures and filesystem containment or resolution failures MUST preserve their respective diagnostics.
@@ -136,12 +139,12 @@ If `a` is a symlink, normalization removes `a/..` before filesystem resolution, 
 
 ## Filesystem containment
 
-Resolving a supplied filesystem path inside an already resolved project root MUST produce an absolute path strictly below that root or report a failure.
+Resolving a supplied filesystem path inside an already resolved project root MUST produce an absolute path at or below that root or report a failure.
 Resolution MUST reject any symbolic link encountered below the resolved project root before following it, including links to internal targets, broken links, and loops.
 This check MUST include intermediate path components and filesystem-input components followed by `..`.
 Symlinks used to select the project root or its ancestors MAY be resolved; they MUST NOT hide a symbolic link below that root.
 Resolution MUST resolve parent-directory segments and enforce containment.
-It MUST reject the root itself and targets outside the root.
+It MUST accept the root itself and reject targets outside the root.
 It MUST NOT require the target to exist or have a particular filesystem kind.
 
 Relative filesystem paths MUST use the process current working directory as their base.
@@ -152,9 +155,10 @@ Containment resolution MUST NOT interpret `@/` identifiers or expand home marker
 
 ## Resolved path identifiers
 
-Conversion to a canonical identifier MUST accept a filesystem path already resolved and checked strictly below the supplied resolved project root.
+Conversion to a canonical identifier MUST accept a filesystem path already resolved and checked at or below the supplied resolved project root.
 The caller MUST supply the same root used for that containment check.
 Conversion MUST return the path relative to that root with an `@/` prefix and `/` separators, preserving all segment text.
+The root itself MUST convert to `@/`.
 It MUST return the identifier directly, with no expected failure outcome for inputs satisfying these preconditions.
 
 Conversion MUST NOT access the filesystem or depend on the current working directory.

@@ -10,6 +10,7 @@ class TestProjectPathParts:
     @pytest.mark.parametrize(
         ("value", "expected"),
         [
+            ("@/", ()),
             ("@/LICENSE", ("LICENSE",)),
             ("@/notes/Project Plan.md", ("notes", "Project Plan.md")),
             ("@/Case/FILE", ("Case", "FILE")),
@@ -32,6 +33,7 @@ class TestIsProjectPathId:
     @pytest.mark.parametrize(
         "value",
         [
+            "@/",
             "@/README.md",
             "@/README",
             "@/LICENSE",
@@ -63,13 +65,11 @@ class TestIsProjectPathId:
             "./file",
             "/project/file",
             " @/file",
-            "@/",
-            "@/.",
             "@/..",
+            "@//",
             "@//file",
             "@/a//b",
             "@/a/",
-            "@/a/..",
             "@/../a",
             "@/a/../../a",
         ],
@@ -77,7 +77,7 @@ class TestIsProjectPathId:
     def test_rejects_malformed_project_paths(self, value: str) -> None:
         assert not is_project_path_id(value)
 
-    @pytest.mark.parametrize("value", ["@/./a", "@/a/.", "@/a/../b", "@/a/b/.."])
+    @pytest.mark.parametrize("value", ["@/.", "@/a/..", "@/./a", "@/a/.", "@/a/../b", "@/a/b/.."])
     def test_rejects_paths_requiring_normalization(self, value: str) -> None:
         assert not is_project_path_id(value)
 
@@ -90,6 +90,11 @@ class TestNormalizeProjectPathId:
     @pytest.mark.parametrize(
         ("value", "expected"),
         [
+            ("@/", "@/"),
+            ("@/.", "@/"),
+            ("@/a/..", "@/"),
+            ("@/a/../.", "@/"),
+            ("@/a/b/../..", "@/"),
             ("@/file", "@/file"),
             ("@/a/./b/../c", "@/a/c"),
             ("@/./a", "@/a"),
@@ -115,14 +120,12 @@ class TestNormalizeProjectPathId:
             "./file",
             "/file",
             " @/file",
-            "@/",
-            "@/.",
             "@/..",
+            "@//",
             "@//file",
             "@/a//b",
             "@/a/",
-            "@/a/..",
-            "@/a/../.",
+            "@/a/../",
             "@/../a",
             "@/a/../../a",
         ],
