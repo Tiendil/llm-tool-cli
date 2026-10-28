@@ -9,6 +9,10 @@ from llm_tool_cli.paths.globs import _compile_glob, _pattern_parts
 
 
 class TestPatternParts:
+    @pytest.mark.parametrize("pattern", ["@/", "@/.", "@/a/..", ".", "nested/.."])
+    def test_root_pattern_has_no_components(self, tmp_path: Path, pattern: str) -> None:
+        assert _pattern_parts(FileGlobPattern(pattern), ProjectRootPath(tmp_path)).unwrap() == ()
+
     def test_resolves_literal_prefix_before_normalizing_remaining_parts(self, tmp_path: Path) -> None:
         assert _pattern_parts(FileGlobPattern("nested/../**/*.py"), ProjectRootPath(tmp_path)).unwrap() == (
             "**",
@@ -32,7 +36,7 @@ class TestPatternParts:
         assert failure.path == str(tmp_path / "src/*.py")
         assert failure.cause == cause
 
-    @pytest.mark.parametrize("pattern", ["", ".", "../*", "@/../*", "@/", "@/a//b"])
+    @pytest.mark.parametrize("pattern", ["", "../*", "@/../*", "@/a//b"])
     def test_invalid_path_is_not_a_pattern(self, tmp_path: Path, pattern: str) -> None:
         assert _pattern_parts(FileGlobPattern(pattern), ProjectRootPath(tmp_path)).is_err(InvalidProjectPath)
 
@@ -94,6 +98,11 @@ class TestMatchGlob:
     @pytest.mark.parametrize(
         ("pattern", "path", "expected"),
         [
+            ("@/", "@/", {}),
+            ("@/.", "@/", {}),
+            ("@/a/..", "@/", {}),
+            (".", "@/", {}),
+            ("@/", "@/file", None),
             ("src/{**package}/{*module}.py", "@/src/core/api.py", {"package": "core", "module": "api"}),
             ("src/{**package}/{*module}.py", "@/src/api.py", {"package": "", "module": "api"}),
             ("src/{**module_path}.py", "@/src/core/api.py", {"module_path": "core/api"}),

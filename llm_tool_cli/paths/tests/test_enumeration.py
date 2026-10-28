@@ -200,7 +200,16 @@ class TestEnumerateFiles:
         assert enumerate_files(tmp_path, FileGlobPattern(str(tmp_path / "*.py"))).unwrap() == ["@/file.py"]
         assert enumerate_files(tmp_path, FileGlobPattern("~/*.py")).unwrap() == ["@/file.py"]
 
-    @pytest.mark.parametrize("pattern", ["../*", "@/../*", "@/", "@/a//b", "."])
+    @pytest.mark.parametrize("pattern", ["@/", "@/.", "@/a/..", ".", "nested/.."])
+    def test_root_directory_pattern_does_not_select_files(self, tmp_path: Path, pattern: str) -> None:
+        (tmp_path / "file.py").touch()
+        nested = tmp_path / "nested"
+        nested.mkdir()
+        (nested / "other.py").touch()
+
+        assert enumerate_files(tmp_path, FileGlobPattern(pattern)).unwrap() == []
+
+    @pytest.mark.parametrize("pattern", ["", "../*", "@/../*", "@/a//b"])
     def test_invalid_patterns_preserve_diagnostics(self, tmp_path: Path, pattern: str) -> None:
         assert enumerate_files(tmp_path, FileGlobPattern(pattern)).is_err(InvalidProjectPath)
 

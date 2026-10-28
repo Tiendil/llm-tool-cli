@@ -46,8 +46,9 @@ class TestResolveProjectPath:
 
         assert resolve_project_path(value, Path("project")).unwrap() == tmp_path / "project" / "file"
 
-    def test_resolves_absolute_input(self, tmp_path: Path) -> None:
-        target = tmp_path / "file"
+    @pytest.mark.parametrize("relative", [".", "file"])
+    def test_resolves_absolute_input(self, tmp_path: Path, relative: str) -> None:
+        target = tmp_path / relative
 
         assert resolve_project_path(str(target), tmp_path).unwrap() == target
 
@@ -62,12 +63,20 @@ class TestResolveProjectPath:
             InvalidProjectPath(path=value)
         ]
 
-    @pytest.mark.parametrize("value", ["@file", "@/", "@/a/..", "@/../file", "@/a//b", "@/a/"])
+    @pytest.mark.parametrize("value", ["@/", "@/.", "@/a/..", ".", "nested/.."])
+    @pytest.mark.parametrize("allow_absolute", [True, False])
+    def test_resolves_root(self, tmp_path: Path, value: str, allow_absolute: bool) -> None:
+        assert resolve_project_path(value, tmp_path, allow_absolute=allow_absolute).unwrap() == tmp_path
+
+    @pytest.mark.parametrize("value", ["@file", "@/../file", "@/a//b", "@/a/"])
     def test_preserves_invalid_identifier_diagnostic(self, tmp_path: Path, value: str) -> None:
         assert resolve_project_path(value, tmp_path).unwrap_err() == [InvalidProjectPath(path=value)]
 
-    @pytest.mark.parametrize("value", ["", ".", "nested/..", "../outside"])
-    def test_rejects_root_and_outside_filesystem_inputs(self, tmp_path: Path, value: str) -> None:
+    def test_rejects_empty_input(self, tmp_path: Path) -> None:
+        assert resolve_project_path("", tmp_path).unwrap_err() == [InvalidProjectPath(path="")]
+
+    @pytest.mark.parametrize("value", ["..", "../outside"])
+    def test_rejects_outside_filesystem_inputs(self, tmp_path: Path, value: str) -> None:
         assert resolve_project_path(value, tmp_path).unwrap_err() == [InvalidProjectPath(path=str(tmp_path / value))]
 
     @pytest.mark.parametrize("value", ["@/link/file", "link/file"])
@@ -162,11 +171,15 @@ class TestResolveProjectPath:
 
 
 class TestNormalizePath:
+    @pytest.mark.parametrize("value", ["@/", "@/.", "@/a/..", ".", "nested/.."])
+    def test_normalizes_root(self, tmp_path: Path, value: str) -> None:
+        assert normalize_path(value, tmp_path).unwrap() == "@/"
+
     @pytest.mark.parametrize("value", ["@/nested/./child/../file", "@/nested/file"])
     def test_normalizes_identifier(self, tmp_path: Path, value: str) -> None:
         assert normalize_path(value, tmp_path).unwrap() == "@/nested/file"
 
-    @pytest.mark.parametrize("value", ["@file", "@/", "@/a/..", "@/../file", "@/a//b", "@/a/"])
+    @pytest.mark.parametrize("value", ["@file", "@/../file", "@/a//b", "@/a/"])
     def test_preserves_invalid_identifier_diagnostic(self, tmp_path: Path, value: str) -> None:
         assert normalize_path(value, tmp_path).unwrap_err() == [InvalidProjectPath(path=value)]
 
@@ -197,8 +210,12 @@ class TestNormalizePath:
 
         assert normalize_path("file", tmp_path, cwd=Path("nested")).unwrap() == "@/nested/file"
 
-    def test_absolute_input_ignores_base(self, tmp_path: Path) -> None:
-        assert normalize_path(str(tmp_path / "file"), tmp_path, cwd=tmp_path.parent).unwrap() == "@/file"
+    @pytest.mark.parametrize(("relative", "expected"), [(".", "@/"), ("file", "@/file")])
+    def test_absolute_input_ignores_base(self, tmp_path: Path, relative: str, expected: str) -> None:
+        assert normalize_path(str(tmp_path / relative), tmp_path, cwd=tmp_path.parent).unwrap() == expected
+
+    def test_root_identifier_ignores_base(self, tmp_path: Path) -> None:
+        assert normalize_path("@/", tmp_path, cwd=tmp_path.parent).unwrap() == "@/"
 
     def test_identifier_checks_symlinks_independently_of_base(self, tmp_path: Path) -> None:
         (tmp_path / "outside").symlink_to(tmp_path.parent, target_is_directory=True)
@@ -222,8 +239,8 @@ class TestNormalizePath:
 
         assert normalize_path("outside/file", tmp_path).unwrap_err() == [InvalidProjectPath(path=str(link / "file"))]
 
-    @pytest.mark.parametrize("value", [".", "nested/..", "../outside"])
-    def test_rejects_root_and_outside_filesystem_inputs(self, tmp_path: Path, value: str) -> None:
+    @pytest.mark.parametrize("value", ["..", "../outside"])
+    def test_rejects_outside_filesystem_inputs(self, tmp_path: Path, value: str) -> None:
         assert normalize_path(value, tmp_path).unwrap_err() == [InvalidProjectPath(path=str(tmp_path / value))]
 
     @pytest.mark.parametrize("base", [None, ".", "nested"])
@@ -309,6 +326,10 @@ class TestNormalizePath:
 
 
 class TestProjectPathIdFromFilesystem:
+    @pytest.mark.parametrize("relative", [".", "nested/.."])
+    def test_converts_root(self, tmp_path: Path, relative: str) -> None:
+        assert project_path_id_from_filesystem(tmp_path / relative, tmp_path).unwrap() == "@/"
+
     @pytest.mark.parametrize("kind", ["file", "directory", "missing"])
     def test_converts_filesystem_path(self, tmp_path: Path, kind: str) -> None:
         path = tmp_path / "target"
@@ -344,13 +365,14 @@ class TestProjectPathIdFromFilesystem:
 
         assert project_path_id_from_filesystem(Path(name) / "file", tmp_path).unwrap() == f"@/{name}/file"
 
-    def test_resolves_root_symlink(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize(("relative", "expected"), [(".", "@/"), ("file", "@/file")])
+    def test_resolves_root_symlink(self, tmp_path: Path, relative: str, expected: str) -> None:
         root = tmp_path / "project"
         root.mkdir()
         link = tmp_path / "link"
         link.symlink_to(root, target_is_directory=True)
 
-        assert project_path_id_from_filesystem(link / "file", link).unwrap() == "@/file"
+        assert project_path_id_from_filesystem(link / relative, link).unwrap() == expected
 
     def test_rejects_internal_symlink(self, tmp_path: Path) -> None:
         target = tmp_path / "target"
@@ -367,8 +389,8 @@ class TestProjectPathIdFromFilesystem:
 
         assert project_path_id_from_filesystem(path, tmp_path).unwrap() == "@/file"
 
-    @pytest.mark.parametrize("relative", [".", "..", "../outside"])
-    def test_rejects_root_and_outside_paths(self, tmp_path: Path, relative: str) -> None:
+    @pytest.mark.parametrize("relative", ["..", "../outside"])
+    def test_rejects_outside_paths(self, tmp_path: Path, relative: str) -> None:
         path = tmp_path / relative
 
         assert project_path_id_from_filesystem(path, tmp_path).unwrap_err() == [InvalidProjectPath(path=str(path))]
@@ -441,13 +463,16 @@ class TestProjectPathIdFromResolved:
 
         assert project_path_id_from_resolved(resolved, root) == "@/file.txt"
 
-    def test_does_not_access_filesystem(self, tmp_path: Path, mocker: MockerFixture) -> None:
+    @pytest.mark.parametrize(("relative", "expected"), [(".", "@/"), ("file.txt", "@/file.txt")])
+    def test_does_not_access_filesystem(
+        self, tmp_path: Path, mocker: MockerFixture, relative: str, expected: str
+    ) -> None:
         root = resolve_project_root(tmp_path).unwrap()
-        resolved = resolve_inside_project(root / "file.txt", root).unwrap()
+        resolved = resolve_inside_project(root / relative, root).unwrap()
         mocker.patch.object(Path, "resolve", side_effect=AssertionError("unexpected path resolution"))
         mocker.patch.object(Path, "stat", side_effect=AssertionError("unexpected filesystem access"))
 
-        assert project_path_id_from_resolved(resolved, root) == "@/file.txt"
+        assert project_path_id_from_resolved(resolved, root) == expected
 
 
 class TestResolveProjectRoot:
@@ -566,6 +591,13 @@ class TestValidateNoSymlinks:
 
 
 class TestResolveInsideProject:
+    @pytest.mark.parametrize("relative", [".", "nested/.."])
+    @pytest.mark.parametrize("root_name", [".", "missing"])
+    def test_accepts_root(self, tmp_path: Path, relative: str, root_name: str) -> None:
+        root = tmp_path / root_name
+
+        assert resolve_inside_project(root / relative, ProjectRootPath(root)).unwrap() == root
+
     def test_symlink_inspection_failure_preserves_cause(self, tmp_path: Path, mocker: MockerFixture) -> None:
         cause = PermissionError("cannot inspect path")
         mocker.patch.object(Path, "lstat", side_effect=cause)
@@ -608,8 +640,8 @@ class TestResolveInsideProject:
 
         assert resolve_inside_project(Path("~/file"), ProjectRootPath(tmp_path)).unwrap() == (tmp_path / "~" / "file")
 
-    @pytest.mark.parametrize("relative", [".", "..", "../outside", "../project-sibling/file"])
-    def test_rejects_root_and_outside_paths(self, tmp_path: Path, relative: str) -> None:
+    @pytest.mark.parametrize("relative", ["..", "../outside", "../project-sibling/file"])
+    def test_rejects_outside_paths(self, tmp_path: Path, relative: str) -> None:
         root = ProjectRootPath(tmp_path / "project")
 
         errors = resolve_inside_project(root / relative, root).unwrap_err()
@@ -675,6 +707,10 @@ class TestResolveInsideProject:
 
 
 class TestResolveRootAnchoredPath:
+    @pytest.mark.parametrize("value", ["@/", "@/.", "@/a/.."])
+    def test_resolves_root(self, tmp_path: Path, value: str) -> None:
+        assert resolve_root_anchored_path(value, ProjectRootPath(tmp_path)).unwrap() == tmp_path
+
     def test_resolves_existing_file(self, tmp_path: Path) -> None:
         target = tmp_path / "file"
         target.touch()
@@ -709,7 +745,7 @@ class TestResolveRootAnchoredPath:
             resolve_root_anchored_path("@/./outside/../file", ProjectRootPath(tmp_path)).unwrap() == tmp_path / "file"
         )
 
-    @pytest.mark.parametrize("value", ["", "file", "@file", "@/", "@/a/..", "@/a//b", "@/a/", "@/../a"])
+    @pytest.mark.parametrize("value", ["", "file", "@file", "@/a//b", "@/a/", "@/../a"])
     def test_invalid_identifier_preserves_lexical_diagnostic(self, tmp_path: Path, value: str) -> None:
         failures = resolve_root_anchored_path(value, ProjectRootPath(tmp_path)).unwrap_err()
 

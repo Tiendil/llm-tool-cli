@@ -13,12 +13,14 @@ _PROJECT_ROOT_PREFIX = "@/"
 def normalize_project_path_id(value: str) -> Result[ProjectPathId]:
     """Normalize a root-anchored identifier without accessing the filesystem.
 
-    Remove ``.`` and resolve ``..`` lexically. Reject missing ``@/``, empty
-    segments, traversal above the root, and a final root-only identifier with
+    Remove ``.`` and resolve ``..`` lexically, representing the root as ``@/``.
+    Reject missing ``@/``, empty segments, and traversal above the root with
     ``Err([InvalidProjectPath(...)])``. Preserve all other segment text.
     """
     if not value.startswith(_PROJECT_ROOT_PREFIX):
         return Err([InvalidProjectPath(path=value)])
+    if value == _PROJECT_ROOT_PREFIX:
+        return Ok(ProjectPathId(value))
 
     parts: list[str] = []
     for part in value.removeprefix(_PROJECT_ROOT_PREFIX).split("/"):
@@ -33,9 +35,6 @@ def normalize_project_path_id(value: str) -> Result[ProjectPathId]:
                 parts.pop()
             case _:
                 parts.append(part)
-
-    if not parts:
-        return Err([InvalidProjectPath(path=value)])
 
     return Ok(ProjectPathId(_PROJECT_ROOT_PREFIX + "/".join(parts)))
 
@@ -55,4 +54,4 @@ def project_path_parts(value: ProjectPathId) -> tuple[str, ...]:
     The caller must establish canonical form before calling. Preserve segment
     text without filesystem access or repeated normalization and validation.
     """
-    return tuple(value.removeprefix(_PROJECT_ROOT_PREFIX).split("/"))
+    return tuple(value.removeprefix(_PROJECT_ROOT_PREFIX).split("/")) if value != _PROJECT_ROOT_PREFIX else ()

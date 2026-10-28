@@ -35,7 +35,7 @@ def _pattern_parts(pattern: FileGlobPattern, root: ProjectRootPath) -> Result[tu
     except (OSError, RuntimeError) as error:
         return Err([PathResolutionFailed(path=str(candidate), reason=str(error)).with_cause(error)])
     normalized = Path(os.path.normpath(resolved))
-    if normalized == root or not normalized.is_relative_to(root):
+    if not normalized.is_relative_to(root):
         return Err([InvalidProjectPath(path=str(candidate))])
     return Ok(normalized.relative_to(root).parts)
 
