@@ -114,7 +114,10 @@ Environment errors MUST declare their process exit status as inherited class pol
 Module roots and concrete error classes MAY override the shared default according to the categories in `specs/behavior/cli.md`.
 Exit policy MUST NOT become per-instance model data or appear in serialized entities, diagnostic records, or cell metadata.
 
-Environment errors MUST carry a human-readable message and MAY carry corrective guidance and typed context fields so consumers can diagnose failures without implementation stack details.
+Environment errors MUST carry a human-readable message and MAY carry typed context fields so consumers can diagnose failures without implementation stack details.
+Concrete environment-error classes MUST provide actionable corrective guidance through `ways_to_fix`, declared as a class default or inherited from a parent whose guidance applies to that failure.
+Corrective guidance MUST NOT be embedded in diagnostic messages or context fields.
+Error-producing call sites MUST supply only varying diagnostic context and MUST NOT construct or append corrective guidance.
 Messages and corrective guidance MAY reference context through `{error.<field>}` formatting.
 Environment-error string fields MUST use the shared base entity's normalization, including stripping surrounding whitespace.
 The shared environment-error model MUST remain independent of protocol-specific fields and rendering behavior.
