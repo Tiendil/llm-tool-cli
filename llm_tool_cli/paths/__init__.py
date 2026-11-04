@@ -22,7 +22,9 @@ from llm_tool_cli.paths.filesystem import (
 from llm_tool_cli.paths.globs import FileGlobPattern, glob_capture_names, match_glob
 from llm_tool_cli.paths.normalization import (
     ProjectPathId,
+    contains_path,
     is_project_path_id,
+    join_path,
     normalize_project_path_id,
     project_path_parts,
 )
@@ -35,9 +37,11 @@ __all__ = [
     "ProjectRootPath",
     "RelativeProjectPath",
     "ResolvedProjectPath",
+    "contains_path",
     "enumerate_files",
     "glob_capture_names",
     "is_project_path_id",
+    "join_path",
     "match_glob",
     "normalize_path",
     "normalize_project_path_id",

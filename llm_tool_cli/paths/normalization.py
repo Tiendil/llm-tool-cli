@@ -55,3 +55,23 @@ def project_path_parts(value: ProjectPathId) -> tuple[str, ...]:
     text without filesystem access or repeated normalization and validation.
     """
     return tuple(value.removeprefix(_PROJECT_ROOT_PREFIX).split("/")) if value != _PROJECT_ROOT_PREFIX else ()
+
+
+def join_path(root: ProjectPathId, relative: ProjectPathId) -> ProjectPathId:
+    """Join canonical identifiers, treating '@/' as an empty relative path.
+
+    For example, '@/docs' joined with '@/guide' becomes '@/docs/guide';
+    joining '@/docs' with '@/' preserves '@/docs'. No normalization or I/O is needed.
+    """
+    suffix = relative.removeprefix("@/")
+    return ProjectPathId(root.rstrip("/") + "/" + suffix) if suffix else root
+
+
+def contains_path(root: ProjectPathId, path: ProjectPathId) -> bool:
+    """Include a canonical root and its descendants, respecting segment boundaries.
+
+    For example, '@/docs' includes '@/docs' and '@/docs/a', but not '@/docs-old'.
+    '@/' includes every canonical identifier, including itself. This lexical
+    relationship does not establish filesystem containment.
+    """
+    return root == "@/" or path == root or path.startswith(root + "/")
