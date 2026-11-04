@@ -38,6 +38,7 @@ The index MUST be kept complete and accurate when specifications are added, remo
 - `specs/architecture/errors.md` — Conventions for representing and propagating diagnostics.
 - `specs/architecture/tests.md` — Requirements for verifying project behavior.
 - `specs/behavior/cli.md` — Contracts for reusable command-line application support.
+- `specs/behavior/cache.md` — The shared disposable cache contract.
 - `specs/behavior/config.md` — Contracts for reusable configuration support.
 - `specs/behavior/protocol.md` — The shared output protocol contract.
 - `specs/behavior/paths.md` — The shared contract for interpreting project paths.

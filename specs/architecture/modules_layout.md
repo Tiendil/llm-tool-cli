@@ -206,6 +206,7 @@ Locking MUST remain independent of cache payloads, project configuration, and ap
 
 Cache identity MUST remain independent of payload semantics and persistence representation.
 Cache access and cleanup MUST coordinate through `file_locks`.
+Cache operations MUST follow `specs/behavior/cache.md` at their caller boundary.
 Consumers MUST own cache selection, payload semantics, and application-specific storage policies.
 Cache storage MUST remain independent of tool identity discovery and application resource bindings.
 `tool_cache` MUST separately own cache-location selection under Tool storage locations in `specs/behavior/paths.md`.

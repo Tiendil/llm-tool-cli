@@ -178,6 +178,16 @@ output = { type = "files", pattern = "@/llm_tool_cli/paths/**/*.py" }
 
 [[rules]]
 relation = "governed_by"
+input = { type = "glob", pattern = "@/llm_tool_cli/tool_cache/**/*.py" }
+output = { type = "list", artifacts = ["@/specs/behavior/cache.md"] }
+
+[[rules]]
+relation = "governs"
+input = { type = "one_of", artifacts = ["@/specs/behavior/cache.md"] }
+output = { type = "files", pattern = "@/llm_tool_cli/tool_cache/**/*.py" }
+
+[[rules]]
+relation = "governed_by"
 input = { type = "one_of", artifacts = [
   "@/AGENTS.md",
   "@/tach.toml",

@@ -151,6 +151,7 @@ The following MUST NOT prepare or access the cache:
 
 The command MUST accept no positional arguments or command-specific options and MUST NOT require confirmation.
 Execution MUST clean the selected cache without loading or activating a project.
+Storage effects MUST follow Cleanup in `specs/behavior/cache.md` for the caller-selected cache.
 Resources supplied for the invocation MUST remain available through result delivery and be released at command closure, including failure paths.
 Expected cache-preparation or cleanup failures MUST follow Command error handling below without success output; unexpected exceptions MUST propagate.
 
