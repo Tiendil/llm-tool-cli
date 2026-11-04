@@ -100,9 +100,9 @@ class StreamOutputEmitter:
     def _render(self, cells: list[LogicCell]) -> str:
         """Prepare complete batch text; subclasses may override without handling streams."""
         protocol = runtime_config.get().protocol
-        tool_label = settings.static_config.get().tool_label
+        tool_name = settings.static_config.get().tool_name
         sequence = [output_cell for cell in cells for output_cell in cell.render(protocol)]
         return b"".join(
-            cell.render(RenderContext(index=index, total=len(sequence), tool_label=tool_label))
+            cell.render(RenderContext(index=index, total=len(sequence), tool_name=tool_name))
             for index, cell in enumerate(sequence)
         ).decode("utf-8")

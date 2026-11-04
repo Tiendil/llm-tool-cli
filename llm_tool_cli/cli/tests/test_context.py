@@ -12,8 +12,9 @@ from llm_tool_cli.cli.context import CommandContext, command_context
 from llm_tool_cli.cli.errors import InvalidArguments
 from llm_tool_cli.config.project import ProjectConfig, project_config
 from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
+from llm_tool_cli.core.entities import ToolName
 from llm_tool_cli.core.result import UnwrapError
-from llm_tool_cli.core.settings import ToolLabel, initialize
+from llm_tool_cli.core.settings import initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
 from llm_tool_cli.output import StreamOutputEmitter
 from llm_tool_cli.output import output as active_output
@@ -32,7 +33,7 @@ class TestCommandContext:
     def test_command_scope_without_project_flushes_and_restores_output(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
         previous = CollectingEmitter()
         with active_output.scope(previous):
             with typer.Context(TyperCommand("show")) as context:
@@ -58,7 +59,7 @@ class TestCommandContext:
     def test_command_scope_finalizes_using_active_emitter_before_framework_cleanup(
         self, tmp_path: Path, failure: Exception | None, exit_code: int, record_types: list[str]
     ) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
         project = ProjectConfig(config_path=ProjectConfigPath(tmp_path / "active.toml"))
         stream = io.StringIO()
         rendered: list[list[LogicCell]] = []
@@ -151,7 +152,7 @@ class TestCommandContext:
     def test_init__binds_output_with_selected_protocol_and_supports_stream_override(
         self, capsys: pytest.CaptureFixture[str], protocol: Protocol, custom_stream: bool
     ) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
         messages = ["Café", "日本語"]
         stream = io.StringIO()
 

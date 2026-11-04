@@ -22,6 +22,10 @@ A dictionary term MAY be renamed only when its existing name or definition has b
 - `module boundary` — a declared public Python import boundary and its allowed dependencies, enforced by Tach where configured.
 - `CLI boundary` — an interface that connects library operations to command-line input, output presentation, or process exit behavior.
 - `semantic primitive type` — a Python type that distinguishes the library-specific meaning of a primitive value.
+- `tool name` — the canonical application identity shared by output framing and per-user storage selection.
+- `tool cache` — disposable per-tool storage whose owned contents can be removed without deleting authoritative application data.
+- `tool state directory` — a per-user location for a tool's persistent local state shared across projects, independent of its disposable cache.
+- `coordination file` — a filesystem location identifying an exclusive process lock; its existence alone does not establish lock ownership.
 - `expected failure` — a failure anticipated by the called operation's documented contract for which the caller has a defined response.
 - `unexpected failure` — a failure outside expected operational conditions, including programming defects, violated internal invariants, or stored-state integrity failures.
 - `warning` — a non-fatal problem discovered while processing a request that can still produce useful requested output.

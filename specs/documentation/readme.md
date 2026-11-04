@@ -44,6 +44,7 @@ The capabilities section MUST describe the following high-level concepts and the
 - project filesystem operations.
 - journaling and diagnostics.
 - scoped application resources.
+- per-user tool storage and process coordination.
 
 Concept descriptions MUST NOT enumerate individual Python APIs, helper operations, or implementation details.
 The section MUST also list the reusable CLI subcommands provided by the library, with a brief purpose for each.
@@ -135,8 +136,13 @@ The README MUST briefly introduce the following extension points:
 - application-owned configuration schemas.
 - scoped resources.
 - journal delivery.
+- tool storage and process coordination.
 
 It MUST link to `specs/intro.md` and the relevant capability specifications for deeper contracts.
+Storage guidance MUST distinguish disposable cache contents from persistent per-user tool state and application-specific project files.
+It MUST explain that state-directory support provides contained paths and named locks, while applications retain operation policy and resource lifetimes.
+It MUST distinguish process-coordination files from persisted dependency lockfiles and explain that file existence alone does not indicate a held lock.
+Cache guidance MUST explain ownership-aware cleanup and the application's responsibility for cache selection and payload semantics without documenting marker encodings or directory layouts.
 
 ## Examples
 

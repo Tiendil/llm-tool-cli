@@ -4,8 +4,9 @@ from llm_tool_cli.protocol.output_cells.base import OutputCell, RenderContext
 class LLMOutputCell(OutputCell):
     def render(self, context: RenderContext) -> bytes:  # noqa: CCR001
         id = self.short_id
+        label = context.tool_name.upper()
 
-        lines = [f"--{context.tool_label}-CELL {id} BEGIN--"]
+        lines = [f"--{label}-CELL {id} BEGIN--"]
 
         lines.append(f"kind={self.kind}")
 
@@ -19,7 +20,7 @@ class LLMOutputCell(OutputCell):
             lines.append("")
             lines.append(self.content.strip())
 
-        lines.append(f"--{context.tool_label}-CELL {id} END--")
+        lines.append(f"--{label}-CELL {id} END--")
         lines.append("")
 
         return "\n".join(lines).encode()

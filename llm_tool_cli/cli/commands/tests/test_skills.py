@@ -11,7 +11,8 @@ from typer.testing import CliRunner
 
 from llm_tool_cli.cli.application import create_app
 from llm_tool_cli.cli.commands.skills import register_skill_command
-from llm_tool_cli.core.settings import ToolLabel, initialize
+from llm_tool_cli.core.entities import ToolName
+from llm_tool_cli.core.settings import initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
 
 __all__ = ["isolated_settings"]
@@ -24,7 +25,7 @@ class Document(StrEnum):
 
 @pytest.fixture
 def skill_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, isolated_settings: None) -> typer.Typer:
-    initialize(label=ToolLabel("TEST"))
+    initialize(name=ToolName("test"))
     initializer = tmp_path / "__init__.py"
     initializer.write_text("", encoding="utf-8")
     package = "cli_skill_test_package"

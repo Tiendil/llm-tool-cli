@@ -7,7 +7,8 @@ from llm_tool_cli.cli.application import create_app
 from llm_tool_cli.cli.context import CommandContext
 from llm_tool_cli.config.project import project_config
 from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
-from llm_tool_cli.core.settings import ToolLabel, initialize
+from llm_tool_cli.core.entities import ToolName
+from llm_tool_cli.core.settings import initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
 from llm_tool_cli.protocol import Protocol
 
@@ -96,7 +97,7 @@ class TestCreateApp:
         assert not runtime_config.is_set()
 
     def test_invalid_protocol_stops_execution(self, app: typer.Typer, isolated_settings: None) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
 
         result = CliRunner().invoke(app, ["--protocol", "invalid", "show"])
 

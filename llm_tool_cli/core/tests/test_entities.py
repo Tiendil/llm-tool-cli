@@ -1,7 +1,7 @@
 import pydantic
 import pytest
 
-from llm_tool_cli.core.entities import BaseEntity
+from llm_tool_cli.core.entities import BaseEntity, Slug
 
 
 class _NestedEntity(BaseEntity):
@@ -63,3 +63,56 @@ class TestBaseEntity:
     def test_from_json__rejects_invalid_input(self, json_data: str) -> None:
         with pytest.raises(pydantic.ValidationError):
             _SampleEntity.from_json(json_data)
+
+
+class TestSlug:
+    @pytest.mark.parametrize(
+        "value,expected",
+        [("a", "a"), ("0", "0"), (" a0-b1-c2 ", "a0-b1-c2"), ("\t docs \n", "docs")],
+    )
+    def test_new__strips_outer_whitespace_and_preserves_name(self, value: str, expected: str) -> None:
+        assert Slug(value) == expected
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "",
+            " \t\n",
+            "UPPER",
+            "aB",
+            "résumé",
+            "日本語",
+            "١",
+            "a b",
+            "a\tb",
+            "a\nb",
+            "a_b",
+            ".",
+            " .. ",
+            "a.b",
+            "-a",
+            "a-",
+            "a--b",
+            "/",
+            "\\",
+            "a/b",
+            "a\\b",
+            "a\x00b",
+        ],
+    )
+    def test_new__rejects_invalid_slugs_without_rewriting(self, value: str) -> None:
+        with pytest.raises(ValueError):
+            Slug(value)
+
+    def test_pydantic_schema__normalizes_and_serializes_as_a_string(self) -> None:
+        adapter = pydantic.TypeAdapter(Slug)
+        slug = adapter.validate_json('" docs-2 "')
+
+        assert isinstance(slug, Slug)
+        assert slug == "docs-2"
+        assert adapter.dump_json(slug) == b'"docs-2"'
+
+    @pytest.mark.parametrize("value", ["A", "a_b", "a b", "a--b", "a/b", "é", "", 42, None])
+    def test_pydantic_schema__rejects_invalid_input(self, value: object) -> None:
+        with pytest.raises(pydantic.ValidationError):
+            pydantic.TypeAdapter(Slug).validate_python(value)

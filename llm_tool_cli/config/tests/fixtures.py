@@ -7,14 +7,15 @@ import pytest
 
 from llm_tool_cli.config.project import ProjectConfig, project_config
 from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
-from llm_tool_cli.core.settings import ConfigFilename, StaticConfig, ToolLabel, static_config
+from llm_tool_cli.core.entities import ToolName
+from llm_tool_cli.core.settings import ConfigFilename, StaticConfig, static_config
 from llm_tool_cli.paths import ProjectConfigPath
 from llm_tool_cli.protocol import Protocol
 
 
 @pytest.fixture
 def project_static_settings() -> Iterator[StaticConfig]:
-    value = StaticConfig(tool_label=ToolLabel("TEST"), config_filename=ConfigFilename("tool.toml"))
+    value = StaticConfig(tool_name=ToolName("test"), config_filename=ConfigFilename("tool.toml"))
     with static_config.scope(value):
         yield value
 

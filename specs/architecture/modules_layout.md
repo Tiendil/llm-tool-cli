@@ -19,6 +19,7 @@ Structure SHOULD grow with behavior rather than preallocate hypothetical feature
 The library owns reusable CLI support; consumers own product behavior and capability composition.
 Production code MUST NOT import or depend on applications that consume the library.
 Dependencies used only for repository development MUST NOT become runtime dependencies.
+
 **Example:** Shared configuration loading can validate an application-supplied schema without importing the application.
 
 Shared contracts MUST distinguish library and consumer responsibilities.
@@ -48,8 +49,15 @@ Modules defining expected fatal errors MUST provide `errors`; other architecture
 
 ### Core and context
 
-Core MUST own result propagation, shared entities, and error bases.
+Core MUST own:
+
+- result propagation.
+- shared entities.
+- error bases.
+- common application identity.
+
 Capability errors and consumer presentation metadata MUST retain their respective owners.
+Application identity MUST remain independent of path semantics and application resource setup.
 
 Public `core.context` MUST provide independent, named, typed resource bindings.
 Bindings MUST support:
@@ -73,8 +81,9 @@ Ownership MUST separate these lifetimes:
 - `config.project` — Selected absolute configuration path and project root derived from its parent.
 
 Applications using project setup MUST declare their default filename in static settings without competing constants.
-Identity MUST be available before parsing and preserve exact whitespace/empty labels.
-Static initialization MUST accept identical repeats and reject conflicting labels or filenames internally without replacing settings.
+Static settings MUST supply one canonical tool name shared by rendering and per-tool storage selection.
+Identity initialization MUST follow Application identity in `specs/behavior/cli.md`.
+Static settings MUST NOT store a separately configurable cell label.
 
 Project preparation MUST expose synchronous loading and initialization scopes yielding a result for the supplied Pydantic schema.
 On entry, project preparation MUST:
@@ -118,11 +127,18 @@ Shared application construction MUST provide:
 The root callback MUST retain unspecified inputs without a separate global-options binding.
 Consumers MUST register their own commands and parse remaining options.
 
-Shared command registration MUST support packaged skill documentation, installed-version reporting, and project initialization independently of consumer command contexts.
-Consumers MUST supply their document choices/resources, distribution identity, or schema/template and optional help as appropriate.
+Shared command registration MUST support these capabilities independently of consumer command contexts:
+
+- packaged skill documentation, using consumer document choices and resources.
+- installed-version reporting, using consumer distribution identity.
+- project initialization, using the consumer schema and template.
+- cache cleanup, using consumer cache preparation.
+
 Shared commands MUST use shared command scope for protocol selection, output, and finalization.
 Initialization MUST use shared project preparation with invocation cwd/unresolved input and emit a creation acknowledgement with the active path.
 Registration MUST NOT prepare projects; schema and starter contents MUST remain consumer-owned.
+The shared cache command MUST delegate storage effects and result projection to `tool_cache`, under Cache cleanup command in `specs/behavior/cli.md`.
+Consumers MUST own command-group composition and invocation cache preparation.
 
 CLI MUST use core exit-status policy and the categories in `specs/behavior/cli.md`, without replacing consumer failure categories.
 Shared option parsing MUST defer configuration-path validation and preserve explicit versus unspecified protocol.
@@ -130,7 +146,8 @@ Shared parsing and consumer explicit argument validation MUST use the same typed
 
 ### Paths
 
-`paths` MUST own project-path interpretation under `specs/behavior/paths.md`.
+`paths` MUST own shared lexical path values and project-path interpretation under `specs/behavior/paths.md`.
+Core MUST remain independent of path operations.
 Lexical normalization MUST remain filesystem-independent.
 Consumers MUST own domain-specific path semantics and policies for handling shared path results.
 
@@ -138,6 +155,7 @@ Public path interfaces MUST distinguish the following through semantic types:
 
 - untrusted filesystem inputs.
 - canonical identifiers.
+- standalone path segments.
 - resolved roots.
 - contained paths.
 - configuration paths.
@@ -145,8 +163,6 @@ Public path interfaces MUST distinguish the following through semantic types:
 - glob patterns.
 
 These distinctions MUST communicate interpretation and established guarantees without repeating validation at every call.
-Filesystem path types MUST use `pathlib.Path`; identifier and glob types MUST use strings.
-Semantic primitive constructors MUST preserve supplied values without conversion or validation.
 Merely constructing any of these values MUST NOT establish resolution, existence, or containment:
 
 - input paths.
@@ -172,6 +188,45 @@ Operations MUST distinguish fallible resolution/validation from direct operation
 - filesystem enumeration.
 
 Failures MUST preserve relevant input, reason, and private causes.
+
+### Process coordination
+
+`file_locks` MUST own reusable exclusive process-lock scopes and acquisition diagnostics.
+Callers MUST own coordination locations, acquisition policy, and operation lifetimes.
+Locking MUST remain independent of cache payloads, project configuration, and application-specific persisted records.
+
+### Cache storage
+
+`tool_cache` MUST own:
+
+- disposable entry storage.
+- entry identity and ownership tracking.
+- coordinated access.
+- ownership-aware cleanup.
+
+Cache identity MUST remain independent of payload semantics and persistence representation.
+Cache access and cleanup MUST coordinate through `file_locks`.
+Consumers MUST own cache selection, payload semantics, and application-specific storage policies.
+Cache storage MUST remain independent of tool identity discovery and application resource bindings.
+`tool_cache` MUST separately own cache-location selection under Tool storage locations in `specs/behavior/paths.md`.
+Public `tool_cache.cells` MUST own pure cache-result projections independently of storage effects and output delivery.
+
+### Tool state directories
+
+`tool_state` MUST own per-user tool-state directories shared across projects.
+The directory abstraction MUST own location selection, contained path resolution, and named locks through `file_locks`.
+It MUST NOT own:
+
+- cache locations.
+- project identities.
+- configuration loading.
+- application operation policies.
+
+Cache and state location selection MUST use the shared application identity independently of project configuration and application resource bindings.
+Location selection and child-path resolution MUST follow Tool storage locations in `specs/behavior/paths.md` through shared path facilities.
+Public `tool_state.project_locks` MUST separately own project identity and project operation coordination, composing state-directory and file-lock facilities.
+Project coordination MUST propagate lower-level diagnostics unchanged.
+Callers MUST own project selection, acquisition policy, and operation lifetimes; project coordination MUST NOT load or activate projects.
 
 ### Configuration files
 
@@ -255,6 +310,17 @@ Re-exports SHOULD improve the supported interface while keeping ownership clear.
 Cross-module production imports MUST use declared boundaries; same-owner submodules MAY import directly.
 Production MUST NOT import tests, helpers, or development scripts.
 Configured boundaries MUST reflect actual ownership/direction and MUST be updated when new modules change them.
+`file_locks` MAY depend on `core` and `paths`; `tool_state` MAY also depend on `file_locks`.
+`tool_cache` MAY depend on:
+
+- `core`.
+- `paths`.
+- `file_locks`.
+- generic `protocol` interfaces for cache-result cells.
+
+Cache and state storage MUST NOT depend on each other for identity.
+Cache-specific cells MUST remain within the `tool_cache` module boundary; `protocol` MUST NOT depend on cache-specific values or cells.
+These storage foundations MUST NOT depend on configuration loading, CLI setup, or output delivery.
 Configured dependency checks MUST enforce the specified ownership and dependency direction.
 Check configuration MUST NOT permit undeclared dependencies merely to silence a finding.
 

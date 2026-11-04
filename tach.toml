@@ -1,4 +1,5 @@
 forbid_circular_dependencies = true
+layers_explicit_depends_on = true
 
 exclude = [
     ".git/",
@@ -9,35 +10,75 @@ exclude = [
     "**/__pycache__/",
 ]
 
+layers = [
+    "meta-tests",
+    "cli",
+    "output",
+    "config",
+    "filesystem_storage",
+    "protocol",
+    "file_locks",
+    "paths",
+    "support",
+    "core",
+]
+
 [[modules]]
 path = "llm_tool_cli"
 depends_on = []
 visibility = []
 
 [[modules]]
+path = "llm_tool_cli.**.tests"
+depends_on = ["llm_tool_cli.**", "llm_tool_cli.**.tests"]
+layer = "meta-tests"
+
+[[modules]]
 path = "llm_tool_cli.core"
 depends_on = []
+layer = "core"
 
 [[modules]]
 path = "llm_tool_cli.cli"
-depends_on = ["llm_tool_cli.core", "llm_tool_cli.config", "llm_tool_cli.paths", "llm_tool_cli.protocol", "llm_tool_cli.skills", "llm_tool_cli.output"]
+depends_on = ["llm_tool_cli.core", "llm_tool_cli.config", "llm_tool_cli.paths", "llm_tool_cli.protocol", "llm_tool_cli.skills", "llm_tool_cli.output", "llm_tool_cli.tool_cache"]
+layer = "cli"
 
 [[modules]]
 path = "llm_tool_cli.output"
 depends_on = ["llm_tool_cli.core", "llm_tool_cli.config", "llm_tool_cli.protocol"]
+layer = "output"
 
 [[modules]]
 path = "llm_tool_cli.config"
 depends_on = ["llm_tool_cli.core", "llm_tool_cli.paths", "llm_tool_cli.protocol"]
+layer = "config"
 
 [[modules]]
 path = "llm_tool_cli.paths"
 depends_on = ["llm_tool_cli.core"]
+layer = "paths"
 
 [[modules]]
 path = "llm_tool_cli.protocol"
 depends_on = ["llm_tool_cli.core", "llm_tool_cli.paths"]
+layer = "protocol"
 
 [[modules]]
 path = "llm_tool_cli.skills"
 depends_on = ["llm_tool_cli.core"]
+layer = "support"
+
+[[modules]]
+path = "llm_tool_cli.file_locks"
+depends_on = ["llm_tool_cli.core", "llm_tool_cli.paths"]
+layer = "file_locks"
+
+[[modules]]
+path = "llm_tool_cli.tool_cache"
+depends_on = ["llm_tool_cli.core", "llm_tool_cli.paths", "llm_tool_cli.file_locks", "llm_tool_cli.protocol"]
+layer = "filesystem_storage"
+
+[[modules]]
+path = "llm_tool_cli.tool_state"
+depends_on = ["llm_tool_cli.core", "llm_tool_cli.paths", "llm_tool_cli.file_locks"]
+layer = "filesystem_storage"

@@ -15,10 +15,10 @@ from llm_tool_cli.config.project import (
 )
 from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
 from llm_tool_cli.config.tests.fixtures import project_static_settings
-from llm_tool_cli.core.entities import BaseEntity
+from llm_tool_cli.core.entities import BaseEntity, ToolName
 from llm_tool_cli.core.errors import EnvironmentErrors
 from llm_tool_cli.core.result import Err, Ok, UnwrapError
-from llm_tool_cli.core.settings import ConfigFilename, StaticConfig, ToolLabel, static_config
+from llm_tool_cli.core.settings import ConfigFilename, StaticConfig, static_config
 from llm_tool_cli.paths import PathInput, ProjectConfigPath
 from llm_tool_cli.paths.errors import InvalidProjectPath
 from llm_tool_cli.protocol import Protocol
@@ -65,7 +65,7 @@ class TestLoadProject:
 
     def test_uses_static_filename(self, tmp_path: Path) -> None:
         (tmp_path / "custom.toml").write_text("count = 3", encoding="utf-8")
-        settings = StaticConfig(tool_label=ToolLabel("TEST"), config_filename=ConfigFilename("custom.toml"))
+        settings = StaticConfig(tool_name=ToolName("test"), config_filename=ConfigFilename("custom.toml"))
         with static_config.scope(settings), load_project(ApplicationConfig, cwd=PathInput(tmp_path)) as result:
             assert result.unwrap().count == 3
             assert project_config.get().config_path == tmp_path / "custom.toml"
@@ -121,7 +121,7 @@ class TestLoadProject:
             assert not project_config.is_set()
 
     def test_missing_static_filename_is_internal_misuse(self, tmp_path: Path) -> None:
-        with static_config.scope(StaticConfig(tool_label=ToolLabel("TEST"))):
+        with static_config.scope(StaticConfig(tool_name=ToolName("test"))):
             with pytest.raises(errors.ConfigFilenameNotSet):
                 with load_project(ApplicationConfig, cwd=PathInput(tmp_path)):
                     pytest.fail("Project setup must reject missing application metadata.")
@@ -187,7 +187,7 @@ class TestInitializeProject:
         loading.assert_not_called()
 
     def test_missing_static_filename_is_internal_misuse(self, tmp_path: Path) -> None:
-        with static_config.scope(StaticConfig(tool_label=ToolLabel("TEST"))):
+        with static_config.scope(StaticConfig(tool_name=ToolName("test"))):
             with pytest.raises(errors.ConfigFilenameNotSet):
                 with initialize_project(
                     ApplicationConfig, package="test", template="starter.toml", cwd=PathInput(tmp_path)

@@ -6,7 +6,7 @@ This document describes shared command-line application support.
 
 ## Scope
 
-Reusable application setup and CLI behavior; consumer command execution, configuration schemas/loading mechanics, and cell layouts are out of scope.
+Reusable application setup and shared command behavior at the caller and CLI boundaries; consumer operation policy, configuration schemas/loading mechanics, and general cell formatting are out of scope.
 
 ## Application setup
 
@@ -21,12 +21,15 @@ Completion MUST include registered commands, options, and document choices.
 
 ## Application identity
 
-Immutable static identity MUST be initialized before parsing/shared rendering, preserving exact labels including whitespace/empty text.
+Immutable static identity MUST be initialized before parsing/shared rendering using one canonical tool name.
+The canonical name MUST supply both per-tool storage names and rendering identity.
+Cell labels MUST derive from that name under `specs/behavior/protocol.md` rather than be configured independently.
 It MUST remain separate from invocation/workspace settings.
 Unset access MUST raise an internal exception.
 An optional static default filename MUST be required for project setup, not parsing/rendering.
-Identical initialization MUST succeed unchanged; conflicting labels or filenames MUST raise internal errors without replacing settings.
-**Example:** Invalid-protocol output can use the label before the root callback runs.
+Identical initialization MUST succeed unchanged; conflicting names or filenames MUST raise internal errors without replacing settings.
+
+**Example:** Initializing the name `demo` supplies `demo` for storage and the derived `DEMO` label for invalid-protocol output before the root callback runs.
 
 ## Global options
 
@@ -46,6 +49,7 @@ Global `--config PATH` MUST precede the subcommand and parse filesystem paths wi
 Configuration-dependent operations MUST validate paths and report their diagnostics when used.
 Unusable paths MUST NOT prevent configuration-independent commands.
 Missing option values MUST remain parsing errors.
+
 **Example:** A directory reaches configuration loading for diagnosis but does not prevent a version command.
 
 ## Protocol option
@@ -85,13 +89,14 @@ Preparing command support without entering execution MUST NOT resolve paths, loa
 Output MUST default to stdout and honor the command's effective protocol throughout execution.
 
 Successful completion MUST deliver results then warnings before command closure.
-Skill, version, and init MUST follow the same completion and failure behavior as custom commands.
+Every shared command MUST follow the same completion and failure behavior as custom commands.
 Error reporting MUST NOT require consumer runtime resources to remain active.
 
 ## Protocol selection
 
 Explicit protocol MUST win; otherwise command named `skill` MUST use LLM, all others human.
 The effective protocol MUST be available to the caller before execution.
+
 **Example:** Skill defaults to LLM, version to human; explicit human overrides skill's default.
 
 ## Skill command
@@ -133,6 +138,32 @@ Success MUST emit one creation cell with the active path under the selected prot
 Expected failures MUST follow Command error handling below without success output; unexpected exceptions MUST propagate.
 Application-specific runtime preparation MUST NOT be required.
 
+## Cache cleanup command
+
+Registration MUST expose one `clean` command directly on the supplied application without adding a command group.
+Callers MUST be able to supply command help and select the cache using the invocation's parsed root options.
+The following MUST NOT prepare or access the cache:
+
+- registration.
+- help.
+- completion.
+- rejected command arguments.
+
+The command MUST accept no positional arguments or command-specific options and MUST NOT require confirmation.
+Execution MUST clean the selected cache without loading or activating a project.
+Resources supplied for the invocation MUST remain available through result delivery and be released at command closure, including failure paths.
+Expected cache-preparation or cleanup failures MUST follow Command error handling below without success output; unexpected exceptions MUST propagate.
+
+Success MUST emit one metadata-only cell with kind `cache`, including for an absent or already empty cache.
+Its metadata MUST contain:
+
+- `type` — `cache`.
+- `operation` — `clean`.
+- `cache_dir` — the effective absolute cache-root path.
+- `outcome` — `cleaned` when owned entries were removed, or `unchanged` otherwise.
+
+Every protocol MUST carry the same payload under Cell formatting in `specs/behavior/protocol.md`; automation `content` MUST be null.
+
 ## Command error handling
 
 Command error reporting MUST use an already selected protocol and accept only valid failed-result payloads.
@@ -152,7 +183,7 @@ Early validation MUST use a supplied fallback protocol without consuming another
 Command failure MUST preserve that command's pending warnings.
 Empty error lists MUST emit nothing and terminate according to the Exit statuses contract below.
 
-Skill, version, and init MUST follow this error-handling contract.
+Every shared command MUST follow this error-handling contract.
 
 ## Exit statuses
 

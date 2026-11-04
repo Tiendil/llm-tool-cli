@@ -5,7 +5,7 @@ from typing import Self
 
 import pydantic
 
-from llm_tool_cli.core.entities import BaseEntity
+from llm_tool_cli.core.entities import BaseEntity, ToolName
 
 MetaValue = str | int | bool | None | list[str]
 
@@ -24,7 +24,7 @@ class RenderContext(BaseEntity):
 
     index: int = pydantic.Field(ge=0)
     total: int = pydantic.Field(ge=1)
-    tool_label: str
+    tool_name: ToolName
 
     @pydantic.model_validator(mode="after")
     def validate_position(self) -> Self:

@@ -10,9 +10,10 @@ from typer.testing import CliRunner
 from llm_tool_cli.cli.errors import InvalidArguments
 from llm_tool_cli.cli.handling import handle_command_errors, report_errors_and_exit
 from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
+from llm_tool_cli.core.entities import ToolName
 from llm_tool_cli.core.errors import EnvironmentError, EnvironmentErrors, InternalError
 from llm_tool_cli.core.result import Err, Ok, UnwrapError
-from llm_tool_cli.core.settings import ToolLabel, initialize
+from llm_tool_cli.core.settings import initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
 from llm_tool_cli.output import StreamOutputEmitter, output
 from llm_tool_cli.output.errors import JournalCommandFailed
@@ -28,7 +29,7 @@ pytestmark = pytest.mark.usefixtures("isolated_settings")
 
 class TestReportErrorsAndExit:
     def test_errors_are_reported_without_journal_processing(self, mocker: MockerFixture) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
         failures: EnvironmentErrors = [
             InvalidArguments(reason="first\nsecond"),
             EnvironmentError(code="unavailable", message="Service unavailable"),
@@ -65,7 +66,7 @@ class TestReportErrorsAndExit:
     def test_failed_emitter_is_not_retried_when_reporting_mixed_errors(
         self, mocker: MockerFixture, reverse: bool, delivery_failure: EnvironmentError
     ) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
         processor = mocker.Mock()
         processor.process.return_value = Err([delivery_failure])
         stream = io.StringIO()
@@ -86,7 +87,7 @@ class TestReportErrorsAndExit:
     def test_ordered_cells_stream_and_highest_exit_code(  # noqa: CCR001
         self, capsys: pytest.CaptureFixture[str], protocol: Protocol, reverse: bool
     ) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
         errors: EnvironmentErrors = [
             InvalidArguments(reason="Invalid café 日本語"),
             EnvironmentError(code="unavailable", message="Service unavailable"),
@@ -124,7 +125,7 @@ class TestReportErrorsAndExit:
     def test_empty_errors_exit_successfully_without_output(
         self, capsys: pytest.CaptureFixture[str], protocol: Protocol
     ) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
 
         with pytest.raises(typer.Exit) as caught:
             report_errors_and_exit([], protocol=protocol)
@@ -145,7 +146,7 @@ class TestHandleCommandErrors:
 
     @pytest.mark.parametrize("protocol", list(Protocol))
     def test_failed_command_stops_and_reports_errors(self, protocol: Protocol) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
         app = typer.Typer()
 
         @app.command()
@@ -201,7 +202,7 @@ class TestHandleCommandErrors:
     def test_discard__failure_outputs_error_then_warnings_without_results(
         self, capsys: pytest.CaptureFixture[str], protocol: Protocol, custom_stream: bool
     ) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
         stream = io.StringIO()
         emitter = StreamOutputEmitter(stream=stream if custom_stream else None)
         with runtime_config.scope(RuntimeConfig(protocol=protocol)), output.scope(emitter):
