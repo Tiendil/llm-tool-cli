@@ -132,13 +132,13 @@ Shared command registration MUST support these capabilities independently of con
 - packaged skill documentation, using consumer document choices and resources.
 - installed-version reporting, using consumer distribution identity.
 - project initialization, using the consumer schema and template.
-- cache cleanup, using consumer cache preparation.
+- cache cleanup, using consumer cache policy.
 
 Shared commands MUST use shared command scope for protocol selection, output, and finalization.
 Initialization MUST use shared project preparation with invocation cwd/unresolved input and emit a creation acknowledgement with the active path.
 Registration MUST NOT prepare projects; schema and starter contents MUST remain consumer-owned.
 The shared cache command MUST delegate storage effects and result projection to `tool_cache`, under Cache cleanup command in `specs/behavior/cli.md`.
-Consumers MUST own command-group composition and invocation cache preparation.
+Consumers MUST own command-group composition and cache policy; shared command setup MUST own invocation cache-location selection.
 
 CLI MUST use core exit-status policy and the categories in `specs/behavior/cli.md`, without replacing consumer failure categories.
 Shared option parsing MUST defer configuration-path validation and preserve explicit versus unspecified protocol.

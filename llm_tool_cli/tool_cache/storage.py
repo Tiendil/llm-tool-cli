@@ -12,9 +12,9 @@ from llm_tool_cli.core.errors import EnvironmentErrors
 from llm_tool_cli.core.result import Err, Ok, Result, unwrap_to_error
 from llm_tool_cli.file_locks import errors as lock_errors
 from llm_tool_cli.file_locks import exclusive_lock
-from llm_tool_cli.paths import PathSegment, ProjectRootPath, resolve_inside_project
+from llm_tool_cli.paths import CacheRootPath, PathSegment, ProjectRootPath, resolve_inside_project
 from llm_tool_cli.tool_cache import errors
-from llm_tool_cli.tool_cache.entities import CacheIdentity, CacheRootPath
+from llm_tool_cli.tool_cache.entities import CacheIdentity
 
 
 def _write_identity(path: Path, identity: CacheIdentity) -> None:

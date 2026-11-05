@@ -1,11 +1,14 @@
 
 ### Migration
 
+- Import `CacheRootPath` from `llm_tool_cli.paths`. `RuntimeConfig.cache_dir` is required; shared command setup selects it from `--cache-dir` or the default, and callers read it directly without preparation or a separate binding.
 - Initialize identity with `initialize(name=ToolName("tool"))`, importing `ToolName` from `core.entities`; use `tool_name` in static settings and render contexts. Cell labels now derive from the validated name in uppercase.
 - Tool names and standalone `PathSegment` values must contain lowercase ASCII letters and digits separated by single hyphens. Construction trims surrounding whitespace and rejects other spelling. Import `PathSegment` from `paths`.
 
 ### Changes
 
+- Share `--cache-dir` parsing and select an always-present cache path during command setup, preserving command scope restoration and deferring cache creation and locking until storage is used.
+- Report early diagnostics through temporary runtime settings with an unused platform null-device cache path when necessary, preserving existing cache settings and emitter interfaces.
 - Define the shared cache storage, ownership, coordination, and cleanup contract separately from consumer repository policy, with matching dependency-governance rules.
 - Clarify specification ownership for storage locations and cache-clean output; document shared storage and coordination in the README contract and guide.
 - Define explicit Tach layers with tests in `meta-tests`, replacing per-file exceptions and requiring declared dependencies between production modules.

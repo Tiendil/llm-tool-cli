@@ -9,7 +9,7 @@ from llm_tool_cli.config.project import ProjectConfig, project_config
 from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
 from llm_tool_cli.core.entities import ToolName
 from llm_tool_cli.core.settings import ConfigFilename, StaticConfig, static_config
-from llm_tool_cli.paths import ProjectConfigPath
+from llm_tool_cli.paths import CacheRootPath, ProjectConfigPath
 from llm_tool_cli.protocol import Protocol
 
 
@@ -21,8 +21,8 @@ def project_static_settings() -> Iterator[StaticConfig]:
 
 
 @pytest.fixture
-def runtime_settings() -> Iterator[RuntimeConfig]:
-    value = RuntimeConfig(protocol=Protocol.human)
+def runtime_settings(tmp_path: Path) -> Iterator[RuntimeConfig]:
+    value = RuntimeConfig(protocol=Protocol.human, cache_dir=CacheRootPath(tmp_path / "cache"))
     with runtime_config.scope(value):
         yield value
 

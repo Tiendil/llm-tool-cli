@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
+from llm_tool_cli.paths import CacheRootPath
 from llm_tool_cli.protocol import Protocol
-from llm_tool_cli.tool_cache import CacheRootPath
 from llm_tool_cli.tool_cache.cells import CacheCleanCell
 
 

@@ -1,14 +1,10 @@
 import hashlib
 import json
-from pathlib import Path
-from typing import NewType
 
 import pydantic
 
 from llm_tool_cli.core.entities import BaseEntity
 from llm_tool_cli.paths import PathSegment
-
-CacheRootPath = NewType("CacheRootPath", Path)
 
 
 class CacheIdentity(BaseEntity):

@@ -24,6 +24,12 @@ ConfigOption = Annotated[
 ]
 
 
+CacheDirOption = Annotated[
+    Path | None,
+    typer.Option("--cache-dir", metavar="DIRECTORY", help="Override the tool's cache root for this invocation."),
+]
+
+
 def _parse_protocol(value: str) -> Protocol:
     try:
         return Protocol(value)

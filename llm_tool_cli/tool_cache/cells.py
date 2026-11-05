@@ -1,8 +1,8 @@
 """Pure result projections for shared cache operations."""
 
+from llm_tool_cli.paths import CacheRootPath
 from llm_tool_cli.protocol.logic_cells.uniform import UniformCell
 from llm_tool_cli.protocol.output_cells.base import OutputCell
-from llm_tool_cli.tool_cache import CacheRootPath
 
 
 class CacheCleanCell(UniformCell):

@@ -4,9 +4,8 @@ from platformdirs import user_cache_path
 
 from llm_tool_cli.core.entities import ToolName
 from llm_tool_cli.core.result import Err, Ok, Result, unwrap_to_error
-from llm_tool_cli.paths import resolve_project_root
+from llm_tool_cli.paths import CacheRootPath, resolve_project_root
 from llm_tool_cli.tool_cache import errors
-from llm_tool_cli.tool_cache.entities import CacheRootPath
 
 
 def _default_cache_root(name: ToolName) -> Result[Path]:

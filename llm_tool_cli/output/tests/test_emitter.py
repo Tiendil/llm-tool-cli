@@ -5,7 +5,7 @@ import sys
 import pytest
 from pytest_mock import MockerFixture
 
-from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
+from llm_tool_cli.config.runtime import runtime_config
 from llm_tool_cli.config.tests.fixtures import project_static_settings, runtime_settings
 from llm_tool_cli.core.entities import ToolName
 from llm_tool_cli.core.errors import ContextValueNotSet, EnvironmentError
@@ -65,7 +65,7 @@ class TestStreamOutputEmitter:
         stream = io.StringIO()
         processor = RecordingProcessor()
         emitter = StreamOutputEmitter(stream=stream, journal_processor=processor)
-        with runtime_config.scope(RuntimeConfig(protocol=protocol)):
+        with runtime_config.scope(runtime_config.get().replace(protocol=protocol)):
             emitter.journal("starting").unwrap()
         assert len(processor.records) == 1
         assert processor.records[0].message == "starting"
@@ -110,7 +110,7 @@ class TestStreamOutputEmitter:
         processor = RecordingProcessor(Err(errors))
         stream = io.StringIO()
         emitter = StreamOutputEmitter(stream=stream, journal_processor=processor)
-        with runtime_config.scope(RuntimeConfig(protocol=Protocol.automation)):
+        with runtime_config.scope(runtime_config.get().replace(protocol=Protocol.automation)):
             assert emitter.journal("failed event").unwrap_err() == errors
             emitter.discard()
             emitter.flush()
@@ -174,7 +174,7 @@ class TestStreamOutputEmitter:
         processor = RecordingProcessor()
         emitter = StreamOutputEmitter(stream=stream, journal_processor=processor)
         event = JournalCell(message="progress")
-        with runtime_config.scope(RuntimeConfig(protocol=protocol)):
+        with runtime_config.scope(runtime_config.get().replace(protocol=protocol)):
             emitter.emit(
                 [
                     WarningCell(message="warning"),
@@ -230,7 +230,7 @@ class TestStreamOutputEmitter:
         first = ContentCell(kind="result", media_type="text/plain", content="first")
         event = JournalCell(message="progress")
         last = first.replace(content="last")
-        with runtime_config.scope(RuntimeConfig(protocol=Protocol.automation)):
+        with runtime_config.scope(runtime_config.get().replace(protocol=Protocol.automation)):
             emitter.emit(
                 [WarningCell(message="warning one"), first, event, last, WarningCell(message="warning two")]
             ).unwrap()
@@ -306,7 +306,7 @@ class TestStreamOutputEmitter:
     def test_flush__selects_protocol_at_delivery(self, capsys: pytest.CaptureFixture[str]) -> None:
         emitter = StreamOutputEmitter()
         emitter.emit([PositionedLogicCell(items=("hidden",))]).unwrap()
-        with runtime_config.scope(RuntimeConfig(protocol=Protocol.llm)):
+        with runtime_config.scope(runtime_config.get().replace(protocol=Protocol.llm)):
             emitter.flush()
         assert capsys.readouterr() == ("", "")
 
@@ -319,7 +319,7 @@ class TestStreamOutputEmitter:
         emitter = StreamOutputEmitter(stream=stream if custom_stream else None)
         emitter.emit([ContentCell(kind="message", media_type="text/plain", content="café 日本語")]).unwrap()
         with (
-            runtime_config.scope(RuntimeConfig(protocol=protocol)),
+            runtime_config.scope(runtime_config.get().replace(protocol=protocol)),
             static_config.scope(StaticConfig(tool_name=ToolName(" tool "))),
         ):
             emitter.flush()
@@ -341,7 +341,7 @@ class TestStreamOutputEmitter:
         cell = ContentCell(kind="message", media_type="text/plain", content="café 日本語", meta={"type": "message"})
         original = cell.model_dump()
         with (
-            runtime_config.scope(RuntimeConfig(protocol=Protocol.automation)),
+            runtime_config.scope(runtime_config.get().replace(protocol=Protocol.automation)),
             static_config.scope(StaticConfig(tool_name=ToolName(name))),
         ):
             emitter.emit([cell]).unwrap()
@@ -362,7 +362,7 @@ class TestStreamOutputEmitter:
                 EnvironmentErrorCell(error=EnvironmentError(code="second", message="Second")),
             ]
         ).unwrap()
-        with runtime_config.scope(RuntimeConfig(protocol=Protocol.automation)):
+        with runtime_config.scope(runtime_config.get().replace(protocol=Protocol.automation)):
             emitter.flush()
         records = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
         assert records[0].pop("id") != records[1].pop("id")

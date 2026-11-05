@@ -7,9 +7,9 @@ from filelock import FileLock, Timeout
 from pytest_mock import MockerFixture
 
 from llm_tool_cli.file_locks.tests.helpers import held_lock
-from llm_tool_cli.paths import PathSegment
+from llm_tool_cli.paths import CacheRootPath, PathSegment
 from llm_tool_cli.paths import errors as path_errors
-from llm_tool_cli.tool_cache import CacheIdentity, CacheRootPath, ToolCache, errors
+from llm_tool_cli.tool_cache import CacheIdentity, ToolCache, errors
 from llm_tool_cli.tool_cache.storage import _write_identity
 from llm_tool_cli.tool_cache.tests.helpers import cached_entry
 from llm_tool_cli.tool_cache.tests.make import cache_storage

@@ -19,7 +19,7 @@ from llm_tool_cli.core.entities import BaseEntity, ToolName
 from llm_tool_cli.core.errors import EnvironmentErrors
 from llm_tool_cli.core.result import Err, Ok, UnwrapError
 from llm_tool_cli.core.settings import ConfigFilename, StaticConfig, static_config
-from llm_tool_cli.paths import PathInput, ProjectConfigPath
+from llm_tool_cli.paths import CacheRootPath, PathInput, ProjectConfigPath
 from llm_tool_cli.paths.errors import InvalidProjectPath
 from llm_tool_cli.protocol import Protocol
 
@@ -204,7 +204,10 @@ class TestLoadProjectConfig:
         path = ProjectConfigPath(tmp_path / "tool.toml")
         path.write_text("count = 7", encoding="utf-8")
         previous = ProjectConfig(config_path=ProjectConfigPath(tmp_path / "outer.toml"))
-        with project_config.scope(previous), runtime_config.scope(RuntimeConfig(protocol=Protocol.llm)):
+        with (
+            project_config.scope(previous),
+            runtime_config.scope(RuntimeConfig(protocol=Protocol.llm, cache_dir=CacheRootPath(tmp_path / "cache"))),
+        ):
             try:
                 with _load_project_config(Ok(path), ApplicationConfig) as result:
                     assert result.unwrap().count == 7

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 import typer
+from pytest_mock import MockerFixture
 from typer.core import TyperCommand
 from typer.testing import CliRunner
 
@@ -13,13 +14,14 @@ from llm_tool_cli.cli.errors import InvalidArguments
 from llm_tool_cli.config.project import ProjectConfig, project_config
 from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
 from llm_tool_cli.core.entities import ToolName
-from llm_tool_cli.core.result import UnwrapError
+from llm_tool_cli.core.errors import EnvironmentErrors
+from llm_tool_cli.core.result import Err, UnwrapError
 from llm_tool_cli.core.settings import initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
 from llm_tool_cli.output import StreamOutputEmitter
 from llm_tool_cli.output import output as active_output
 from llm_tool_cli.output.tests.helpers import CollectingEmitter
-from llm_tool_cli.paths import ProjectConfigPath
+from llm_tool_cli.paths import CacheRootPath, ProjectConfigPath
 from llm_tool_cli.protocol import Protocol
 from llm_tool_cli.protocol.cell_shortcuts import info, operation_succeeded
 from llm_tool_cli.protocol.logic_cells.base import LogicCell
@@ -61,6 +63,7 @@ class TestCommandContext:
     ) -> None:
         initialize(name=ToolName("test"))
         project = ProjectConfig(config_path=ProjectConfigPath(tmp_path / "active.toml"))
+        cache = CacheRootPath(tmp_path / "active-cache")
         stream = io.StringIO()
         rendered: list[list[LogicCell]] = []
 
@@ -68,6 +71,7 @@ class TestCommandContext:
             def _render(self, cells: list[LogicCell]) -> str:
                 assert project_config.get() == project
                 assert runtime_config.get().protocol == Protocol.automation
+                assert runtime_config.get().cache_dir == cache
                 rendered.append(cells)
                 return super()._render(cells)
 
@@ -77,6 +81,7 @@ class TestCommandContext:
         def show(context: typer.Context) -> None:
             with command_context(context):
                 context.with_resource(project_config.scope(project))
+                context.with_resource(runtime_config.scope(runtime_config.get().replace(cache_dir=cache)))
                 context.with_resource(active_output.scope(ProjectEmitter(stream=stream)))
                 active_output.get().emit([WarningCell(message="A warning")]).unwrap()
                 active_output.get().emit([operation_succeeded("Completed")]).unwrap()
@@ -85,7 +90,7 @@ class TestCommandContext:
                     raise failure
 
         previous_output = CollectingEmitter()
-        previous_runtime = RuntimeConfig(protocol=Protocol.llm)
+        previous_runtime = RuntimeConfig(protocol=Protocol.llm, cache_dir=CacheRootPath(tmp_path / "outer-cache"))
         previous_project = ProjectConfig(config_path=ProjectConfigPath(tmp_path / "outer.toml"))
         with (
             active_output.scope(previous_output),
@@ -107,6 +112,7 @@ class TestCommandContext:
             assert result.exception == failure
 
     def test_init__nested_skill_uses_leaf_command_default(self) -> None:
+        initialize(name=ToolName("test"))
         with typer.Context(TyperCommand("root")) as root:
             with typer.Context(TyperCommand("group"), parent=root) as group:
                 with typer.Context(TyperCommand("skill"), parent=group, info_name="skill") as context:
@@ -117,6 +123,7 @@ class TestCommandContext:
         [("skill", Protocol.llm), ("version", Protocol.human), ("alias", Protocol.human), (None, Protocol.human)],
     )
     def test_init__selects_default_for_invoked_name(self, name: str | None, expected: Protocol) -> None:
+        initialize(name=ToolName("test"))
         with typer.Context(TyperCommand("different-name"), info_name=name) as context:
             command = CommandContext(context)
             assert command.protocol == expected
@@ -127,6 +134,7 @@ class TestCommandContext:
 
     @pytest.mark.parametrize("protocol", list(Protocol))
     def test_init__uses_root_inputs_for_nested_command(self, protocol: Protocol) -> None:
+        initialize(name=ToolName("test"))
         with typer.Context(TyperCommand("root")) as root:
             root.params.update(protocol=protocol, config_path=ProjectConfigPath(Path("~/missing.toml")))
             with typer.Context(TyperCommand("group"), parent=root) as group:
@@ -138,14 +146,63 @@ class TestCommandContext:
         assert not runtime_config.is_set()
 
     def test_protocol__reads_current_runtime_instead_of_retaining_a_copy(self) -> None:
+        initialize(name=ToolName("test"))
         with typer.Context(TyperCommand("show"), info_name="show") as context:
             context.params["protocol"] = Protocol.automation
             command = CommandContext(context)
             observed = [command.protocol]
-            with runtime_config.scope(RuntimeConfig(protocol=Protocol.llm)):
+            with runtime_config.scope(runtime_config.get().replace(protocol=Protocol.llm)):
                 observed.append(command.protocol)
             observed.append(command.protocol)
             assert observed == [Protocol.automation, Protocol.llm, Protocol.automation]
+
+    @pytest.mark.parametrize("cache_input", [None, "relative-cache", "~/home-cache", "/absolute-cache"])
+    def test_init__exposes_cache_path_without_creating_storage(
+        self, tmp_path: Path, mocker: MockerFixture, cache_input: str | None
+    ) -> None:
+        initialize(name=ToolName("test"))
+        mocker.patch.dict("os.environ", {"HOME": str(tmp_path)})
+        mocker.patch("llm_tool_cli.cli.context.Path.cwd", return_value=tmp_path)
+        discovery = mocker.patch("llm_tool_cli.tool_cache.paths.user_cache_path", return_value=tmp_path / "default")
+        expected = {
+            None: tmp_path / "default",
+            "relative-cache": tmp_path / "relative-cache",
+            "~/home-cache": tmp_path / "home-cache",
+            "/absolute-cache": Path("/absolute-cache"),
+        }[cache_input]
+        with typer.Context(TyperCommand("root")) as root:
+            root.params["cache_dir"] = cache_input
+            with typer.Context(TyperCommand("version"), parent=root) as context:
+                with command_context(context):
+                    assert runtime_config.get().cache_dir == expected
+                    assert not project_config.is_set()
+        assert discovery.call_count == (1 if cache_input is None else 0)
+        assert not list(tmp_path.iterdir())
+        assert not runtime_config.is_set()
+
+    def test_init__cache_selection_failure_preserves_caller_resources(
+        self, tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        initialize(name=ToolName("test"))
+        failures: EnvironmentErrors = [InvalidArguments(reason="first"), InvalidArguments(reason="second")]
+        mocker.patch("llm_tool_cli.cli.context.resolve_cache_root", return_value=Err(failures))
+        previous = RuntimeConfig(protocol=Protocol.llm, cache_dir=CacheRootPath(tmp_path / "outer"))
+        emitter = CollectingEmitter()
+        emitter.emit([info("pending outer output")]).unwrap()
+        with runtime_config.scope(previous), active_output.scope(emitter):
+            with typer.Context(TyperCommand("show")) as context:
+                context.params["protocol"] = Protocol.automation
+                with pytest.raises(typer.Exit) as caught:
+                    with command_context(context):
+                        pytest.fail("Command must not run after failed cache selection")
+                assert caught.value.exit_code == 1
+                assert runtime_config.get() == previous
+                assert active_output.get() == emitter
+                assert len(emitter.cells) == 1
+        records = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+        assert [record["reason"] for record in records] == ["first", "second"]
+        assert not runtime_config.is_set()
+        assert not active_output.is_set()
 
     @pytest.mark.parametrize("protocol", list(Protocol))
     @pytest.mark.parametrize("custom_stream", [False, True])
