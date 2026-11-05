@@ -1,5 +1,8 @@
 import io
 import json
+import os
+from contextlib import nullcontext
+from pathlib import Path
 
 import click
 import pytest
@@ -10,14 +13,17 @@ from typer.testing import CliRunner
 from llm_tool_cli.cli.errors import InvalidArguments
 from llm_tool_cli.cli.handling import handle_command_errors, report_errors_and_exit
 from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
+from llm_tool_cli.core.entities import ToolName
 from llm_tool_cli.core.errors import EnvironmentError, EnvironmentErrors, InternalError
 from llm_tool_cli.core.result import Err, Ok, UnwrapError
-from llm_tool_cli.core.settings import ToolLabel, initialize
+from llm_tool_cli.core.settings import initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
 from llm_tool_cli.output import StreamOutputEmitter, output
 from llm_tool_cli.output.errors import JournalCommandFailed
+from llm_tool_cli.paths import CacheRootPath
 from llm_tool_cli.protocol import Protocol
 from llm_tool_cli.protocol.logic_cells import ContentCell
+from llm_tool_cli.protocol.logic_cells.base import LogicCell
 from llm_tool_cli.protocol.logic_cells.journal import JournalCell
 from llm_tool_cli.protocol.logic_cells.warning import WarningCell
 
@@ -27,8 +33,53 @@ pytestmark = pytest.mark.usefixtures("isolated_settings")
 
 
 class TestReportErrorsAndExit:
+    @pytest.mark.parametrize("existing_runtime", [False, True])
+    @pytest.mark.parametrize("delivery_fails", [False, True])
+    def test_reporting_preserves_cache_and_restores_runtime(  # noqa: CCR001 — Runtime and delivery cases.
+        self, tmp_path: Path, mocker: MockerFixture, existing_runtime: bool, delivery_fails: bool
+    ) -> None:
+        initialize(name=ToolName("test"))
+        previous = RuntimeConfig(protocol=Protocol.human, cache_dir=CacheRootPath(tmp_path / "cache"))
+        observed: list[RuntimeConfig] = []
+        stream = io.StringIO()
+
+        class InspectingEmitter(StreamOutputEmitter):
+            def _render(self, cells: list[LogicCell]) -> str:
+                observed.append(runtime_config.get())
+                if delivery_fails:
+                    raise OSError("Output unavailable")
+                return super()._render(cells)
+
+        for target in (
+            "llm_tool_cli.tool_cache.paths.user_cache_path",
+            "pathlib.Path.home",
+            "pathlib.Path.resolve",
+        ):
+            mocker.patch(target, side_effect=AssertionError("Diagnostics must not resolve cache paths"))
+
+        scope = runtime_config.scope(previous) if existing_runtime else nullcontext()
+        with scope:
+            with pytest.raises(OSError if delivery_fails else typer.Exit):
+                report_errors_and_exit(
+                    [InvalidArguments(reason="Invalid input")],
+                    protocol=Protocol.automation,
+                    emitter=InspectingEmitter(stream=stream),
+                )
+            if existing_runtime:
+                assert runtime_config.get() == previous
+            else:
+                assert not runtime_config.is_set()
+
+        expected_cache = previous.cache_dir if existing_runtime else CacheRootPath(Path(os.devnull))
+        assert observed == [RuntimeConfig(protocol=Protocol.automation, cache_dir=expected_cache)]
+        assert not runtime_config.is_set()
+        if delivery_fails:
+            assert not stream.getvalue()
+        else:
+            assert json.loads(stream.getvalue())["reason"] == "Invalid input"
+
     def test_errors_are_reported_without_journal_processing(self, mocker: MockerFixture) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
         failures: EnvironmentErrors = [
             InvalidArguments(reason="first\nsecond"),
             EnvironmentError(code="unavailable", message="Service unavailable"),
@@ -65,7 +116,7 @@ class TestReportErrorsAndExit:
     def test_failed_emitter_is_not_retried_when_reporting_mixed_errors(
         self, mocker: MockerFixture, reverse: bool, delivery_failure: EnvironmentError
     ) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
         processor = mocker.Mock()
         processor.process.return_value = Err([delivery_failure])
         stream = io.StringIO()
@@ -86,7 +137,7 @@ class TestReportErrorsAndExit:
     def test_ordered_cells_stream_and_highest_exit_code(  # noqa: CCR001
         self, capsys: pytest.CaptureFixture[str], protocol: Protocol, reverse: bool
     ) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
         errors: EnvironmentErrors = [
             InvalidArguments(reason="Invalid café 日本語"),
             EnvironmentError(code="unavailable", message="Service unavailable"),
@@ -124,7 +175,7 @@ class TestReportErrorsAndExit:
     def test_empty_errors_exit_successfully_without_output(
         self, capsys: pytest.CaptureFixture[str], protocol: Protocol
     ) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
 
         with pytest.raises(typer.Exit) as caught:
             report_errors_and_exit([], protocol=protocol)
@@ -145,7 +196,7 @@ class TestHandleCommandErrors:
 
     @pytest.mark.parametrize("protocol", list(Protocol))
     def test_failed_command_stops_and_reports_errors(self, protocol: Protocol) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
         app = typer.Typer()
 
         @app.command()
@@ -199,12 +250,15 @@ class TestHandleCommandErrors:
     @pytest.mark.parametrize("protocol", list(Protocol))
     @pytest.mark.parametrize("custom_stream", [False, True])
     def test_discard__failure_outputs_error_then_warnings_without_results(
-        self, capsys: pytest.CaptureFixture[str], protocol: Protocol, custom_stream: bool
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str], protocol: Protocol, custom_stream: bool
     ) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
         stream = io.StringIO()
         emitter = StreamOutputEmitter(stream=stream if custom_stream else None)
-        with runtime_config.scope(RuntimeConfig(protocol=protocol)), output.scope(emitter):
+        with (
+            runtime_config.scope(RuntimeConfig(protocol=protocol, cache_dir=CacheRootPath(tmp_path / "cache"))),
+            output.scope(emitter),
+        ):
             with pytest.raises(typer.Exit) as caught:
                 with handle_command_errors(protocol=protocol):
                     emitter.emit([ContentCell(kind="success"), WarningCell(message="keep warning")]).unwrap()

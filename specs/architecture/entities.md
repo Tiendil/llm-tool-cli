@@ -70,6 +70,11 @@ They MAY also appear in local helpers after validation or when semantic typing w
 
 Semantic types MUST belong to their concept's owner.
 
+### Validated strings
+
+Validated string types MUST apply the same normalization and validation during direct construction and Pydantic model validation.
+Model validation MUST preserve the semantic type, and serialization MUST produce its string value.
+
 ## Static typing suppressions
 
 For semantic relationships already guaranteed by validation or construction at the same boundary, code SHOULD prefer local `# type: ignore[...]` over `typing.cast(...)` or runtime no-ops such as `str(...)`, exposing checker limitations without implying conversion.

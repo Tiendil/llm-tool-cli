@@ -39,10 +39,6 @@ class ContextValueAlreadySet(InternalError):
     message_template = "Context value {name!r} is already set."
 
 
-class ToolLabelAlreadyInitialized(InternalError):
-    message_template = "Tool label is already initialized as {current!r}; cannot initialize it as {requested!r}."
-
-
 class EnvironmentError(BaseEntity):
     """An expected operational failure returned as data.
 

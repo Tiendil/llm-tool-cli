@@ -60,6 +60,7 @@ Content-cell rendering MUST support one identical payload in every protocol, wit
 - metadata.
 
 Content cells MUST support metadata-only payloads and reject all content without media type, including empty content.
+
 **Example:** Domain data can project to grouped Markdown for text and separate metadata records for automation.
 
 ## Cell formatting
@@ -72,9 +73,9 @@ Cells MUST render immutable UTF-8 bytes with terminators, without:
 - error classification.
 - exit policy.
 
-Context MUST supply zero-based position, positive total, and tool label, with `0 <= position < total`.
+Formatting MUST use a zero-based position, positive total, and the canonical tool name under Application identity in `specs/behavior/cli.md`, with `0 <= position < total`.
 Single/multiple-cell boundaries MUST be preserved.
-LLM framing MUST preserve the label exactly; human and automation output MUST omit it.
+Human and automation output MUST NOT add the tool name or a framing label.
 
 ### Human cells
 
@@ -96,7 +97,10 @@ Compact journal output MUST follow the journal formatting contract below.
 Text MUST emit kind, optional media type, then sorted metadata as strings, including `True`, `False`, and `None`.
 Nonempty content MUST follow a blank line with surrounding whitespace stripped; absent/empty content MUST omit that section.
 Cells MUST open with `--<label>-CELL <id> BEGIN--`, use `key=value` fields, and end with `--<label>-CELL <id> END--` and one newline.
+The label MUST be the tool name with its ASCII letters uppercased, without changing the name used for storage.
 Ids MUST use compact form.
+
+**Example:** The name `demo-tool` produces `--DEMO-TOOL-CELL <id> BEGIN--`.
 
 ### Automation cells
 
@@ -186,7 +190,7 @@ Flush MUST NOT repeat processing.
 
 Ordering MUST hold within immediate journals, ordinary buffers, and warnings; journals MAY overtake earlier buffered results.
 Flush MUST render the complete final batch before writing, clear consumed buffers, and flush the stream.
-Every cell in a batch MUST use the same protocol and tool label selected at the start of rendering.
+Every cell in a batch MUST use the same protocol and tool name selected at the start of rendering.
 Output MUST preserve submission order and each projection's cell order.
 Cell positions and totals MUST describe the complete flattened sequence.
 Batch text MUST preserve each cell's UTF-8 output without added separators.
@@ -200,6 +204,7 @@ All cells from an emitter MUST use one text stream selected when the emitter is 
 Submissions MUST NOT select streams.
 Writing MUST NOT add newlines, alter stream encoding, or close the stream.
 Immediate journals MUST flush that same stream.
+
 **Example:** A journal submitted between two results is output immediately.
 A subsequent warning waits until flush, which outputs both results followed by the warning.
 

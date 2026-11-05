@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 import typer
 from pytest_mock import MockerFixture
@@ -7,8 +9,10 @@ from llm_tool_cli.cli.application import create_app
 from llm_tool_cli.cli.context import CommandContext
 from llm_tool_cli.config.project import project_config
 from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
-from llm_tool_cli.core.settings import ToolLabel, initialize
+from llm_tool_cli.core.entities import ToolName
+from llm_tool_cli.core.settings import initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
+from llm_tool_cli.paths import CacheRootPath
 from llm_tool_cli.protocol import Protocol
 
 __all__ = ["isolated_settings"]
@@ -25,19 +29,28 @@ def app() -> typer.Typer:
     return application
 
 
+@pytest.mark.usefixtures("isolated_settings")
 class TestCreateApp:
     @pytest.mark.parametrize("option", ["-p", "--protocol"])
     @pytest.mark.parametrize("protocol", list(Protocol))
-    def test_nested_commands_and_repeated_invocations(self, option: str, protocol: Protocol) -> None:
+    def test_nested_commands_and_repeated_invocations(
+        self, tmp_path: Path, mocker: MockerFixture, option: str, protocol: Protocol
+    ) -> None:
+        initialize(name=ToolName("test"))
+        mocker.patch.dict("os.environ", {"HOME": str(tmp_path)})
+        default_cache = CacheRootPath(tmp_path / "default-cache")
+        mocker.patch("llm_tool_cli.tool_cache.paths.user_cache_path", return_value=default_cache)
         application = create_app(help="Inspect nested resources.")
         group = typer.Typer()
         application.add_typer(group, name="nested")
         received: list[RuntimeConfig] = []
+        cache_inputs: list[str | None] = []
 
         @group.command()
         def show(context: typer.Context) -> None:
             command = CommandContext(context)
             received.append(runtime_config.get())
+            cache_inputs.append(context.find_root().params["cache_dir"])
             assert command.config_input == context.find_root().params["config_path"]
             assert context.obj == {"other": "state"}
             assert context.find_root().meta == {}
@@ -45,7 +58,7 @@ class TestCreateApp:
         runner = CliRunner()
         explicit = runner.invoke(
             application,
-            [option, protocol.value, "--config", "~/custom.toml", "nested", "show"],
+            [option, protocol.value, "--config", "~/custom.toml", "--cache-dir", "~/custom-cache", "nested", "show"],
             obj={"other": "state"},
         )
         assert not runtime_config.is_set()
@@ -55,15 +68,21 @@ class TestCreateApp:
         assert explicit.exit_code == unspecified.exit_code == 0
         assert explicit.stdout == explicit.stderr == unspecified.stdout == unspecified.stderr == ""
         assert received == [
-            RuntimeConfig(protocol=protocol),
-            RuntimeConfig(protocol=Protocol.human),
+            RuntimeConfig(protocol=protocol, cache_dir=CacheRootPath(tmp_path / "custom-cache")),
+            RuntimeConfig(protocol=Protocol.human, cache_dir=default_cache),
         ]
+        assert cache_inputs == ["~/custom-cache", None]
 
     @pytest.mark.parametrize(
         ("failure", "exit_code"),
         [(None, 0), (typer.Exit(7), 7), (RuntimeError("command failed"), 1)],
     )
-    def test_restores_outer_runtime_after_command(self, failure: Exception | None, exit_code: int) -> None:
+    def test_restores_outer_runtime_after_command(
+        self, tmp_path: Path, mocker: MockerFixture, failure: Exception | None, exit_code: int
+    ) -> None:
+        initialize(name=ToolName("test"))
+        cache = CacheRootPath(tmp_path / "cache")
+        mocker.patch("llm_tool_cli.tool_cache.paths.user_cache_path", return_value=cache)
         application = create_app(help="Inspect scoped options.")
         received: list[RuntimeConfig] = []
 
@@ -75,12 +94,12 @@ class TestCreateApp:
             if failure is not None:
                 raise failure
 
-        outer = RuntimeConfig(protocol=Protocol.automation)
+        outer = RuntimeConfig(protocol=Protocol.automation, cache_dir=CacheRootPath(tmp_path / "outer"))
         with runtime_config.scope(outer):
             result = CliRunner().invoke(application, ["show"])
 
             assert result.exit_code == exit_code
-            assert received == [RuntimeConfig(protocol=Protocol.human)]
+            assert received == [RuntimeConfig(protocol=Protocol.human, cache_dir=cache)]
             assert runtime_config.get() == outer
 
         assert not runtime_config.is_set()
@@ -96,7 +115,7 @@ class TestCreateApp:
         assert not runtime_config.is_set()
 
     def test_invalid_protocol_stops_execution(self, app: typer.Typer, isolated_settings: None) -> None:
-        initialize(label=ToolLabel("TEST"))
+        initialize(name=ToolName("test"))
 
         result = CliRunner().invoke(app, ["--protocol", "invalid", "show"])
 
@@ -108,7 +127,7 @@ class TestCreateApp:
         assert not runtime_config.is_set()
         assert not project_config.is_set()
 
-    @pytest.mark.parametrize("option", ["-p", "--protocol", "--config"])
+    @pytest.mark.parametrize("option", ["-p", "--protocol", "--config", "--cache-dir"])
     def test_missing_option_value(self, app: typer.Typer, option: str) -> None:
         result = CliRunner().invoke(app, [option])
 
@@ -131,6 +150,7 @@ class TestCreateApp:
             assert "--protocol" in result.stdout
             assert "-p" in result.stdout
             assert "--config" in result.stdout
+            assert "--cache-dir" in result.stdout
             assert "--show-completion" in result.stdout
             assert "--install-completion" in result.stdout
 

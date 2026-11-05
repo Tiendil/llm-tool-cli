@@ -54,6 +54,7 @@ Execution MUST use Docker-backed helpers: normally `./bin/dev-tests.sh`; targete
 Tests SHOULD live in the nearest owning package's `tests` subpackage, retaining nested component ownership when clearer.
 Files MUST use `test_<module>.py`.
 Integration tests MAY belong to the exercised public boundary; CLI tests SHOULD belong to their CLI package.
+
 **Example:** `example/paths.py` maps to `example/tests/test_paths.py`; no example module is required.
 
 Reusable test utilities SHOULD be owned as follows:

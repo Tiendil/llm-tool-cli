@@ -3,6 +3,7 @@ import uuid
 import pydantic
 import pytest
 
+from llm_tool_cli.core.entities import ToolName
 from llm_tool_cli.protocol.errors import ContentWithoutMediaType
 from llm_tool_cli.protocol.output_cells import HumanOutputCell
 from llm_tool_cli.protocol.output_cells.base import MetaValue, RenderContext, to_meta_value
@@ -77,10 +78,10 @@ class TestRenderContext:
     @pytest.mark.parametrize(("index", "total"), [(-1, 1), (0, 0), (1, 1), (3, 2)])
     def test_validate_position__rejects_invalid_sequence_position(self, index: int, total: int) -> None:
         with pytest.raises(pydantic.ValidationError):
-            RenderContext(index=index, total=total, tool_label="TOOL")
+            RenderContext(index=index, total=total, tool_name=ToolName("tool"))
 
     @pytest.mark.parametrize(("index", "total"), [(0, 1), (0, 2), (1, 2)])
     def test_validate_position__accepts_sequence_boundaries(self, index: int, total: int) -> None:
-        context = RenderContext(index=index, total=total, tool_label="TOOL")
+        context = RenderContext(index=index, total=total, tool_name=ToolName("tool"))
 
         assert (context.index, context.total) == (index, total)

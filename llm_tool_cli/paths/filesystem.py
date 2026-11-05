@@ -9,6 +9,7 @@ from llm_tool_cli.paths.errors import InvalidProjectPath, PathResolutionFailed
 from llm_tool_cli.paths.normalization import ProjectPathId, normalize_project_path_id, project_path_parts
 
 PathInput = NewType("PathInput", Path)
+CacheRootPath = NewType("CacheRootPath", Path)
 ProjectConfigPath = NewType("ProjectConfigPath", Path)
 ProjectRootPath = NewType("ProjectRootPath", Path)
 RelativeProjectPath = NewType("RelativeProjectPath", Path)

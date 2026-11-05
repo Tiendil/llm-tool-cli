@@ -70,6 +70,7 @@ Required selection with no match MUST return a missing-configuration diagnostic,
 
 Initialization MUST resolve an explicit path or the default filename in supplied cwd.
 Selection MUST NOT search ancestors, read, or create.
+
 **Example:** Child-directory initialization selects the child's file even when ordinary loading would discover a parent's configuration.
 
 ## Configuration loading

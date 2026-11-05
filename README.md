@@ -22,12 +22,14 @@ At its current stage, this is a personal project of [Tiendil](https://tiendil.or
 - **Project filesystem operations** — Use a common interpretation of project paths and file selection.
 - **Journaling and diagnostics** — Report progress and problems through a common output system.
 - **Scoped application resources** — Make resources available throughout the parts of an invocation that need them.
+- **Tool storage and coordination** — Reuse disposable caches, persistent per-user state directories, and exclusive process locks across projects.
 
 The library also provides reusable subcommands for applications to register:
 
 - `init` — Create project configuration from the application's template.
 - `version` — Print the installed version of the application's distribution.
 - `skill [DOCUMENT]` — Print packaged usage or other skill documentation supplied by the application.
+- `clean` — Remove owned disposable entries from an application-supplied cache.
 
 ## Output protocols
 
@@ -93,7 +95,7 @@ Values can still be passed explicitly as function arguments.
 
 Shared configuration distinguishes three lifetimes:
 
-- **Application identity — `StaticConfig`.** Initialized before CLI parsing, it contains the tool label and optional default configuration filename.
+- **Application identity — `StaticConfig`.** Initialized before CLI parsing, it contains one canonical tool name and an optional default configuration filename.
 - **Command invocation — `RuntimeConfig`.** Contains the effective output protocol.
   The shared command context establishes it together with an independently bound output emitter.
 - **Selected project — `ProjectConfig`.** Contains the selected configuration path and the project directory derived from its parent.
@@ -159,11 +161,12 @@ import typer
 
 from llm_tool_cli.cli.application import create_app
 from llm_tool_cli.cli.context import command_context
-from llm_tool_cli.core.settings import ToolLabel, initialize
+from llm_tool_cli.core.entities import ToolName
+from llm_tool_cli.core.settings import initialize
 from llm_tool_cli.output import output
 from llm_tool_cli.protocol.logic_cells import ContentCell
 
-initialize(label=ToolLabel("DEMO"))
+initialize(name=ToolName("demo"))
 app = create_app(help="A greeting tool built with llm-tool-cli.")
 
 
@@ -247,5 +250,10 @@ Use these extension points to adapt the library to your tool:
 - **Journal delivery** — Use `output.get().journal("Starting work").unwrap()` to report explicit progress.
   A journal-cell factory can add application context, and a journal processor can deliver records externally; the default processor performs no external delivery.
   [Donna](https://github.com/Tiendil/donna) supplies a factory that adds workflow execution context to journal cells.
+- **Tool storage and coordination** — `ToolCache` coordinates access to disposable entries and cleans up only owned data.
+  `ToolStateDirectory` provides persistent per-user state locations shared across projects, contained paths, and named locks.
+  Applications own cache selection, payload semantics, and operation policies and lifetimes.
+  Process-coordination files are separate from project configuration and dependency lockfiles; their existence does not indicate a held lock.
+  See the [storage boundaries](specs/architecture/modules_layout.md#cache-storage), [location rules](specs/behavior/paths.md#tool-storage-locations), and [cache-clean command contract](specs/behavior/cli.md#cache-cleanup-command).
 
 See the [specification index](specs/intro.md) for the complete contracts, including [CLI support](specs/behavior/cli.md) and [project paths](specs/behavior/paths.md).

@@ -5,11 +5,12 @@ import sys
 import pytest
 from pytest_mock import MockerFixture
 
-from llm_tool_cli.config.runtime import RuntimeConfig, runtime_config
+from llm_tool_cli.config.runtime import runtime_config
 from llm_tool_cli.config.tests.fixtures import project_static_settings, runtime_settings
+from llm_tool_cli.core.entities import ToolName
 from llm_tool_cli.core.errors import ContextValueNotSet, EnvironmentError
 from llm_tool_cli.core.result import Err, Ok, Result
-from llm_tool_cli.core.settings import StaticConfig, ToolLabel, static_config
+from llm_tool_cli.core.settings import StaticConfig, static_config
 from llm_tool_cli.core.tests.fixtures import isolated_settings
 from llm_tool_cli.output import StreamOutputEmitter
 from llm_tool_cli.protocol import Protocol
@@ -37,7 +38,7 @@ class RecordingProcessor:
 
 class PositionedOutputCell(OutputCell):
     def render(self, context: RenderContext) -> bytes:
-        return f"{context.tool_label} {context.index}/{context.total}: {self.content}\n".encode()
+        return f"{context.tool_name} {context.index}/{context.total}: {self.content}\n".encode()
 
 
 class PositionedLogicCell(LogicCell):
@@ -64,7 +65,7 @@ class TestStreamOutputEmitter:
         stream = io.StringIO()
         processor = RecordingProcessor()
         emitter = StreamOutputEmitter(stream=stream, journal_processor=processor)
-        with runtime_config.scope(RuntimeConfig(protocol=protocol)):
+        with runtime_config.scope(runtime_config.get().replace(protocol=protocol)):
             emitter.journal("starting").unwrap()
         assert len(processor.records) == 1
         assert processor.records[0].message == "starting"
@@ -109,7 +110,7 @@ class TestStreamOutputEmitter:
         processor = RecordingProcessor(Err(errors))
         stream = io.StringIO()
         emitter = StreamOutputEmitter(stream=stream, journal_processor=processor)
-        with runtime_config.scope(RuntimeConfig(protocol=Protocol.automation)):
+        with runtime_config.scope(runtime_config.get().replace(protocol=Protocol.automation)):
             assert emitter.journal("failed event").unwrap_err() == errors
             emitter.discard()
             emitter.flush()
@@ -173,7 +174,7 @@ class TestStreamOutputEmitter:
         processor = RecordingProcessor()
         emitter = StreamOutputEmitter(stream=stream, journal_processor=processor)
         event = JournalCell(message="progress")
-        with runtime_config.scope(RuntimeConfig(protocol=protocol)):
+        with runtime_config.scope(runtime_config.get().replace(protocol=protocol)):
             emitter.emit(
                 [
                     WarningCell(message="warning"),
@@ -229,7 +230,7 @@ class TestStreamOutputEmitter:
         first = ContentCell(kind="result", media_type="text/plain", content="first")
         event = JournalCell(message="progress")
         last = first.replace(content="last")
-        with runtime_config.scope(RuntimeConfig(protocol=Protocol.automation)):
+        with runtime_config.scope(runtime_config.get().replace(protocol=Protocol.automation)):
             emitter.emit(
                 [WarningCell(message="warning one"), first, event, last, WarningCell(message="warning two")]
             ).unwrap()
@@ -287,8 +288,8 @@ class TestStreamOutputEmitter:
     @pytest.mark.parametrize(
         ("items", "expected"),
         [
-            ([("café", "second"), (), ("third",)], "  TOOL   0/3: café\n  TOOL   1/3: second\n  TOOL   2/3: third\n"),
-            ([("only",)], "  TOOL   0/1: only\n"),
+            ([("café", "second"), (), ("third",)], "tool 0/3: café\ntool 1/3: second\ntool 2/3: third\n"),
+            ([("only",)], "tool 0/1: only\n"),
             ([()], ""),
             ([], ""),
         ],
@@ -298,14 +299,14 @@ class TestStreamOutputEmitter:
     ) -> None:
         emitter = StreamOutputEmitter()
         emitter.emit([PositionedLogicCell(items=values) for values in items]).unwrap()
-        with static_config.scope(StaticConfig(tool_label=ToolLabel("  TOOL  "))):
+        with static_config.scope(StaticConfig(tool_name=ToolName(" tool "))):
             emitter.flush()
         assert capsys.readouterr() == (expected, "")
 
     def test_flush__selects_protocol_at_delivery(self, capsys: pytest.CaptureFixture[str]) -> None:
         emitter = StreamOutputEmitter()
         emitter.emit([PositionedLogicCell(items=("hidden",))]).unwrap()
-        with runtime_config.scope(RuntimeConfig(protocol=Protocol.llm)):
+        with runtime_config.scope(runtime_config.get().replace(protocol=Protocol.llm)):
             emitter.flush()
         assert capsys.readouterr() == ("", "")
 
@@ -318,8 +319,8 @@ class TestStreamOutputEmitter:
         emitter = StreamOutputEmitter(stream=stream if custom_stream else None)
         emitter.emit([ContentCell(kind="message", media_type="text/plain", content="café 日本語")]).unwrap()
         with (
-            runtime_config.scope(RuntimeConfig(protocol=protocol)),
-            static_config.scope(StaticConfig(tool_label=ToolLabel("  TOOL  "))),
+            runtime_config.scope(runtime_config.get().replace(protocol=protocol)),
+            static_config.scope(StaticConfig(tool_name=ToolName(" tool "))),
         ):
             emitter.flush()
         captured = capsys.readouterr()
@@ -330,18 +331,18 @@ class TestStreamOutputEmitter:
         if protocol == Protocol.human:
             assert text == "café 日本語\n\n"
         else:
-            assert text.startswith("--  TOOL  -CELL ")
+            assert text.startswith("--TOOL-CELL ")
             assert text.endswith(" END--\n")
 
-    @pytest.mark.parametrize("label", ["FIRST", "SECOND"])
-    def test_flush__automation_preserves_cells_and_ignores_label(self, label: str) -> None:
+    @pytest.mark.parametrize("name", ["first", "second"])
+    def test_flush__automation_preserves_cells_and_ignores_name(self, name: str) -> None:
         stream = io.StringIO()
         emitter = StreamOutputEmitter(stream=stream)
         cell = ContentCell(kind="message", media_type="text/plain", content="café 日本語", meta={"type": "message"})
         original = cell.model_dump()
         with (
-            runtime_config.scope(RuntimeConfig(protocol=Protocol.automation)),
-            static_config.scope(StaticConfig(tool_label=ToolLabel(label))),
+            runtime_config.scope(runtime_config.get().replace(protocol=Protocol.automation)),
+            static_config.scope(StaticConfig(tool_name=ToolName(name))),
         ):
             emitter.emit([cell]).unwrap()
             emitter.flush()
@@ -361,7 +362,7 @@ class TestStreamOutputEmitter:
                 EnvironmentErrorCell(error=EnvironmentError(code="second", message="Second")),
             ]
         ).unwrap()
-        with runtime_config.scope(RuntimeConfig(protocol=Protocol.automation)):
+        with runtime_config.scope(runtime_config.get().replace(protocol=Protocol.automation)):
             emitter.flush()
         records = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
         assert records[0].pop("id") != records[1].pop("id")

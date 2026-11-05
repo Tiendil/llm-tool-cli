@@ -10,7 +10,8 @@ from typer.testing import CliRunner
 
 from llm_tool_cli.cli.application import create_app
 from llm_tool_cli.cli.commands.version import register_version_command
-from llm_tool_cli.core.settings import ToolLabel, initialize
+from llm_tool_cli.core.entities import ToolName
+from llm_tool_cli.core.settings import initialize
 from llm_tool_cli.core.tests.fixtures import isolated_settings
 
 __all__ = ["isolated_settings"]
@@ -18,7 +19,7 @@ __all__ = ["isolated_settings"]
 
 @pytest.fixture
 def version_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, isolated_settings: None) -> typer.Typer:
-    initialize(label=ToolLabel("TEST"))
+    initialize(name=ToolName("test"))
     distribution = tmp_path / "sample_distribution-9.8.7.dist-info"
     distribution.mkdir()
     (distribution / "METADATA").write_text(

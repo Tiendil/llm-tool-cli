@@ -1,6 +1,6 @@
 import typer
 
-from llm_tool_cli.cli.options import ConfigOption, ProtocolOption
+from llm_tool_cli.cli.options import CacheDirOption, ConfigOption, ProtocolOption
 
 
 def create_app(*, help: str) -> typer.Typer:
@@ -14,16 +14,17 @@ def create_app(*, help: str) -> typer.Typer:
     def initialize(
         protocol: ProtocolOption = None,
         config_path: ConfigOption = None,
+        cache_dir: CacheDirOption = None,
     ) -> None:
         """Declare global options for command-specific runtime setup."""
-        # Typer uses this callback's signature to register --protocol/-p and
-        # --config on the root command group. Before calling it, the framework
+        # Typer uses this callback's signature to register --protocol/-p,
+        # --config, and --cache-dir on the root command group. Before calling it, the framework
         # parses these options and stores them in the root context's params;
         # this function does not need to store or forward the values itself.
         # CommandContext reads them through context.find_root().params when the
         # selected command starts. It can then choose the command's default
-        # protocol and bind RuntimeConfig, while leaving configuration path
-        # resolution and loading to commands that actually need a workspace.
+        # protocol and bind RuntimeConfig, while leaving configuration and cache
+        # path resolution to commands that actually need those resources.
         # The callback therefore intentionally performs no initialization.
         # Removing it would remove the global option declarations and could
         # make a single-command application lose its command-group interface.

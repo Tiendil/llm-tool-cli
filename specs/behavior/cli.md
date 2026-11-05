@@ -6,7 +6,7 @@ This document describes shared command-line application support.
 
 ## Scope
 
-Reusable application setup and CLI behavior; consumer command execution, configuration schemas/loading mechanics, and cell layouts are out of scope.
+Reusable application setup and shared command behavior at the caller and CLI boundaries; consumer operation policy, configuration schemas/loading mechanics, and general cell formatting are out of scope.
 
 ## Application setup
 
@@ -21,12 +21,15 @@ Completion MUST include registered commands, options, and document choices.
 
 ## Application identity
 
-Immutable static identity MUST be initialized before parsing/shared rendering, preserving exact labels including whitespace/empty text.
+Immutable static identity MUST be initialized before parsing/shared rendering using one canonical tool name.
+The canonical name MUST supply both per-tool storage names and rendering identity.
+Cell labels MUST derive from that name under `specs/behavior/protocol.md` rather than be configured independently.
 It MUST remain separate from invocation/workspace settings.
 Unset access MUST raise an internal exception.
 An optional static default filename MUST be required for project setup, not parsing/rendering.
-Identical initialization MUST succeed unchanged; conflicting labels or filenames MUST raise internal errors without replacing settings.
-**Example:** Invalid-protocol output can use the label before the root callback runs.
+Identical initialization MUST succeed unchanged; conflicting names or filenames MUST raise internal errors without replacing settings.
+
+**Example:** Initializing the name `demo` supplies `demo` for storage and the derived `DEMO` label for invalid-protocol output before the root callback runs.
 
 ## Global options
 
@@ -46,7 +49,15 @@ Global `--config PATH` MUST precede the subcommand and parse filesystem paths wi
 Configuration-dependent operations MUST validate paths and report their diagnostics when used.
 Unusable paths MUST NOT prevent configuration-independent commands.
 Missing option values MUST remain parsing errors.
+
 **Example:** A directory reaches configuration loading for diagnosis but does not prevent a version command.
+
+## Cache directory option
+
+Global `--cache-dir DIRECTORY` MUST precede the subcommand and retain an optional filesystem path without resolving it or accessing cache storage during parsing.
+Missing option values MUST remain parsing errors.
+Command setup MUST select the effective root under Cache roots in `specs/behavior/paths.md` using the supplied override, canonical tool name, and invocation working directory.
+Selecting the root MUST NOT create cache storage or acquire cache locks.
 
 ## Protocol option
 
@@ -74,24 +85,28 @@ Unadapted framework parsing MUST retain its diagnostics.
 
 ## Invocation context
 
-Command setup MUST expose a complete effective protocol without requiring a framework context or an active project.
+Command setup MUST expose the effective protocol and a resolved absolute cache location without requiring callers to access a framework context or an active project.
+Every executing command MUST receive the explicit cache override or the default location; there MUST be no unprepared cache-location state within an active invocation.
+Failed cache-location selection MUST prevent command execution, preserve the caller's runtime and output state, and report unchanged diagnostics under the selected protocol.
+The cache location MUST remain available through execution and output delivery without creating storage merely by exposing the location.
 An active project MUST identify an absolute configuration path and its parent root.
 Project preparation MUST follow the Project scopes contract in `specs/behavior/config.md`, preserving the selected project through dependent execution and output.
 Projectless commands MUST NOT establish an active project even with `--config`.
 
 Each command MUST start with fresh output state without changing unrelated caller context.
-Command closure MUST restore the caller's preceding protocol, project, and output state, including absence, after success, failure, or early exit.
-Preparing command support without entering execution MUST NOT resolve paths, load workspaces, or emit.
+Command closure MUST restore the caller's preceding runtime settings, project, and output state, including absence, after success, failure, or early exit.
+Application and command registration MUST NOT resolve paths, load workspaces, or emit.
 Output MUST default to stdout and honor the command's effective protocol throughout execution.
 
 Successful completion MUST deliver results then warnings before command closure.
-Skill, version, and init MUST follow the same completion and failure behavior as custom commands.
+Every shared command MUST follow the same completion and failure behavior as custom commands.
 Error reporting MUST NOT require consumer runtime resources to remain active.
 
 ## Protocol selection
 
 Explicit protocol MUST win; otherwise command named `skill` MUST use LLM, all others human.
 The effective protocol MUST be available to the caller before execution.
+
 **Example:** Skill defaults to LLM, version to human; explicit human overrides skill's default.
 
 ## Skill command
@@ -133,6 +148,33 @@ Success MUST emit one creation cell with the active path under the selected prot
 Expected failures MUST follow Command error handling below without success output; unexpected exceptions MUST propagate.
 Application-specific runtime preparation MUST NOT be required.
 
+## Cache cleanup command
+
+Registration MUST expose one `clean` command directly on the supplied application without adding a command group.
+Callers MUST be able to supply command help and select the cache using the invocation's effective settings.
+The following MUST NOT prepare or access the cache:
+
+- registration.
+- help.
+- completion.
+- rejected command arguments.
+
+The command MUST accept no positional arguments or command-specific options and MUST NOT require confirmation.
+Execution MUST clean the selected cache without loading or activating a project.
+Storage effects MUST follow Cleanup in `specs/behavior/cache.md` for the caller-selected cache.
+Resources supplied for the invocation MUST remain available through result delivery and be released at command closure, including failure paths.
+Expected cache-selection or cleanup failures MUST follow Command error handling below without success output; unexpected exceptions MUST propagate.
+
+Success MUST emit one metadata-only cell with kind `cache`, including for an absent or already empty cache.
+Its metadata MUST contain:
+
+- `type` — `cache`.
+- `operation` — `clean`.
+- `cache_dir` — the effective absolute cache-root path.
+- `outcome` — `cleaned` when owned entries were removed, or `unchanged` otherwise.
+
+Every protocol MUST carry the same payload under Cell formatting in `specs/behavior/protocol.md`; automation `content` MUST be null.
+
 ## Command error handling
 
 Command error reporting MUST use an already selected protocol and accept only valid failed-result payloads.
@@ -148,11 +190,13 @@ Expected failure MUST suppress pending ordinary results, report errors, then del
 Unexpected exceptions/framework exits MUST NOT flush pending ordinary results.
 
 Explicit error-list reporting MUST offer the same stream/exit behavior, including before command execution.
+Early reporting MUST NOT require cache-location selection or cache access.
+Reporting MUST retain any existing effective cache location and restore the caller's runtime settings, including absence, after delivery or a delivery failure.
 Early validation MUST use a supplied fallback protocol without consuming another command's pending output.
 Command failure MUST preserve that command's pending warnings.
 Empty error lists MUST emit nothing and terminate according to the Exit statuses contract below.
 
-Skill, version, and init MUST follow this error-handling contract.
+Every shared command MUST follow this error-handling contract.
 
 ## Exit statuses
 

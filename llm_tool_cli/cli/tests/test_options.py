@@ -6,6 +6,7 @@ from typer.testing import CliRunner
 
 from llm_tool_cli.cli.options import ConfigOption, ProtocolOption
 from llm_tool_cli.core import settings
+from llm_tool_cli.core.entities import ToolName
 from llm_tool_cli.core.tests.fixtures import isolated_settings
 from llm_tool_cli.paths import ProjectConfigPath
 from llm_tool_cli.protocol import Protocol
@@ -15,7 +16,7 @@ __all__ = ["isolated_settings"]
 
 @pytest.fixture
 def protocol_app(isolated_settings: None) -> typer.Typer:
-    settings.initialize(label=settings.ToolLabel("TEST"))
+    settings.initialize(name=ToolName("test"))
     app = typer.Typer()
 
     @app.callback()

@@ -1,13 +1,13 @@
-# Project paths
+# Filesystem paths
 
 ## Goal of the document
 
-This document describes the shared contract for interpreting project paths.
+This document describes shared path interpretation and filesystem-location selection.
 
 ## Scope
 
-This specification applies to project-path concepts owned by the library.
-Application-specific artifact semantics, template substitution, and rule evaluation are out of scope.
+This specification applies to lexical path values and filesystem locations exposed by the library.
+Application-specific artifact semantics, storage lifecycle, and process coordination are out of scope.
 
 ## Identifiers
 
@@ -31,6 +31,15 @@ The check MUST NOT access the filesystem or depend on the current working direct
 It MUST NOT impose application-specific existence or filename-extension requirements.
 
 **Example:** `@/a/b` passes the check, while `@/a/../b` fails even though normalization can produce the valid identifier `@/b`.
+
+## Standalone segments
+
+Standalone path segments MUST represent one nonempty path component.
+
+Accepting a standalone segment MUST NOT access the filesystem, expand home markers, or establish existence or containment.
+Accepted segments MUST serialize as their string values.
+
+Standalone segment validation MUST NOT alter canonical identifier normalization or component extraction, which preserve literal segment text under their own contracts.
 
 ## Identifier components
 
@@ -166,7 +175,6 @@ Conversion MUST NOT access the filesystem or depend on the current working direc
 It MUST support files, directories, and missing targets without imposing existence or filename-extension requirements.
 
 **Example:** A resolved path `/project/notes/Project Plan.md` under `/project` converts to `@/notes/Project Plan.md`.
-The supplied path MUST already satisfy the prohibition on symbolic links below the project root.
 
 ## Glob patterns
 
@@ -246,6 +254,30 @@ Root resolution failures MUST take precedence over target resolution and contain
 Failures MUST retain the diagnostics of the failed resolution or containment operation.
 
 **Example:** With the working directory `/workspace`, a filesystem path `project/notes.md` and root `project` produce `@/notes.md`, while the path `notes.md` is outside that root.
+
+## Tool storage locations
+
+Cache and state location selection MUST accept an explicit canonical tool name under Application identity in `specs/behavior/cli.md`, independently of an active project or invocation.
+Selection MUST produce an absolute resolved root without creating directories or requiring the root to exist.
+Cache and state locations MUST remain independent so cache selection and cleanup cannot relocate project coordination.
+
+### Cache roots
+
+An explicit cache-root override MUST take precedence over platform discovery.
+Home markers MUST expand, and relative overrides MUST resolve against the caller-supplied working directory.
+An unusable explicit override MUST fail without fallback.
+Without an override, selection MUST use the platform's per-user cache location for the supplied tool name.
+Unavailable default discovery MAY fall back to `~/.cache/<tool-name>`.
+Failures after selecting a location MUST NOT cause another location to be selected.
+
+### State roots
+
+State-location selection MUST use the platform's per-user application state directory for the supplied tool name.
+Unavailable or non-absolute platform locations MUST fail without selecting an alternative coordination location.
+Child-path resolution MUST accept only relative filesystem paths and enforce Filesystem containment above against the selected state root.
+It MUST NOT create directories or require the child to exist.
+
+**Example:** Resolving a missing child such as `projects/demo/operation.lock` identifies a contained location without creating it; a child that traverses a symlink below the state root is rejected.
 
 ## Errors
 
