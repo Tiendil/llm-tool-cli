@@ -250,11 +250,10 @@ Use these extension points to adapt the library to your tool:
 - **Journal delivery** — Use `output.get().journal("Starting work").unwrap()` to report explicit progress.
   A journal-cell factory can add application context, and a journal processor can deliver records externally; the default processor performs no external delivery.
   [Donna](https://github.com/Tiendil/donna) supplies a factory that adds workflow execution context to journal cells.
-- **Tool storage and coordination** — `ToolCache` manages disposable entries and coordinates access and cleanup while preserving unrelated data.
-  Your application selects the cache and defines what its payloads mean.
-  `ToolStateDirectory` locates persistent per-user state shared across projects and provides contained paths and named locks; your application chooses which operations use them and how long they remain held.
-  Process locks coordinate running operations independently of project configuration or persisted dependency lockfiles.
-  Coordination files remain after release, so their existence does not mean a lock is held.
+- **Tool storage and coordination** — `ToolCache` coordinates access to disposable entries and cleans up only owned data.
+  `ToolStateDirectory` provides persistent per-user state locations shared across projects, contained paths, and named locks.
+  Applications own cache selection, payload semantics, and operation policies and lifetimes.
+  Process-coordination files are separate from project configuration and dependency lockfiles; their existence does not indicate a held lock.
   See the [storage boundaries](specs/architecture/modules_layout.md#cache-storage), [location rules](specs/behavior/paths.md#tool-storage-locations), and [cache-clean command contract](specs/behavior/cli.md#cache-cleanup-command).
 
 See the [specification index](specs/intro.md) for the complete contracts, including [CLI support](specs/behavior/cli.md) and [project paths](specs/behavior/paths.md).
